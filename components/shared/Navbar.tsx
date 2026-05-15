@@ -1,59 +1,145 @@
 'use client';
 
-import React from 'react';
-import { Plane, User } from 'lucide-react';
+import React, { useState } from 'react';
+import { Plane, User, Menu, X, Upload } from 'lucide-react';
 import Link from 'next/link';
 import { useAuth } from '@/lib/contexts/AuthContext';
 import { supabase } from '@/lib/utils/supabase';
+import { AnimatePresence, motion } from 'framer-motion';
 
 const Navbar = () => {
   const { user, setUser, openAuthModal } = useAuth();
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
     setUser(null);
   };
 
+  const scrollToTop = () => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   return (
     <nav className="fixed top-0 w-full bg-bg/80 backdrop-blur-md border-b border-border z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-20">
-          <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-            <div className="bg-accent p-2 rounded-lg">
-              <Plane className="w-6 h-6 text-accent-fg" />
+          <Link 
+            href="/" 
+            className="flex items-center gap-2 hover:opacity-80 transition-opacity"
+          >
+            {/* Abstract Runway Logo */}
+            <div className="flex flex-col gap-1">
+              <div className="w-6 h-1.5 bg-accent/30" />
+              <div className="w-6 h-3 bg-accent/60" />
+              <div className="w-6 h-6 bg-accent" />
             </div>
-            <span className="text-2xl font-bold tracking-tight text-accent">Cemrosta</span>
+            <span className="text-2xl font-bold tracking-tight text-text">Cemrosta</span>
           </Link>
-          <div className="hidden md:flex items-center gap-8 font-medium text-sm text-text-muted">
-            <Link href="/" className="hover:text-text transition-colors">Home</Link>
-            <Link href="/marketplace" className="hover:text-text transition-colors">Marketplace</Link>
-            {user && (
-              <Link href="/profile" className="flex items-center gap-2 hover:text-text transition-colors group">
-                <div className="p-1.5 rounded-full bg-surface group-hover:bg-accent/10 group-hover:text-accent transition-colors">
-                  <User size={16} />
-                </div>
-                My Profile
-              </Link>
-            )}
-            
+
+          {/* Desktop Nav */}
+          <div className="hidden md:flex items-center gap-4 font-medium text-sm text-text-muted">
             {user ? (
-              <button 
-                onClick={handleSignOut}
-                className="bg-text text-bg px-6 py-2.5 rounded-full hover:bg-text/90 transition-all active:scale-95 shadow-sm font-bold"
-              >
-                Sign Out
-              </button>
+              <>
+                <Link href="/profile" className="flex items-center gap-2 hover:text-text transition-colors group px-4 py-2">
+                  <div className="p-1.5 rounded-full bg-surface group-hover:bg-accent/10 group-hover:text-accent transition-colors">
+                    <User size={16} />
+                  </div>
+                  My Passport
+                </Link>
+                <button 
+                  onClick={handleSignOut}
+                  className="bg-surface text-text border border-border px-6 py-2.5 rounded-xl hover:bg-surface-2 transition-all active:scale-95 font-bold"
+                >
+                  Sign Out
+                </button>
+              </>
             ) : (
-              <button 
-                onClick={() => openAuthModal('login')}
-                className="bg-accent text-accent-fg px-6 py-2.5 rounded-full hover:bg-accent-hover transition-all active:scale-95 shadow-sm font-bold"
-              >
-                Sign In
-              </button>
+              <>
+                <button 
+                  onClick={() => openAuthModal('login')}
+                  className="text-text-muted hover:text-text px-4 py-2.5 transition-colors font-bold"
+                >
+                  Sign In
+                </button>
+                <button 
+                  onClick={scrollToTop}
+                  className="bg-accent text-accent-fg px-6 py-2.5 rounded-xl hover:bg-accent-hover transition-all active:scale-95 shadow-lg shadow-accent/20 font-bold flex items-center gap-2"
+                >
+                  <Upload size={16} strokeWidth={3} />
+                  Upload Roster
+                </button>
+              </>
             )}
+          </div>
+
+          {/* Mobile Menu Toggle */}
+          <div className="md:hidden">
+            <button 
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              className="p-2 text-text-muted hover:text-text transition-colors"
+            >
+              {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+            </button>
           </div>
         </div>
       </div>
+
+      {/* Mobile Menu Overlay */}
+      <AnimatePresence>
+        {isMobileMenuOpen && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="absolute top-20 left-0 w-full bg-bg border-b border-border md:hidden p-4 space-y-4"
+          >
+            {user ? (
+              <>
+                <Link 
+                  href="/profile" 
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="flex items-center gap-3 w-full px-4 py-4 text-text font-bold bg-surface rounded-2xl"
+                >
+                  <User size={20} />
+                  My Passport
+                </Link>
+                <button 
+                  onClick={() => {
+                    handleSignOut();
+                    setIsMobileMenuOpen(false);
+                  }}
+                  className="w-full px-4 py-4 text-text-muted font-bold text-left"
+                >
+                  Sign Out
+                </button>
+              </>
+            ) : (
+              <>
+                <button 
+                  onClick={() => {
+                    scrollToTop();
+                    setIsMobileMenuOpen(false);
+                  }}
+                  className="flex items-center gap-3 w-full px-4 py-4 text-accent-fg font-bold bg-accent rounded-2xl"
+                >
+                  <Upload size={20} strokeWidth={3} />
+                  Upload Roster
+                </button>
+                <button 
+                  onClick={() => {
+                    openAuthModal('login');
+                    setIsMobileMenuOpen(false);
+                  }}
+                  className="w-full px-4 py-4 text-text font-bold text-left"
+                >
+                  Sign In
+                </button>
+              </>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </nav>
   );
 };

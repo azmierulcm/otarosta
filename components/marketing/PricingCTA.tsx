@@ -2,29 +2,41 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
+import { Upload } from 'lucide-react';
 
 const PricingCTA = () => {
+  const scrollToTop = () => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   return (
-    <section className="py-32 px-4 bg-bg text-center">
-      <div className="max-w-3xl mx-auto">
+    <section className="py-40 px-4 bg-bg relative overflow-hidden">
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-accent/10 blur-[100px] rounded-full -z-10" />
+      
+      <div className="max-w-4xl mx-auto text-center">
         <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          whileInView={{ opacity: 1, scale: 1 }}
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          className="bg-gray-900 rounded-[3rem] p-16 text-white relative overflow-hidden"
         >
-          {/* Subtle light effect */}
-          <div className="absolute top-0 right-0 w-64 h-64 bg-accent/20 blur-[100px] -mr-32 -mt-32 rounded-full" />
-          
-          <h2 className="text-5xl md:text-6xl font-black mb-6 tracking-tighter">
-            Ready for takeoff.
+          <h2 className="text-5xl md:text-8xl font-bold tracking-tighter text-text mb-8">
+            Ready for <br /> <span className="text-accent italic font-serif font-light">takeoff.</span>
           </h2>
-          <p className="text-xl text-text-subtle font-medium mb-12 max-w-md mx-auto">
-            Join the crew who have ditched the manual data entry.
+          <p className="text-xl text-text-muted mb-12 max-w-2xl mx-auto font-medium">
+            Join the Malaysia Airlines crew members already using Cemrosta to own their flight data.
           </p>
-          <button className="bg-accent text-white px-12 py-5 rounded-2xl text-xl font-black shadow-2xl shadow-accent/20 hover:scale-105 active:scale-95 transition-all">
-            Create Your Free Profile →
+          
+          <button 
+            onClick={scrollToTop}
+            className="bg-accent text-accent-fg px-12 py-6 rounded-[2rem] text-xl font-bold shadow-2xl shadow-accent/20 hover:scale-[1.02] hover:bg-accent-hover transition-all active:scale-95 flex items-center gap-3 mx-auto"
+          >
+            <Upload size={24} strokeWidth={3} />
+            Upload your roster
           </button>
+
+          <div className="mt-12 text-[10px] font-bold text-text-subtle uppercase tracking-[0.4em] font-mono">
+            // FREE FOREVER FOR INDIVIDUAL CREW
+          </div>
         </motion.div>
       </div>
     </section>
