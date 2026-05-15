@@ -5,9 +5,9 @@ export const runtime = 'edge';
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { route: string } }
+  { params }: { params: Promise<{ route: string }> }
 ) {
-  const { route } = params;
+  const { route } = await params;
 
   // approved visual tokens
   const bg = '#0A0B0F';
