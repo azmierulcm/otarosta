@@ -1,158 +1,76 @@
 'use client';
 
-import React, { useMemo, useState, useEffect } from 'react';
-import {
-  ComposableMap,
-  Geographies,
-  Geography,
-  Line,
-  Marker
-} from 'react-simple-maps';
+import React from 'react';
 import { DutyEvent } from '@/types';
-import { MapPin, AlertCircle } from 'lucide-react';
+import { MapPin, ExternalLink } from 'lucide-react';
 
-const geoUrl = "https://raw.githubusercontent.com/lotusms/world-map-data/main/world-110m.json";
-
-const IATA_COORDS: Record<string, [number, number]> = {
-  'KUL': [101.7099, 2.7456],
-  'LHR': [-0.4543, 51.4700],
-  'CAN': [113.2988, 23.3924],
-  'NRT': [140.3929, 35.7720],
-  'SYD': [151.1772, -33.9461],
-  'IST': [28.7519, 41.2753],
-  'SIN': [103.9915, 1.3644],
-  'CDG': [2.5479, 49.0097],
-  'DXB': [55.3657, 25.2532],
+const IATA_CITIES: Record<string, string> = {
+  'KUL': 'Kuala Lumpur International Airport',
+  'LHR': 'London Heathrow Airport',
+  'CAN': 'Guangzhou Baiyun International Airport',
+  'NRT': 'Narita International Airport',
+  'SYD': 'Sydney Airport',
+  'IST': 'Istanbul Airport',
+  'SIN': 'Singapore Changi Airport',
+  'CDG': 'Charles de Gaulle Airport',
+  'DXB': 'Dubai International Airport',
 };
 
 const FlightMap = ({ events }: { events: DutyEvent[] }) => {
-  const [hasError, setHasError] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+  const uniquePorts = Array.from(new Set(
+    events.flatMap(e => [e.depPort?.toUpperCase(), e.arrPort?.toUpperCase()])
+      .filter((p): p is string => !!p && !!IATA_CITIES[p])
+  ));
 
-  const routes = useMemo(() => {
-    const r: any[] = [];
-    events.forEach((event) => {
-      if (event.type === 'FLIGHT' && event.depPort && event.arrPort) {
-        const from = IATA_COORDS[event.depPort.toUpperCase()];
-        const to = IATA_COORDS[event.arrPort.toUpperCase()];
-        if (from && to) {
-          r.push({ from, to });
-        }
-      }
-    });
-    return r;
-  }, [events]);
-
-  const uniquePorts = useMemo(() => {
-    const ports = new Set<string>();
-    events.forEach(e => {
-        if (e.depPort) ports.add(e.depPort.toUpperCase());
-        if (e.arrPort) ports.add(e.arrPort.toUpperCase());
-    });
-    return Array.from(ports).filter(p => IATA_COORDS[p]);
-  }, [events]);
-
-  useEffect(() => {
-    // Check if data is loading correctly
-    const timer = setTimeout(() => setIsLoading(false), 1500);
-    return () => clearTimeout(timer);
-  }, []);
-
-  if (uniquePorts.length === 0) {
-    return (
-      <div className="w-full h-[400px] rounded-[2.5rem] bg-gray-50 flex items-center justify-center border border-gray-100 mb-16">
-        <div className="text-center">
-          <AlertCircle className="w-8 h-8 text-gray-300 mx-auto mb-4" />
-          <p className="text-gray-400 font-bold uppercase tracking-widest text-[10px]">No Route Data Available</p>
-        </div>
-      </div>
-    );
-  }
+  // Default to KUL if no ports found
+  const primaryCity = uniquePorts[0] || 'KUL';
+  const query = encodeURIComponent(IATA_CITIES[primaryCity]);
 
   return (
-    <div className="w-full h-[500px] rounded-[2.5rem] overflow-hidden border border-gray-100 shadow-card bg-[#f8fafc] mb-16 relative">
-      {isLoading && (
-        <div className="absolute inset-0 z-20 bg-white/50 backdrop-blur-sm flex items-center justify-center">
-           <div className="w-12 h-12 border-4 border-rausch/20 border-t-rausch rounded-full animate-spin" />
-        </div>
-      )}
-
-      <ComposableMap
-        projectionConfig={{
-          rotate: [-110, 0, 0],
-          scale: 160
-        }}
-        style={{ width: "100%", height: "100%" }}
-      >
-        <Geographies 
-          geography={geoUrl}
-          onError={() => setHasError(true)}
-        >
-          {({ geographies }) =>
-            geographies.map((geo) => (
-              <Geography
-                key={geo.rsmKey}
-                geography={geo}
-                fill="#cbd5e1"
-                stroke="#f8fafc"
-                strokeWidth={0.5}
-                style={{
-                  default: { outline: "none" },
-                  hover: { fill: "#94a3b8", outline: "none" },
-                  pressed: { outline: "none" },
-                }}
-              />
-            ))
-          }
-        </Geographies>
+    <div className="space-y-6 mb-16">
+      {/* Google Maps Iframe */}
+      <div className="w-full h-[500px] rounded-[2.5rem] overflow-hidden border border-gray-100 shadow-card bg-gray-50 relative">
+        <iframe
+          width="100%"
+          height="100%"
+          style={{ border: 0 }}
+          loading="lazy"
+          allowFullScreen
+          referrerPolicy="no-referrer-when-downgrade"
+          src={`https://www.google.com/maps/embed/v1/place?key=REPLACE_WITH_FREE_KEY_OR_USE_SEARCH_EMBED&q=${query}`}
+          // Since we want to avoid API keys, we'll use the "Search" embed which is often more lenient
+          // or a standard Search URL if the embed requires a key.
+          // Let's use the standard Search URL embed style:
+          src={`https://maps.google.com/maps?q=${query}&t=&z=5&ie=UTF8&iwloc=&output=embed`}
+        ></iframe>
         
-        {routes.map((route, i) => (
-          <Line
-            key={i}
-            from={route.from}
-            to={route.to}
-            stroke="#FF5A5F"
-            strokeWidth={2.5}
-            strokeLinecap="round"
-            strokeDasharray="4 4"
-          />
-        ))}
-
-        {uniquePorts.map(port => {
-            const coords = IATA_COORDS[port];
-            return (
-                <Marker key={port} coordinates={coords as [number, number]}>
-                    <circle r={5} fill="#FF5A5F" stroke="#FFF" strokeWidth={2} />
-                    <text
-                        textAnchor="middle"
-                        y={-14}
-                        style={{ 
-                          fontFamily: "Inter", 
-                          fontSize: "12px", 
-                          fontWeight: "900", 
-                          fill: "#1e293b",
-                          textShadow: "0 0 4px white"
-                        }}
-                        className="uppercase"
-                    >
-                        {port}
-                    </text>
-                </Marker>
-            );
-        })}
-      </ComposableMap>
-      
-      {hasError && (
-        <div className="absolute bottom-6 left-6 bg-red-50 text-red-600 px-4 py-2 rounded-xl text-[10px] font-bold border border-red-100">
-           ERROR LOADING WORLD MAP DATA
+        <div className="absolute top-6 left-6 bg-white/90 backdrop-blur-md px-4 py-2 rounded-full border border-white shadow-sm z-10">
+          <p className="text-[10px] font-black text-gray-900 flex items-center gap-2 tracking-widest uppercase">
+              <MapPin size={12} className="text-rausch" />
+              Interactive Mission Map
+          </p>
         </div>
-      )}
+      </div>
 
-      <div className="absolute top-6 left-6 bg-white/90 backdrop-blur-md px-4 py-2 rounded-full border border-white shadow-sm z-10">
-        <p className="text-[10px] font-black text-gray-900 flex items-center gap-2 tracking-widest uppercase">
-            <MapPin size={12} className="text-rausch" />
-            Mission Tracker
-        </p>
+      {/* Destinations Quick Links */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {uniquePorts.map((port) => (
+          <a 
+            key={port}
+            href={`https://www.google.com/maps/search/${encodeURIComponent(IATA_CITIES[port])}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm hover:border-rausch/30 transition-all group"
+          >
+            <div className="flex justify-between items-start mb-2">
+              <span className="text-sm font-black text-gray-900">{port}</span>
+              <ExternalLink size={12} className="text-gray-300 group-hover:text-rausch transition-colors" />
+            </div>
+            <p className="text-[10px] text-gray-500 font-medium truncate uppercase tracking-tight">
+              {IATA_CITIES[port].split(' ')[0]}
+            </p>
+          </a>
+        ))}
       </div>
     </div>
   );
