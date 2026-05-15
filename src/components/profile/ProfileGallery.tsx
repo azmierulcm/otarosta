@@ -1,14 +1,16 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Grid, Share, Heart } from 'lucide-react';
+import { Grid, Share, Settings } from 'lucide-react';
 
 interface GalleryProps {
   name?: string;
   photos?: string[];
+  onEdit?: () => void;
+  isOwner?: boolean;
 }
 
-const ProfileGallery = ({ name = 'Crew Member', photos = [] }: GalleryProps) => {
-  // Use uploaded photos or fall back to high-quality placeholders
+const ProfileGallery = ({ name = 'Crew Member', photos = [], onEdit, isOwner }: GalleryProps) => {
+  // ... (defaultPhotos remains the same)
   const defaultPhotos = [
     "https://images.unsplash.com/photo-1569154941061-e231b4725ef1?auto=format&fit=crop&q=80&w=1200", // Cockpit view
     "https://images.unsplash.com/photo-1540339832862-474599807836?auto=format&fit=crop&q=80&w=600",  // Uniform detail
@@ -31,9 +33,14 @@ const ProfileGallery = ({ name = 'Crew Member', photos = [] }: GalleryProps) => 
           <button className="flex items-center gap-2 text-sm font-semibold hover:bg-gray-100 px-3 py-2 rounded-lg transition-colors underline">
             <Share size={16} /> Share
           </button>
-          <button className="flex items-center gap-2 text-sm font-semibold hover:bg-gray-100 px-3 py-2 rounded-lg transition-colors underline">
-            <Heart size={16} /> Save
-          </button>
+          {isOwner && onEdit && (
+            <button 
+              onClick={onEdit}
+              className="flex items-center gap-2 text-sm font-semibold hover:bg-gray-100 px-3 py-2 rounded-lg transition-colors underline"
+            >
+              <Settings size={16} /> Edit Profile
+            </button>
+          )}
         </div>
       </div>
 

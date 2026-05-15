@@ -61,18 +61,12 @@ export default function ProfilePage() {
       
       <div className="max-w-7xl mx-auto px-4 pt-32 relative">
         {/* Gallery Section */}
-        <div className="relative group">
-          <ProfileGallery name={displayName} photos={profile?.gallery_urls} />
-          {user && (
-            <button 
-              onClick={() => setIsEditModalOpen(true)}
-              className="absolute top-6 right-6 z-10 bg-white/90 backdrop-blur-md border border-gray-100 p-3 rounded-2xl shadow-xl hover:scale-110 active:scale-95 transition-all opacity-0 group-hover:opacity-100 flex items-center gap-2 font-bold text-sm text-gray-900"
-            >
-              <Settings size={18} />
-              Edit Profile
-            </button>
-          )}
-        </div>
+        <ProfileGallery 
+          name={displayName} 
+          photos={profile?.gallery_urls} 
+          isOwner={!!user}
+          onEdit={() => setIsEditModalOpen(true)}
+        />
 
         <div className="mt-12 flex flex-col md:flex-row md:items-center justify-between gap-8">
           <div>
