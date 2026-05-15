@@ -8,8 +8,9 @@ export const runtime = 'edge';
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { crewId: string } }
+  { params }: { params: Promise<{ crewId: string }> }
 ) {
+  const { crewId } = await params;
   const { searchParams } = new URL(req.url);
   const format = searchParams.get('format') || 'story';
   const privacy = searchParams.get('privacy') || 'public';

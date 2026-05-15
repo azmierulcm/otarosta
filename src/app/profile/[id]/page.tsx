@@ -8,7 +8,8 @@ import StatsGrid from '@/components/profile/StatsGrid';
 import DestinationPatch from '@/components/DestinationPatch';
 import { useRosterStore } from '@/store/useRosterStore';
 
-export default function PublicProfilePage({ params }: { params: { id: string } }) {
+export default function PublicProfilePage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = React.use(params);
   // In a real app, we would fetch the profile from Supabase by ID.
   // For now, we reuse our local roster data or sample data.
   const { roster, loadSampleRoster } = useRosterStore();
