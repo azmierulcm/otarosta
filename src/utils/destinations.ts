@@ -21,7 +21,7 @@ export function extractDestinations(events: DutyEvent[]): Destination[] {
         city: iata, 
         country: 'Global', 
         color: 'border-gray-400 text-gray-500',
-        shape: SHAPES[Math.floor(Math.random() * SHAPES.length)]
+        shape: SHAPES[iata.charCodeAt(0) % SHAPES.length]
       };
 
       const existing = destMap.get(iata);

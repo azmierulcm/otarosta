@@ -31,7 +31,7 @@ export default function ProfilePage() {
       <Navbar />
 
       <div className="max-w-7xl mx-auto px-4 pt-32">
-        <ProfileGallery />
+        <ProfileGallery name={roster.crewName} />
 
         <div className="mt-12">
           <h3 className="text-2xl font-bold text-gray-900 mb-8">Monthly Performance</h3>

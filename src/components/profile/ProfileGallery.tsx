@@ -2,7 +2,7 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { Grid, Share, Heart } from 'lucide-react';
 
-const ProfileGallery = () => {
+const ProfileGallery = ({ name = 'Crew Member' }: { name?: string }) => {
   // Placeholder images - in a real app, these would be uploaded by the crew
   const photos = [
     "https://images.unsplash.com/photo-1569154941061-e231b4725ef1?auto=format&fit=crop&q=80&w=1200", // Cockpit view
@@ -17,7 +17,7 @@ const ProfileGallery = () => {
       {/* Title & Actions Row */}
       <div className="flex justify-between items-end mb-6">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Muhammad Azmierul&apos;s Profile</h1>
+          <h1 className="text-3xl font-bold text-gray-900">{name}&apos;s Profile</h1>
           <p className="text-gray-500 font-medium">First Officer • A350 Fleet</p>
         </div>
         <div className="flex gap-4">
