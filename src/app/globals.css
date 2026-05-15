@@ -5,6 +5,17 @@
   --foreground: #222222;
   --rausch: #FF5A5F;
   --card-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
+
+  /* Passport Tokens */
+  --passport-bg-primary: #0A1628;
+  --passport-bg-secondary: #050B17;
+  --passport-bg-surface: #13243F;
+  --passport-border: #2A3B5E;
+  --passport-gold: #D4AF37;
+  --passport-gold-soft: #B8A878;
+  --passport-text-primary: #FAFAFA;
+  --passport-text-secondary: #8FA0BC;
+  --passport-text-tertiary: #5C6B85;
 }
 
 @theme inline {
@@ -12,6 +23,13 @@
   --color-foreground: var(--foreground);
   --color-rausch: var(--rausch);
   --shadow-card: var(--card-shadow);
+  
+  --color-passport-bg: var(--passport-bg-primary);
+  --color-passport-surface: var(--passport-bg-surface);
+  --color-passport-gold: var(--passport-gold);
+  --color-passport-text: var(--passport-text-primary);
+  --color-passport-secondary: var(--passport-text-secondary);
+  
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
