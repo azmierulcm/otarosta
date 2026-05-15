@@ -27,8 +27,7 @@
     "react-leaflet": "^5.0.0",
     "react-map-gl": "^8.1.1",
     "react-simple-maps": "^3.0.0",
-    "unpdf": "^1.6.2",
-    "zustand": "^5.0.13"
+    "unpdf": "^1.6.2"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
