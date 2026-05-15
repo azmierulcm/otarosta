@@ -67,7 +67,7 @@ export async function GET(
         </div>
 
         {/* Hero Number */}
-        <div style={{ fontSize: '160px', fontWeight: '500', marginBottom: '10px', tracking: '-4px' }}>
+        <div style={{ fontSize: '160px', fontWeight: '500', marginBottom: '10px', letterSpacing: '-4px' }}>
           {stats.ytd_km.toLocaleString()}
         </div>
 
