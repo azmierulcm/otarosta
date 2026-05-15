@@ -15,13 +15,12 @@ const EditProfileModal = ({ isOpen, onClose }: { isOpen: boolean, onClose: () =>
   const [airline, setAirline] = useState(profile?.airline || 'Malaysia Airlines');
   const [bio, setBio] = useState(profile?.bio || '');
   
-  const [images, setImages] = useState<File[]>([]);
+  const [newFiles, setNewFiles] = useState<File[]>([]);
   const [previews, setPreviews] = useState<string[]>(profile?.gallery_urls || []);
   
   const [isUpdating, setIsUpdating] = useState(false);
   const [status, setStatus] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
-  // Sync state if profile changes
   useEffect(() => {
     if (profile) {
       setFullName(profile.full_name || '');
@@ -41,44 +40,48 @@ const EditProfileModal = ({ isOpen, onClose }: { isOpen: boolean, onClose: () =>
       return;
     }
 
-    setImages(prev => [...prev, ...files]);
-    
-    // Create previews
+    setNewFiles(prev => [...prev, ...files]);
     const newPreviews = files.map(file => URL.createObjectURL(file));
     setPreviews(prev => [...prev, ...newPreviews]);
   };
 
   const removeImage = (index: number) => {
-    // If it's an existing URL, we just remove it from previews
-    // If it's a new file, we remove it from both
-    const previewToRemove = previews[index];
     setPreviews(prev => prev.filter((_, i) => i !== index));
-    
-    // Check if it was a newly added file
-    // (This is a simplified approach, in prod we'd track IDs)
+    // Note: In a more complex app, we'd specifically track which File to remove from newFiles
   };
 
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) return;
+    if (!user) {
+      console.error("DEBUG: No user found in AuthStore");
+      setStatus({ type: 'error', text: 'Auth Error: No user session found.' });
+      return;
+    }
 
+    console.log("DEBUG: Starting Profile Update for user:", user.id);
     setIsUpdating(true);
     setStatus(null);
 
     try {
-      let finalGalleryUrls = previews.filter(url => url.startsWith('http')); // Keep existing ones
+      // 1. Filter existing URLs
+      let finalGalleryUrls = previews.filter(url => url.startsWith('http'));
+      console.log("DEBUG: Retained existing photos:", finalGalleryUrls.length);
 
-      // 1. Upload NEW Images
-      for (const file of images) {
+      // 2. Upload NEW Images
+      for (const file of newFiles) {
         const fileExt = file.name.split('.').pop();
-        const fileName = `${Math.random()}.${fileExt}`;
+        const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
         const filePath = `${user.id}/gallery/${fileName}`;
 
+        console.log("DEBUG: Uploading new file:", filePath);
         const { error: uploadError } = await supabase.storage
           .from('profile-photos')
           .upload(filePath, file);
 
-        if (uploadError) throw uploadError;
+        if (uploadError) {
+          console.error("DEBUG: Upload Error:", uploadError);
+          throw uploadError;
+        }
 
         const { data: { publicUrl } } = supabase.storage
           .from('profile-photos')
@@ -87,39 +90,55 @@ const EditProfileModal = ({ isOpen, onClose }: { isOpen: boolean, onClose: () =>
         finalGalleryUrls.push(publicUrl);
       }
 
-      // 2. Update Profile in DB
-      const { error: dbError } = await supabase
+      const updateData = {
+        id: user.id,
+        full_name: fullName,
+        rank,
+        airline,
+        bio,
+        gallery_urls: finalGalleryUrls.slice(0, 5),
+        updated_at: new Date().toISOString()
+      };
+
+      console.log("DEBUG: Upserting into 'profiles' table:", updateData);
+
+      // 3. Update Profile in DB
+      const { data, error: dbError } = await supabase
         .from('profiles')
-        .upsert({
-          id: user.id,
-          full_name: fullName,
-          rank,
-          airline,
-          bio,
-          gallery_urls: finalGalleryUrls.slice(0, 5)
-        });
+        .upsert(updateData)
+        .select();
 
-      if (dbError) throw dbError;
+      if (dbError) {
+        console.error("DEBUG: Database Error:", dbError);
+        throw dbError;
+      }
 
-      // 3. Update Global State
+      console.log("DEBUG: Database success:", data);
+
+      // 4. Update Global State
       setProfile({
         id: user.id,
         full_name: fullName,
         rank,
         airline,
         bio,
-        gallery_urls: finalGalleryUrls
+        gallery_urls: finalGalleryUrls.slice(0, 5)
       });
 
-      setStatus({ type: 'success', text: 'Profile updated successfully!' });
+      setStatus({ type: 'success', text: 'Profile saved! Refreshing...' });
       
       setTimeout(() => {
         onClose();
         setStatus(null);
+        setNewFiles([]);
       }, 1500);
 
     } catch (err: any) {
-      setStatus({ type: 'error', text: err.message || 'Failed to update profile.' });
+      console.error("DEBUG: Final Catch Error:", err);
+      setStatus({ 
+        type: 'error', 
+        text: err.message || 'Failed to update profile. Check Supabase RLS policies.' 
+      });
     } finally {
       setIsUpdating(false);
     }
@@ -147,7 +166,7 @@ const EditProfileModal = ({ isOpen, onClose }: { isOpen: boolean, onClose: () =>
           </button>
 
           <h2 className="text-3xl font-black text-gray-900 mb-2">Edit Profile</h2>
-          <p className="text-gray-500 font-medium mb-10 text-lg">Personalize your digital presence on Cemrosta.</p>
+          <p className="text-gray-500 font-medium mb-10 text-lg italic">Build your pilot persona.</p>
 
           {status && (
             <div className={`mb-8 p-5 rounded-2xl flex items-center gap-3 text-sm font-bold border ${
@@ -240,7 +259,12 @@ const EditProfileModal = ({ isOpen, onClose }: { isOpen: boolean, onClose: () =>
               disabled={isUpdating}
               className="w-full bg-black text-white py-6 rounded-2xl font-black text-lg hover:bg-gray-800 transition-all active:scale-[0.98] shadow-xl disabled:opacity-50 disabled:scale-100 flex items-center justify-center gap-3"
             >
-              {isUpdating ? <Loader2 className="animate-spin" /> : 'Save Profile Changes'}
+              {isUpdating ? (
+                <>
+                  <Loader2 className="animate-spin" />
+                  Updating...
+                </>
+              ) : 'Save Profile Changes'}
             </button>
           </form>
         </motion.div>
