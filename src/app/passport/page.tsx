@@ -11,31 +11,43 @@ import { Loader2 } from 'lucide-react';
 export default function PassportPage() {
   const { user } = useAuthStore();
   const [stats, setStats] = useState<CrewStats | null>(null);
+  const [earnedAchievements, setEarnedAchievements] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const fetchStats = async () => {
+    const fetchData = async () => {
       if (!user) {
         setIsLoading(false);
         return;
       }
 
-      const { data, error } = await supabase
+      // 1. Fetch Stats
+      const { data: statsData } = await supabase
         .from('crew_stats')
         .select('*')
-        .eq('crew_id', user.id) // Simplified: assuming crew_id maps directly for this phase
+        .eq('crew_id', user.id)
         .single();
 
-      if (data && !error) {
-        setStats(data as CrewStats);
+      if (statsData) setStats(statsData as CrewStats);
+
+      // 2. Fetch Achievements
+      const { data: achievementsData } = await supabase
+        .from('achievements')
+        .select('key')
+        .eq('crew_id', user.id);
+
+      if (achievementsData) {
+        setEarnedAchievements(achievementsData.map(a => a.key));
       }
+
       setIsLoading(false);
     };
 
-    fetchStats();
+    fetchData();
   }, [user]);
 
-  // Mock data for Phase 1 demonstration if no real stats exist
+  // Mock data for demo
+  const mockAchievements = ['first-flight', 'first-international', 'equator-bound'];
   const mockStats: CrewStats = {
     crew_id: 'demo',
     total_km: 124500,
@@ -75,7 +87,10 @@ export default function PassportPage() {
   return (
     <main>
       <Navbar />
-      <PassportDashboard stats={stats || mockStats} />
+      <PassportDashboard 
+        stats={stats || mockStats} 
+        earnedAchievements={stats ? earnedAchievements : mockAchievements}
+      />
     </main>
   );
 }

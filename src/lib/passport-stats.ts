@@ -71,11 +71,18 @@ export async function recomputeStats(crewId: string) {
     updated_at: new Date().toISOString(),
   };
 
+import { evaluateAchievements } from './achievements/evaluator';
+
+// ... inside recomputeStats
   // 5. Save to Supabase
   const { error: updateError } = await supabase
     .from('crew_stats')
     .upsert({ crew_id: crewId, ...finalStats });
 
   if (updateError) console.error('Stats recompute failed:', updateError);
+
+  // 6. Evaluate Achievements
+  await evaluateAchievements(crewId, finalStats as CrewStats);
+
   return finalStats;
 }
