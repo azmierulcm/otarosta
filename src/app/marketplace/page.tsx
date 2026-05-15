@@ -1,80 +1,54 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Navbar from '@/components/Navbar';
 import MarketplaceCard from '@/components/marketplace/MarketplaceCard';
 import CreateAdModal from '@/components/marketplace/CreateAdModal';
-import { Search, SlidersHorizontal, Plus } from 'lucide-react';
-import { motion } from 'framer-motion';
+import ListingDetailModal from '@/components/marketplace/ListingDetailModal';
+import { Search, SlidersHorizontal, Plus, Loader2, PackageOpen } from 'lucide-react';
+import { supabase } from '@/utils/supabase';
 
 const CATEGORIES = ["All", "Headsets", "Luggage", "Watches", "Uniforms", "Manuals"];
 
-const MOCK_LISTINGS = [
-  {
-    id: '1',
-    title: "Bose A20 Aviation Headset",
-    price: 3800,
-    condition: "Lightly Used",
-    category: "Headsets",
-    image: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&q=80&w=800",
-    seller: "Capt. Sarah",
-    avatar: "https://i.pravatar.cc/150?u=sarah"
-  },
-  {
-    id: '2',
-    title: "Rimowa Original Cabin Silver",
-    price: 4200,
-    condition: "Well Used",
-    category: "Luggage",
-    image: "https://images.unsplash.com/photo-1565026057447-bc90a3dceb87?auto=format&fit=crop&q=80&w=800",
-    seller: "FO James",
-    avatar: "https://i.pravatar.cc/150?u=james"
-  },
-  {
-    id: '3',
-    title: "Garmin D2 Mach 1 Aviator Watch",
-    price: 5500,
-    condition: "New",
-    category: "Watches",
-    image: "https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&q=80&w=800",
-    seller: "Muhammad Azmierul",
-    avatar: "https://i.pravatar.cc/150?u=azmierul"
-  },
-  {
-    id: '4',
-    title: "Sennheiser S1 Digital Headset",
-    price: 1200,
-    condition: "Well Used",
-    category: "Headsets",
-    image: "https://images.unsplash.com/photo-1484704849700-f032a568e944?auto=format&fit=crop&q=80&w=800",
-    seller: "Sarah Jenkins",
-    avatar: "https://i.pravatar.cc/150?u=sarahj"
-  },
-  {
-    id: '5',
-    title: "Travelpro Platinum Elite",
-    price: 950,
-    condition: "Lightly Used",
-    category: "Luggage",
-    image: "https://images.unsplash.com/photo-1581553670339-6142a9dd289a?auto=format&fit=crop&q=80&w=800",
-    seller: "Capt. Ahmad",
-    avatar: "https://i.pravatar.cc/150?u=ahmad"
-  },
-  {
-    id: '6',
-    title: "A350 Quick Reference Handbook",
-    price: 450,
-    condition: "New",
-    category: "Manuals",
-    image: "https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&q=80&w=800",
-    seller: "Capt. Sarah",
-    avatar: "https://i.pravatar.cc/150?u=sarah"
-  }
-];
-
 export default function MarketplacePage() {
+  const [listings, setListings] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [activeCategory, setActiveCategory] = useState("All");
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [selectedListing, setSelectedListing] = useState<any>(null);
+
+  const fetchListings = async () => {
+    setIsLoading(true);
+    try {
+      let query = supabase
+        .from('marketplace_listings')
+        .select('*, profiles(full_name, avatar_url, rank)')
+        .eq('status', 'available')
+        .order('created_at', { ascending: false });
+
+      if (activeCategory !== "All") {
+        query = query.eq('category', activeCategory);
+      }
+
+      if (searchQuery) {
+        query = query.ilike('title', `%${searchQuery}%`);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+      setListings(data || []);
+    } catch (err) {
+      console.error('Failed to fetch listings:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchListings();
+  }, [activeCategory, searchQuery]);
 
   return (
     <main className="min-h-screen bg-white pb-32">
@@ -88,7 +62,7 @@ export default function MarketplacePage() {
             <p className="text-xl text-gray-500 font-medium italic">Elite gear for elite crew.</p>
           </div>
           <button 
-            onClick={() => setIsModalOpen(true)}
+            onClick={() => setIsCreateModalOpen(true)}
             className="bg-rausch text-white px-10 py-5 rounded-2xl font-black shadow-xl shadow-rausch/20 hover:scale-[1.02] active:scale-95 transition-all flex items-center gap-3"
           >
             <Plus size={20} strokeWidth={3} />
@@ -103,10 +77,12 @@ export default function MarketplacePage() {
             <input 
               type="text" 
               placeholder="Search headsets, luggage, watches..."
-              className="w-full bg-gray-50 border border-gray-100 pl-16 pr-8 py-5 rounded-full font-bold focus:outline-none focus:ring-2 focus:ring-rausch/10 focus:bg-white transition-all"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-gray-50 border border-gray-100 pl-16 pr-8 py-5 rounded-full font-bold focus:outline-none focus:ring-2 focus:ring-rausch/10 focus:bg-white transition-all text-gray-900"
             />
           </div>
-          <div className="flex items-center gap-3 overflow-x-auto w-full md:w-auto no-scrollbar">
+          <div className="flex items-center gap-3 overflow-x-auto w-full md:w-auto no-scrollbar pb-2 md:pb-0">
              {CATEGORIES.map((cat) => (
                 <button
                   key={cat}
@@ -121,21 +97,47 @@ export default function MarketplacePage() {
                   {cat}
                 </button>
              ))}
-             <button className="p-4 bg-white border border-gray-200 rounded-full hover:border-gray-900 transition-colors">
-                <SlidersHorizontal size={20} className="text-gray-900" />
-             </button>
           </div>
         </div>
 
         {/* Listings Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-8 gap-y-16">
-          {MOCK_LISTINGS.filter(l => activeCategory === "All" || l.category === activeCategory).map((item) => (
-            <MarketplaceCard key={item.id} listing={item} />
-          ))}
-        </div>
+        {isLoading ? (
+          <div className="flex flex-col items-center justify-center py-40">
+             <Loader2 className="w-12 h-12 animate-spin text-rausch mb-4" />
+             <p className="text-gray-400 font-bold uppercase tracking-widest text-xs">Loading Gear...</p>
+          </div>
+        ) : listings.length > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-8 gap-y-16">
+            {listings.map((item) => (
+              <div key={item.id} onClick={() => setSelectedListing(item)}>
+                <MarketplaceCard listing={{
+                  ...item,
+                  image: item.image_urls[0] || "https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&q=80&w=800",
+                  seller: item.profiles?.full_name || "Crew Member",
+                  avatar: item.profiles?.avatar_url || `https://i.pravatar.cc/150?u=${item.seller_id}`
+                }} />
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="flex flex-col items-center justify-center py-40 bg-gray-50 rounded-[3rem] border border-dashed border-gray-200">
+             <PackageOpen className="w-16 h-16 text-gray-300 mb-6" />
+             <h3 className="text-2xl font-black text-gray-900 mb-2">No items found</h3>
+             <p className="text-gray-500 font-medium">Be the first to list your gear in this category.</p>
+          </div>
+        )}
       </div>
 
-      <CreateAdModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
+      <CreateAdModal isOpen={isCreateModalOpen} onClose={() => {
+        setIsCreateModalOpen(false);
+        fetchListings(); // Refresh list after closing sell modal
+      }} />
+
+      <ListingDetailModal 
+        listing={selectedListing} 
+        isOpen={!!selectedListing} 
+        onClose={() => setSelectedListing(null)} 
+      />
     </main>
   );
 }
