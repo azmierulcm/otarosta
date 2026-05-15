@@ -1,26 +1,53 @@
+'use client';
+
 import React from 'react';
+import { Share2, MapPin } from 'lucide-react';
 import { motion } from 'framer-motion';
 
-const ProfileHeader = ({ name, rank, airline }: { name: string, rank: string, airline: string }) => {
+interface ProfileHeaderProps {
+  name: string;
+  role: string;
+  homeBase: string;
+  aircraftType: string;
+}
+
+const ProfileHeader = ({ name, role, homeBase, aircraftType }: ProfileHeaderProps) => {
+  // Initials for avatar fallback
+  const initials = name
+    .split(' ')
+    .map((n) => n[0])
+    .join('')
+    .toUpperCase();
+
   return (
-    <div className="flex flex-col md:flex-row items-center gap-8 mb-16 pt-10">
-      <div className="w-32 h-32 rounded-full bg-surface-2 border-4 border-white shadow-lg overflow-hidden shrink-0">
-        <div className="w-full h-full bg-gradient-to-br from-accent to-rose-600 flex items-center justify-center text-white text-4xl font-bold">
-          {name.charAt(0)}
+    <div className="bg-surface border border-border rounded-[2.5rem] p-8 md:p-12 flex flex-col md:flex-row justify-between items-start md:items-center gap-8 shadow-2xl relative overflow-hidden group">
+      <div className="absolute top-0 right-0 w-64 h-64 bg-accent/5 blur-[80px] -mr-32 -mt-32 rounded-full" />
+      
+      <div className="flex flex-col md:flex-row items-center gap-8 relative z-10">
+        <div className="w-24 h-24 md:w-32 md:h-32 rounded-[2.5rem] bg-bg border border-border flex items-center justify-center text-3xl md:text-4xl font-black text-accent shadow-inner">
+          {initials}
+        </div>
+        <div className="text-center md:text-left">
+          <h1 className="text-4xl md:text-5xl font-bold tracking-tighter text-text mb-2">
+            {name}
+          </h1>
+          <div className="flex flex-wrap justify-center md:justify-start items-center gap-3 text-text-muted font-medium">
+            <span className="bg-accent/10 text-accent px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest">{role}</span>
+            <div className="w-1 h-1 rounded-full bg-border" />
+            <div className="flex items-center gap-1">
+              <MapPin size={14} className="text-text-subtle" />
+              <span>{homeBase}</span>
+            </div>
+            <div className="w-1 h-1 rounded-full bg-border" />
+            <span>{aircraftType}</span>
+          </div>
         </div>
       </div>
-      <div className="text-center md:text-left">
-        <h1 className="text-4xl font-extrabold text-text tracking-tight mb-2">{name}</h1>
-        <div className="flex flex-wrap items-center justify-center md:justify-start gap-3">
-          <span className="bg-accent/10 text-accent px-4 py-1.5 rounded-full text-sm font-bold border border-accent/20 uppercase tracking-wide">
-            {rank}
-          </span>
-          <span className="text-text-subtle font-medium">•</span>
-          <span className="text-text-muted font-bold">{airline}</span>
-          <span className="text-text-subtle font-medium">•</span>
-          <span className="text-text-muted font-medium italic">Member since May 2026</span>
-        </div>
-      </div>
+
+      <button className="bg-bg border border-border text-text px-8 py-4 rounded-2xl font-bold hover:bg-surface-2 transition-all active:scale-95 flex items-center gap-2 relative z-10 self-stretch md:self-auto justify-center">
+        <Share2 size={18} />
+        Share
+      </button>
     </div>
   );
 };
