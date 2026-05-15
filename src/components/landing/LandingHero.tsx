@@ -35,9 +35,9 @@ const LandingHero = () => {
           transition={{ delay: 0.2 }}
           className="text-xl md:text-2xl text-gray-500 mb-12 max-w-3xl mx-auto font-medium leading-relaxed"
         >
-          Build a beautiful digital passport of your flying career. 
-          Automatically extract flights, sync to your calendar, and unlock destination patches.
-          <span className="text-gray-900 font-bold block mt-2">Join the elite crew community today.</span>
+          Drop your monthly roster PDF. We automatically extract your flights, 
+          sync them to your calendar in local time, and build a beautiful &apos;passport&apos; 
+          of the cities you&apos;ve flown to. <span className="text-gray-900 font-bold">Ready in 10 seconds.</span>
         </motion.p>
 
         <motion.div
