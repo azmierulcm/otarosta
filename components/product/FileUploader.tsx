@@ -21,11 +21,32 @@ export const FileUploader = ({ onSuccess }: FileUploaderProps) => {
   const classifyError = (err: unknown): string => {
     const msg = err instanceof Error ? err.message : String(err);
     const lower = msg.toLowerCase();
+    // Surface specific messages from the server action directly
+    if (
+      lower.includes('text-based') ||
+      lower.includes('image-based') ||
+      lower.includes('blank or image') ||
+      lower.includes('could not read this pdf')
+    ) {
+      return msg; // already user-friendly
+    }
+    if (lower.includes('no duties') || lower.includes('no duties were found')) {
+      return msg;
+    }
+    if (lower.includes('parsed successfully but could not be saved')) {
+      return msg;
+    }
+    if (lower.includes('could not recognise') || lower.includes('not yet supported')) {
+      return msg;
+    }
+    if (lower.includes('no dates found')) {
+      return 'No dates were found in this PDF. Make sure it is a Malaysia Airlines AIMS roster — not a scanned image or a different format.';
+    }
     if (lower.includes('not a pdf') || lower.includes('invalid pdf') || lower.includes('unsupported')) {
-      return 'This file isn\'t a PDF roster. Please export your AIMS roster as a PDF and try again.';
+      return 'This file isn\'t a valid PDF. Please export your AIMS roster as a PDF and try again.';
     }
     if (lower.includes('no flights') || lower.includes('no events') || lower.includes('could not parse') || lower.includes('empty')) {
-      return 'We couldn\'t read any flights from this PDF. Make sure it\'s a Malaysia Airlines AIMS roster, not a scanned image.';
+      return 'No flights found in this PDF. Make sure it\'s a Malaysia Airlines AIMS roster, not a scanned image.';
     }
     if (lower.includes('network') || lower.includes('fetch') || lower.includes('failed to fetch')) {
       return 'Network error — check your connection and try again.';
@@ -36,11 +57,11 @@ export const FileUploader = ({ onSuccess }: FileUploaderProps) => {
     if (lower.includes('password') || lower.includes('encrypted')) {
       return 'This PDF is password-protected. Please remove the password before uploading.';
     }
-    // Firebase / server errors
     if (lower.includes('permission') || lower.includes('unauthenticated')) {
       return 'You need to be signed in to save a roster.';
     }
-    return 'Something went wrong parsing your roster. Try a different month\'s PDF or contact support.';
+    // Last resort: show the raw message so it's debuggable
+    return msg || 'Something went wrong parsing your roster. Try a different month\'s PDF or contact support.';
   };
 
   const onDrop = useCallback(async (acceptedFiles: File[], rejectedFiles: import('react-dropzone').FileRejection[]) => {

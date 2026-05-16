@@ -2,12 +2,22 @@ import { ParsedRoster, UnsupportedAirlineError } from './types';
 import { parseMasAims } from './airlines/mas-aims';
 
 export function parseRosterText(text: string): ParsedRoster {
-  // Simple detection: MAS AIMS rosters usually contain "MALAYSIA AIRLINES" and "CREW ROSTER"
-  if (text.includes('MALAYSIA AIRLINES') || text.includes('MH') || text.match(/\d{2}-[A-Z]{3}-\d{4}/)) {
+  const upper = text.toUpperCase();
+  // Detect MAS AIMS: look for airline name, MH flight numbers, or DD-MMM-YYYY date pattern
+  const isMasAims =
+    upper.includes('MALAYSIA AIRLINES') ||
+    upper.includes('MALAYSIAN AIRLINES') ||
+    upper.includes('AIMS') ||
+    /\bMH\s*\d{1,4}\b/.test(upper) ||
+    /\d{2}-[A-Z]{3}-\d{4}/.test(upper);
+
+  if (isMasAims) {
     return parseMasAims(text);
   }
 
-  throw new UnsupportedAirlineError('This airline roster format is not yet supported. Please join the waitlist!');
+  throw new UnsupportedAirlineError(
+    'This roster format is not yet supported. Currently only Malaysia Airlines AIMS rosters are accepted.'
+  );
 }
 
 export * from './types';
