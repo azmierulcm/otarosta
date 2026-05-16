@@ -27,7 +27,7 @@ function LoadingShell() {
 
 export default function ProfileClient() {
   const { user, profile, isLoading: isAuthLoading } = useAuth();
-  const { rosters, activeRosterId, isLoadingList } = useRoster();
+  const { rosters, activeRosterId, isLoading: isRosterLoading, isLoadingList } = useRoster();
 
   const [earnedDestinations, setEarnedDestinations] = useState<EarnedDestination[]>([]);
   const [isLoadingDests, setIsLoadingDests] = useState(false);
@@ -49,7 +49,7 @@ export default function ProfileClient() {
   }, [user, isLoadingList, activeRosterId]);
 
   const hasRosters = rosters.length > 0;
-  const isLoading = isAuthLoading || (!!user && (isLoadingList || isLoadingDests));
+  const isLoading = isAuthLoading || (!!user && (isLoadingList || isRosterLoading || isLoadingDests));
 
   // Build display name: prefer Firestore profile, fall back to Firebase displayName, then email prefix
   const displayName =

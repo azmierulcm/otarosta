@@ -59,10 +59,13 @@ function LoadingState() {
 }
 
 export default function HomeClient() {
-  const { activeRoster, isLoadingList } = useRoster();
+  const { activeRoster, isLoading: isRosterLoading, isLoadingList } = useRoster();
   const { user, isLoading: isAuthLoading } = useAuth();
 
-  const showLoading = isAuthLoading || (!!user && isLoadingList);
+  // Wait for both the roster list AND the active roster fetch before showing content.
+  // Without isRosterLoading, the upload prompt flashes between isLoadingList→false
+  // and selectRoster completing, making the app appear stuck on refresh.
+  const showLoading = isAuthLoading || (!!user && (isLoadingList || isRosterLoading));
 
   return (
     <main id="main-content" className="min-h-screen bg-surface-2 selection:bg-accent/30 selection:text-accent-fg flex flex-col">
