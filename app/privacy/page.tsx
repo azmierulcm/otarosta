@@ -1,8 +1,17 @@
-import Navbar from "@/components/shared/Navbar";
-import Footer from "@/components/shared/Footer";
+import { Navbar } from "@/components/shared/Navbar";
+import { Footer } from "@/components/shared/Footer";
 
-export const metadata = {
-  title: "Privacy Policy",
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Privacy Policy — Cemrosta",
+  description: "How Cemrosta collects, uses, and protects your flight data and personal information.",
+  alternates: { canonical: "/privacy" },
+  openGraph: {
+    title: "Privacy Policy — Cemrosta",
+    description: "How Cemrosta collects, uses, and protects your flight data and personal information.",
+    url: "https://cemrosta.vercel.app/privacy",
+  },
 };
 
 export default function PrivacyPage() {
@@ -11,7 +20,7 @@ export default function PrivacyPage() {
       <Navbar />
       <div className="max-w-3xl mx-auto px-4 pt-40 pb-32">
         <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.4em] text-accent mb-6 font-mono">
-          // DATA PROTECTION PROTOCOL
+          {"// DATA PROTECTION PROTOCOL"}
         </div>
         <h1 className="text-5xl font-bold text-text tracking-tighter mb-12">Privacy Policy</h1>
         
@@ -26,7 +35,7 @@ export default function PrivacyPage() {
           <section>
             <h2 className="text-2xl font-bold text-text mb-4 tracking-tight">2. Information We Collect</h2>
             <p>
-              When you upload a roster, we extract flight numbers, times, and destinations. This data is stored securely in our database to build your "Passport" profile. We also collect your email address for account authentication.
+              When you upload a roster, we extract flight numbers, times, and destinations. This data is stored securely in our database to build your &quot;Passport&quot; profile. We also collect your email address for account authentication.
             </p>
           </section>
 

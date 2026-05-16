@@ -1,87 +1,64 @@
-'use client';
+'use client'
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { User } from '@supabase/supabase-js';
-import { supabase } from '@/lib/utils/supabase';
+import React, { createContext, useContext, useState, useEffect } from 'react'
+import { User, onAuthStateChanged, signOut } from 'firebase/auth'
+import { doc, getDoc } from 'firebase/firestore'
+import { auth, db } from '@/lib/firebase/client'
 
-interface Profile {
-  id: string;
-  full_name?: string;
-  rank?: string;
-  airline?: string;
-  fleet?: string;
-  bio?: string;
-  avatar_url?: string;
-  gallery_urls?: string[];
+export interface Profile {
+  id: string
+  full_name?: string
+  rank?: string
+  airline?: string
+  fleet?: string
+  bio?: string
+  avatar_url?: string
 }
 
 interface AuthContextType {
-  user: User | null;
-  profile: Profile | null;
-  isAuthModalOpen: boolean;
-  authView: 'login' | 'signup';
-  setUser: (user: User | null) => void;
-  setProfile: (profile: Profile | null) => void;
-  openAuthModal: (view?: 'login' | 'signup') => void;
-  closeAuthModal: () => void;
-  setAuthView: (view: 'login' | 'signup') => void;
-  isLoading: boolean;
+  user: User | null
+  profile: Profile | null
+  isAuthModalOpen: boolean
+  authView: 'login' | 'signup'
+  setProfile: (profile: Profile | null) => void
+  openAuthModal: (view?: 'login' | 'signup') => void
+  closeAuthModal: () => void
+  setAuthView: (view: 'login' | 'signup') => void
+  signOutUser: () => Promise<void>
+  isLoading: boolean
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [profile, setProfile] = useState<Profile | null>(null);
-  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
-  const [authView, setAuthView] = useState<'login' | 'signup'>('signup');
-  const [isLoading, setIsLoading] = useState(true);
+  const [user, setUser] = useState<User | null>(null)
+  const [profile, setProfile] = useState<Profile | null>(null)
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false)
+  const [authView, setAuthView] = useState<'login' | 'signup'>('signup')
+  const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    // Check current session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        fetchProfile(session.user.id);
-      }
-      setIsLoading(false);
-    });
-
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      const currentUser = session?.user ?? null;
-      setUser(currentUser);
-      if (currentUser) {
-        fetchProfile(currentUser.id);
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      setUser(firebaseUser)
+      if (firebaseUser) {
+        const snap = await getDoc(doc(db, 'profiles', firebaseUser.uid))
+        if (snap.exists()) {
+          setProfile({ id: firebaseUser.uid, ...snap.data() } as Profile)
+        }
       } else {
-        setProfile(null);
+        setProfile(null)
       }
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
-
-  const fetchProfile = async (userId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .single();
-
-      if (error && error.code !== 'PGRST116') throw error;
-      if (data) setProfile(data as Profile);
-    } catch (err) {
-      console.error('Error fetching profile:', err);
-    }
-  };
+      setIsLoading(false)
+    })
+    return unsubscribe
+  }, [])
 
   const openAuthModal = (view: 'login' | 'signup' = 'signup') => {
-    setAuthView(view);
-    setIsAuthModalOpen(true);
-  };
-
-  const closeAuthModal = () => setIsAuthModalOpen(false);
+    setAuthView(view)
+    setIsAuthModalOpen(true)
+  }
+  const closeAuthModal = () => setIsAuthModalOpen(false)
+  const signOutUser = () => signOut(auth)
 
   return (
     <AuthContext.Provider
@@ -90,23 +67,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         profile,
         isAuthModalOpen,
         authView,
-        setUser,
         setProfile,
         openAuthModal,
         closeAuthModal,
         setAuthView,
+        signOutUser,
         isLoading,
       }}
     >
       {children}
     </AuthContext.Provider>
-  );
+  )
 }
 
 export function useAuth() {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
+  const ctx = useContext(AuthContext)
+  if (!ctx) throw new Error('useAuth must be used within AuthProvider')
+  return ctx
 }

@@ -1,179 +1,305 @@
 'use client';
 
-import React, { useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { X, MapPin, Calendar, Clock, Plane, ShieldCheck, Globe } from 'lucide-react';
-import { ILLUSTRATIONS } from '@/lib/patches/illustrations';
-import { REGION_TAXONOMY, RARITY_COLORS, getRarityTier } from '@/lib/patches/rules';
-import { formatVisitCount } from '@/lib/utils/format';
-import { ComposableMap, Geographies, Geography, Marker } from 'react-simple-maps';
+import React, { useEffect, useRef, useCallback } from 'react';
 
-const geoUrl = "https://raw.githubusercontent.com/lotusms/world-map-data/main/world-110m.json";
+const FOCUSABLE_SEL = 'a[href], button:not([disabled]), input, [tabindex]:not([tabindex="-1"])';
+import { motion, AnimatePresence } from 'framer-motion';
+import { X } from 'lucide-react';
+import dynamic from 'next/dynamic';
+
+const ComposableMap = dynamic(() => import('react-simple-maps').then(m => m.ComposableMap), { ssr: false });
+const Geographies = dynamic(() => import('react-simple-maps').then(m => m.Geographies), { ssr: false });
+const Geography = dynamic(() => import('react-simple-maps').then(m => m.Geography), { ssr: false });
+const Marker = dynamic(() => import('react-simple-maps').then(m => m.Marker), { ssr: false });
+import { ILLUSTRATIONS } from '@/lib/patches/illustrations';
+import { REGION_PATCH_VAR, RARITY_CSS, getRarityTier } from '@/lib/patches/rules';
+import { formatVisitCount } from '@/lib/utils/format';
+import type { CatalogEntry } from '@/lib/data/destination-catalog';
+import type { EarnedDestination } from '@/lib/actions/destinations';
+
+const GEO_URL =
+  'https://raw.githubusercontent.com/lotusms/world-map-data/main/world-110m.json';
+
+/** [longitude, latitude] for the dot on the mini-map */
+const COORDS: Record<string, [number, number]> = {
+  // Malaysia domestic
+  KUL: [101.7, 3.1],  JHB: [103.7, 1.5],  PEN: [100.3, 5.4],  BKI: [116.1, 6.0],
+  KCH: [110.3, 1.5],  LGK: [99.7, 6.3],   BTU: [113.0, 3.2],  TWU: [118.1, 4.3],
+  // Southeast Asia
+  SIN: [103.8, 1.4],  BKK: [100.7, 13.7], CGK: [107.1, -6.1], DPS: [115.2, -8.7],
+  MNL: [121.0, 14.5], HAN: [105.8, 21.0], SGN: [106.7, 10.8], RGN: [96.1, 16.9],
+  PNH: [104.9, 11.6], HKT: [98.3, 8.1],   CNX: [99.0, 18.8],  DAD: [108.2, 16.0],
+  // East Asia
+  HKG: [114.2, 22.3], NRT: [140.4, 35.8], ICN: [126.5, 37.5], KIX: [135.2, 34.4],
+  FUK: [130.5, 33.6], TPE: [121.2, 25.1], PVG: [121.8, 31.1], CAN: [113.3, 23.1],
+  PKX: [116.4, 39.9], SZX: [113.8, 22.6], XMN: [118.1, 24.5], CSX: [112.9, 28.2],
+  TFU: [103.9, 30.6],
+  // Oceania
+  SYD: [151.2, -33.9], MEL: [145.0, -37.8], BNE: [153.1, -27.4],
+  PER: [115.9, -31.9], AKL: [174.8, -36.9], ADL: [138.5, -34.9],
+  // Middle East
+  DOH: [51.6, 25.3], JED: [39.2, 21.5], MED: [39.6, 24.5],
+  // Europe
+  LHR: [-0.4, 51.5], CDG: [2.5, 49.0],
+  // South Asia
+  DEL: [77.1, 28.6],  BOM: [72.9, 19.1],  BLR: [77.6, 12.9],
+  MAA: [80.3, 13.1],  HYD: [78.5, 17.4],  CCU: [88.4, 22.6],
+  COK: [76.3, 10.0],  AMD: [72.6, 23.0],  ATQ: [74.9, 31.6],
+  TRV: [76.9, 8.5],   DAC: [90.4, 23.7],  CMB: [79.9, 6.9],
+  MLE: [73.5, 4.2],   KTM: [85.3, 27.7],
+};
 
 interface PatchDetailModalProps {
   isOpen: boolean;
   onClose: () => void;
-  destination: any; 
+  entry: CatalogEntry | null;
+  earned: EarnedDestination | null;
 }
 
-const PatchDetailModal = ({ isOpen, onClose, destination }: PatchDetailModalProps) => {
+export function PatchDetailModal({ isOpen, onClose, entry, earned }: PatchDetailModalProps) {
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLElement | null>(null);
+
+  // Store trigger + return focus on close
   useEffect(() => {
-    const handleEsc = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', handleEsc);
-    return () => window.removeEventListener('keydown', handleEsc);
+    if (isOpen) {
+      triggerRef.current = document.activeElement as HTMLElement;
+      closeRef.current?.focus();
+    } else {
+      triggerRef.current?.focus();
+    }
+  }, [isOpen]);
+
+  // Escape + Tab trap
+  const handleKey = useCallback((e: KeyboardEvent) => {
+    if (e.key === 'Escape') { onClose(); return; }
+    if (e.key === 'Tab' && panelRef.current) {
+      const els = Array.from(panelRef.current.querySelectorAll<HTMLElement>(FOCUSABLE_SEL));
+      if (!els.length) return;
+      if (e.shiftKey) {
+        if (document.activeElement === els[0]) { e.preventDefault(); els[els.length - 1].focus(); }
+      } else {
+        if (document.activeElement === els[els.length - 1]) { e.preventDefault(); els[0].focus(); }
+      }
+    }
   }, [onClose]);
 
-  if (!destination) return null;
+  useEffect(() => {
+    if (!isOpen) return;
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [isOpen, handleKey]);
 
-  const Illustration = ILLUSTRATIONS[destination.iata] || MapPin;
-  const regionData = REGION_TAXONOMY[destination.region as keyof typeof REGION_TAXONOMY] || REGION_TAXONOMY['Southeast Asia'];
-  const rarity = getRarityTier(destination.visits);
-  const rarityColor = RARITY_COLORS[rarity];
+  if (!entry) return null;
 
-  // Placeholder coordinates (in a real app, these would come from an airport DB)
-  const coordinates: Record<string, [number, number]> = {
-    'KUL': [101.7, 2.7],
-    'LHR': [-0.4, 51.5],
-    'SYD': [151.2, -33.9],
-    'NRT': [140.4, 35.8],
-    'SIN': [103.9, 1.3],
-  };
-  const markerPos = coordinates[destination.iata] || [101.7, 2.7];
+  const Illustration = ILLUSTRATIONS[entry.iata] ?? ILLUSTRATIONS['Generic'];
+  const regionColor = REGION_PATCH_VAR[entry.region];
+  const visits = earned?.visits ?? 0;
+  const rarity = getRarityTier(visits);
+  const rarityColor = RARITY_CSS[rarity];
+  const coords = COORDS[entry.iata] ?? [101.7, 3.1];
 
   return (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-8">
+        <div
+          ref={panelRef}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="patch-modal-title"
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4"
+        >
+          {/* Backdrop */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="fixed inset-0 bg-bg/90 backdrop-blur-md"
+            className="fixed inset-0"
+            style={{ background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(6px)' }}
           />
-          
+
+          {/* Modal panel */}
           <motion.div
-            initial={{ opacity: 0, scale: 0.9, y: 20 }}
+            initial={{ opacity: 0, scale: 0.94, y: 12 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.9, y: 20 }}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="modal-title"
-            className="w-full max-w-4xl bg-surface border border-border rounded-[3rem] overflow-hidden shadow-2xl relative z-10"
+            exit={{ opacity: 0, scale: 0.94, y: 12 }}
+            transition={{ type: 'spring', stiffness: 380, damping: 32 }}
+            className="relative w-full overflow-y-auto"
+            style={{
+              maxWidth: '480px',
+              maxHeight: '90vh',
+              background: 'var(--bg)',
+              borderRadius: 'var(--radius-xl)',
+              boxShadow: 'var(--shadow-xl)',
+            }}
           >
-            <button 
+            {/* Close button */}
+            <button
+              ref={closeRef}
               onClick={onClose}
-              className="absolute top-8 right-8 p-3 hover:bg-bg/50 rounded-full transition-colors text-text-muted hover:text-text z-20"
+              className="absolute top-4 right-4 z-10 flex items-center justify-center rounded-full transition-colors"
+              style={{
+                width: '36px', height: '36px',
+                color: 'var(--text-muted)',
+                background: 'var(--surface)',
+              }}
+              aria-label="Close patch details"
             >
-              <X size={24} />
+              <X size={18} />
             </button>
 
-            <div className="grid grid-cols-1 md:grid-cols-5 h-full max-h-[90vh] md:max-h-none overflow-y-auto md:overflow-hidden">
-              {/* Left: Illustration & Map (2/5) */}
-              <div className="md:col-span-2 flex flex-col border-b md:border-b-0 md:border-r border-border">
-                <div className={`p-12 flex flex-col items-center justify-center relative`} style={{ backgroundColor: regionData.bg }}>
-                   <div 
-                     className="w-40 h-40 rounded-[2.5rem] bg-white/50 backdrop-blur-sm border-4 flex items-center justify-center mb-6 shadow-xl"
-                     style={{ borderColor: rarityColor }}
-                   >
-                      <div style={{ color: regionData.accent }}>
-                        <Illustration />
-                      </div>
-                   </div>
-                   <div className="text-center">
-                      <div className="text-3xl font-black font-mono tracking-tighter mb-1" style={{ color: regionData.accent }}>{destination.iata}</div>
-                      <div className="bg-white/80 px-4 py-1 rounded-full text-[9px] font-black uppercase tracking-[0.2em] shadow-sm" style={{ color: regionData.text }}>
-                         {rarity} Tier
-                      </div>
-                   </div>
-                </div>
-                
-                {/* Minimal Map */}
-                <div className="flex-1 bg-bg/50 p-8 flex flex-col items-center">
-                   <div className="flex items-center gap-2 text-[9px] font-black uppercase tracking-[0.3em] text-text-subtle mb-4 font-mono">
-                      <Globe size={12} className="text-accent" />
-                      Global Operations
-                   </div>
-                   <div className="w-full h-40 bg-surface rounded-2xl border border-border overflow-hidden relative">
-                      <ComposableMap projectionConfig={{ scale: 120 }}>
-                        <Geographies geography={geoUrl}>
-                          {({ geographies }) =>
-                            geographies.map((geo) => (
-                              <Geography
-                                key={geo.rsmKey}
-                                geography={geo}
-                                fill="#1C1F27"
-                                stroke="#262A35"
-                                strokeWidth={0.5}
-                              />
-                            ))
-                          }
-                        </Geographies>
-                        <Marker coordinates={markerPos}>
-                          <circle r={4} fill="var(--accent)" />
-                          <circle r={8} fill="var(--accent)" opacity={0.3} className="animate-ping" />
-                        </Marker>
-                      </ComposableMap>
-                   </div>
-                </div>
+            {/* Illustration hero */}
+            <div
+              className="flex flex-col items-center pt-10 pb-6 px-6"
+              style={{ background: 'var(--surface-2)' }}
+            >
+              <div
+                className="flex items-center justify-center mb-4"
+                style={{
+                  width: '160px',
+                  height: '160px',
+                  color: regionColor,
+                  boxShadow: earned ? `inset 0 0 0 1.5px ${rarityColor}` : undefined,
+                  borderRadius: 'var(--radius-lg)',
+                  background: 'var(--bg)',
+                }}
+              >
+                <Illustration size={160} />
               </div>
 
-              {/* Right: Stats & Info (3/5) */}
-              <div className="md:col-span-3 p-12 overflow-y-auto">
-                 <div className="mb-10">
-                    <h2 id="modal-title" className="text-4xl font-bold tracking-tighter text-text mb-1">{destination.name}</h2>
-                    <p className="text-text-muted font-medium flex items-center gap-2">
-                       {destination.country} <span className="w-1 h-1 rounded-full bg-border" /> {destination.region}
+              {/* Rarity pill */}
+              {earned && (
+                <span
+                  className="text-[10px] font-[700] font-mono uppercase tracking-[0.12em] px-3 py-1 rounded-full"
+                  style={{ color: rarityColor, background: 'var(--bg)', border: `1px solid ${rarityColor}` }}
+                >
+                  {rarity}
+                </span>
+              )}
+              {!earned && (
+                <span
+                  className="text-[10px] font-[700] font-mono uppercase tracking-[0.12em] px-3 py-1 rounded-full"
+                  style={{ color: 'var(--text-subtle)', background: 'var(--surface)', border: '1px solid var(--border)' }}
+                >
+                  Locked
+                </span>
+              )}
+            </div>
+
+            {/* Content */}
+            <div className="px-6 py-5 space-y-5">
+              {/* City / country */}
+              <div>
+                <h2
+                  id="patch-modal-title"
+                  className="font-[600] leading-tight"
+                  style={{ fontSize: '24px', color: 'var(--text)' }}
+                >
+                  {entry.city}
+                </h2>
+                <p style={{ fontSize: '14px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                  {entry.country}
+                </p>
+                <p
+                  className="font-mono font-[500] mt-1"
+                  style={{ fontSize: '13px', color: regionColor }}
+                >
+                  {entry.iata}
+                </p>
+              </div>
+
+              {/* Stats row */}
+              {earned ? (
+                <div className="grid grid-cols-2 gap-3">
+                  <div
+                    className="rounded-[var(--radius-md)] px-4 py-3"
+                    style={{ background: 'var(--surface)' }}
+                  >
+                    <p className="font-mono text-[10px] uppercase tracking-[0.1em]" style={{ color: 'var(--text-subtle)' }}>
+                      Total visits
                     </p>
-                 </div>
+                    <p className="font-mono font-[600] text-[22px] leading-tight" style={{ color: 'var(--text)' }}>
+                      {visits}
+                    </p>
+                    <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                      {formatVisitCount(visits)}
+                    </p>
+                  </div>
+                  <div
+                    className="rounded-[var(--radius-md)] px-4 py-3"
+                    style={{ background: 'var(--surface)' }}
+                  >
+                    <p className="font-mono text-[10px] uppercase tracking-[0.1em]" style={{ color: 'var(--text-subtle)' }}>
+                      Status
+                    </p>
+                    <p className="font-[600] text-[15px] leading-tight mt-1" style={{ color: 'var(--text)' }}>
+                      {earned.isHome ? 'Home Base' : rarity}
+                    </p>
+                    <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                      {earned.isNew ? 'Earned this month' : 'Lifetime'}
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div
+                  className="rounded-[var(--radius-md)] px-4 py-3 text-center"
+                  style={{ background: 'var(--surface)' }}
+                >
+                  <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
+                    Fly to {entry.city} to unlock this patch.
+                  </p>
+                </div>
+              )}
 
-                 <div className="grid grid-cols-2 gap-6 mb-10">
-                    <div className="bg-bg p-6 rounded-2xl border border-border group hover:border-accent/30 transition-colors">
-                       <p className="text-[10px] font-bold text-text-subtle uppercase tracking-widest mb-2 font-mono">Visits</p>
-                       <p className="text-2xl font-bold text-text">{destination.visits}</p>
-                    </div>
-                    <div className="bg-bg p-6 rounded-2xl border border-border">
-                       <p className="text-[10px] font-bold text-text-subtle uppercase tracking-widest mb-2 font-mono">First Mission</p>
-                       <p className="text-2xl font-bold text-text">12 May 24</p>
-                    </div>
-                 </div>
-
-                 <div className="space-y-6">
-                    <div className="flex items-center gap-4 p-4 rounded-2xl hover:bg-surface-2 transition-colors">
-                       <div className="w-12 h-12 rounded-xl bg-surface border border-border flex items-center justify-center shrink-0">
-                          <Clock size={20} className="text-accent" />
-                       </div>
-                       <div>
-                          <p className="text-[10px] font-bold text-text-subtle uppercase tracking-widest font-mono">Cumulative Stay</p>
-                          <p className="text-sm font-bold text-text">142 Hours on ground</p>
-                       </div>
-                    </div>
-                    <div className="flex items-center gap-4 p-4 rounded-2xl hover:bg-surface-2 transition-colors">
-                       <div className="w-12 h-12 rounded-xl bg-surface border border-border flex items-center justify-center shrink-0">
-                          <Plane size={20} className="text-accent" />
-                       </div>
-                       <div>
-                          <p className="text-[10px] font-bold text-text-subtle uppercase tracking-widest font-mono">Last Flight</p>
-                          <p className="text-sm font-bold text-text">MH 123 · 04 Nov 25</p>
-                       </div>
-                    </div>
-                 </div>
-
-                 <div className="mt-12 pt-8 border-t border-border">
-                    <button className="w-full bg-accent text-accent-fg py-5 rounded-2xl font-bold text-lg hover:bg-accent-hover transition-all flex items-center justify-center gap-3 shadow-xl shadow-accent/20">
-                       <ShieldCheck size={20} strokeWidth={3} />
-                       Verified Flight Record
-                    </button>
-                 </div>
+              {/* Mini map */}
+              <div
+                className="overflow-hidden"
+                style={{
+                  borderRadius: 'var(--radius-md)',
+                  border: '0.5px solid var(--border)',
+                  height: '140px',
+                }}
+              >
+                <ComposableMap
+                  projectionConfig={{ scale: 120 }}
+                  style={{ width: '100%', height: '100%' }}
+                >
+                  <Geographies geography={GEO_URL}>
+                    {({ geographies }) =>
+                      geographies.map((geo) => (
+                        <Geography
+                          key={geo.rsmKey}
+                          geography={geo}
+                          fill="var(--surface)"
+                          stroke="var(--border)"
+                          strokeWidth={0.5}
+                        />
+                      ))
+                    }
+                  </Geographies>
+                  <Marker coordinates={coords}>
+                    <circle r={5} fill={regionColor} />
+                    <circle r={10} fill={regionColor} opacity={0.25} />
+                  </Marker>
+                </ComposableMap>
               </div>
+
+              {/* Badge note for home base */}
+              {earned?.isHome && (
+                <p
+                  className="text-center text-[12px]"
+                  style={{ color: 'var(--text-subtle)', paddingBottom: '4px' }}
+                >
+                  Your home base — Platinum tier at{' '}
+                  <span className="font-mono">100+</span> landings.
+                </p>
+              )}
             </div>
           </motion.div>
         </div>
       )}
     </AnimatePresence>
   );
-};
-
-export default PatchDetailModal;
+}

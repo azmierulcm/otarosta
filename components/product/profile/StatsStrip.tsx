@@ -1,61 +1,47 @@
 'use client';
 
 import React from 'react';
-import { formatBlockHours, formatKilometers } from '@/lib/utils/format';
-import { Plane, Clock, Globe, MapPinned } from 'lucide-react';
+import { formatKilometers } from '@/lib/utils/format';
+import type { LifetimeStats } from '@/lib/utils/stats';
 
-interface StatsStripProps {
-  stats: {
-    sectors: number;
-    blockMinutes: number;
-    kilometers: number;
-    citiesCollected: number;
-    totalAvailableCities: number;
-  };
+interface StatCardProps {
+  label: string;
+  value: string;
+  sublabel?: string;
 }
 
-const StatCard = ({ label, value, sub, icon: Icon }: any) => (
-  <div className="bg-surface p-8 rounded-[2rem] border border-border flex flex-col gap-4 group">
-    <div className="flex justify-between items-start">
-      <div className="w-10 h-10 rounded-xl bg-bg border border-border flex items-center justify-center group-hover:border-accent/30 transition-colors">
-        <Icon size={20} className="text-text-muted group-hover:text-accent transition-colors" />
-      </div>
-      <span className="text-[10px] font-black uppercase tracking-[0.3em] text-text-subtle font-mono">{label}</span>
-    </div>
-    <div className="flex items-baseline gap-2">
-      <span className="text-4xl font-bold tracking-tighter font-mono text-text">{value}</span>
-      {sub && <span className="text-[10px] font-black uppercase tracking-widest text-accent font-mono">{sub}</span>}
-    </div>
+const StatCard = ({ label, value, sublabel }: StatCardProps) => (
+  <div className="bg-surface rounded-[var(--radius-md)] p-5 flex flex-col gap-2">
+    <p className="text-[12px] font-[500] text-text-muted">{label}</p>
+    <p className="text-[24px] font-[500] text-text font-mono leading-none">{value}</p>
+    {sublabel && (
+      <p className="text-[12px] text-text-subtle font-mono">{sublabel}</p>
+    )}
   </div>
 );
 
-const StatsStrip = ({ stats }: StatsStripProps) => {
+interface StatsStripProps {
+  stats: LifetimeStats;
+}
+
+export function StatsStrip({ stats }: StatsStripProps) {
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-      <StatCard 
-        label="Sectors" 
-        value={stats.sectors.toLocaleString()} 
-        icon={Plane} 
+    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+      <StatCard
+        label="Sectors"
+        value={stats.sectors.toLocaleString()}
+        sublabel="total flights"
       />
-      <StatCard 
-        label="Block Hours" 
-        value={formatBlockHours(stats.blockMinutes)} 
-        sub="HRS" 
-        icon={Clock} 
+      <StatCard
+        label="Kilometers"
+        value={formatKilometers(stats.km)}
+        sublabel="distance flown"
       />
-      <StatCard 
-        label="Distance" 
-        value={formatKilometers(stats.kilometers)} 
-        sub="KM" 
-        icon={Globe} 
-      />
-      <StatCard 
-        label="Cities" 
-        value={`${stats.citiesCollected}/${stats.totalAvailableCities}`} 
-        icon={MapPinned} 
+      <StatCard
+        label="Cities"
+        value={`${stats.citiesCollected}`}
+        sublabel={`/ ${stats.citiesAvailable} to unlock`}
       />
     </div>
   );
-};
-
-export default StatsStrip;
+}

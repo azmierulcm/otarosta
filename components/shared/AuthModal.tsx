@@ -1,19 +1,25 @@
 'use client';
 
 import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { X, Mail, Lock, Loader2, AlertCircle, LogIn, UserPlus } from 'lucide-react';
+import { Mail, Lock, Loader2, AlertCircle, LogIn, UserPlus } from 'lucide-react';
+import {
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  GoogleAuthProvider,
+  signInWithPopup,
+} from 'firebase/auth';
+import { auth } from '@/lib/firebase/client';
 import { useAuth } from '@/lib/contexts/AuthContext';
-import { supabase } from '@/lib/utils/supabase';
+import { Modal } from '@/components/shared/Modal';
 
-const AuthModal = () => {
-  const { isAuthModalOpen, closeAuthModal, authView, setAuthView, setUser } = useAuth();
+const TITLE_ID = 'auth-modal-title';
+
+export const AuthModal = () => {
+  const { isAuthModalOpen, closeAuthModal, authView, setAuthView } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  if (!isAuthModalOpen) return null;
 
   const isLogin = authView === 'login';
 
@@ -21,131 +27,141 @@ const AuthModal = () => {
     e.preventDefault();
     setIsLoading(true);
     setError(null);
-
     try {
       if (isLogin) {
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-        if (error) throw error;
-        setUser(data.user);
-        closeAuthModal();
+        await signInWithEmailAndPassword(auth, email, password);
       } else {
-        const { data, error } = await supabase.auth.signUp({
-          email,
-          password,
-        });
-        if (error) throw error;
-        
-        if (data.user && data.session) {
-          setUser(data.user);
-          closeAuthModal();
-        } else {
-          setError('Check your email for the confirmation link!');
-        }
+        await createUserWithEmailAndPassword(auth, email, password);
       }
-    } catch (err: any) {
-      setError(err.message);
+      closeAuthModal();
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Something went wrong';
+      setError(message.replace('Firebase: ', '').replace(/ \(auth\/[^)]+\)/, ''));
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleGoogle = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      await signInWithPopup(auth, new GoogleAuthProvider());
+      closeAuthModal();
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Something went wrong';
+      setError(message.replace('Firebase: ', '').replace(/ \(auth\/[^)]+\)/, ''));
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        onClick={closeAuthModal}
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-      />
-      
-      <motion.div
-        initial={{ opacity: 0, scale: 0.9, y: 20 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.9, y: 20 }}
-        className="bg-white w-full max-w-md rounded-[2.5rem] p-10 relative z-10 shadow-2xl overflow-hidden"
-      >
-        <button onClick={closeAuthModal} className="absolute top-8 right-8 p-2 hover:bg-gray-100 rounded-full transition-colors">
-          <X size={20} className="text-gray-400" />
+    <Modal
+      isOpen={isAuthModalOpen}
+      onClose={closeAuthModal}
+      titleId={TITLE_ID}
+      className="rounded-[var(--radius-xl)] p-10"
+      hideCloseButton={false}
+    >
+      <div className="mb-8 mt-2">
+        <div className="w-12 h-12 bg-accent-soft rounded-[var(--radius-lg)] flex items-center justify-center mb-6">
+          {isLogin
+            ? <LogIn className="text-accent" size={22} aria-hidden="true" />
+            : <UserPlus className="text-accent" size={22} aria-hidden="true" />}
+        </div>
+        <h2 id={TITLE_ID} className="text-[28px] font-semibold text-text leading-tight tracking-tight">
+          {isLogin ? 'Welcome back.' : 'Join the crew.'}
+        </h2>
+        <p className="text-text-muted text-[15px] mt-2">
+          {isLogin
+            ? 'Sign in to your Cemrosta account.'
+            : 'Create an account to build your flight passport.'}
+        </p>
+      </div>
+
+      {error && (
+        <div
+          role="alert"
+          className="mb-6 p-4 rounded-[var(--radius-md)] bg-danger-soft border border-danger/20 flex items-start gap-3 text-[14px] text-danger"
+        >
+          <AlertCircle size={16} className="shrink-0 mt-0.5" aria-hidden="true" />
+          <span>{error}</span>
+        </div>
+      )}
+
+      <form onSubmit={handleAuth} className="space-y-4" noValidate>
+        <div>
+          <label htmlFor="auth-email" className="sr-only">Email address</label>
+          <div className="relative">
+            <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-text-subtle" size={16} aria-hidden="true" />
+            <input
+              id="auth-email"
+              type="email"
+              placeholder="Email address"
+              required
+              autoComplete="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full bg-surface border border-border rounded-[var(--radius-md)] pl-10 pr-4 py-3 text-[15px] text-text placeholder:text-text-subtle focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0 focus-visible:border-accent transition-colors"
+            />
+          </div>
+        </div>
+        <div>
+          <label htmlFor="auth-password" className="sr-only">Password</label>
+          <div className="relative">
+            <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-text-subtle" size={16} aria-hidden="true" />
+            <input
+              id="auth-password"
+              type="password"
+              placeholder="Password"
+              required
+              minLength={6}
+              autoComplete={isLogin ? 'current-password' : 'new-password'}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full bg-surface border border-border rounded-[var(--radius-md)] pl-10 pr-4 py-3 text-[15px] text-text placeholder:text-text-subtle focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0 focus-visible:border-accent transition-colors"
+            />
+          </div>
+        </div>
+
+        <button
+          type="submit"
+          disabled={isLoading}
+          className="w-full bg-accent text-accent-fg rounded-[var(--radius-pill)] py-3 text-[15px] font-medium hover:bg-accent-hover transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+        >
+          {isLoading
+            ? <Loader2 size={16} className="animate-spin" aria-hidden="true" />
+            : isLogin ? 'Sign in' : 'Create account'}
         </button>
+      </form>
 
-        <div className="w-16 h-16 bg-rausch/10 rounded-2xl flex items-center justify-center mb-8">
-           {isLogin ? <LogIn className="text-rausch w-8 h-8" /> : <UserPlus className="text-rausch w-8 h-8" />}
+      <div className="relative my-6" aria-hidden="true">
+        <div className="absolute inset-0 flex items-center">
+          <div className="w-full border-t border-border" />
         </div>
-
-        <div className="mb-10">
-          <h2 className="text-3xl font-black text-gray-900 mb-2">
-            {isLogin ? 'Welcome back' : 'Join Cemrosta'}
-          </h2>
-          <p className="text-gray-500 font-medium italic leading-relaxed">
-            {isLogin ? 'Log in to manage your duty roster.' : 'Create your account to start transforming your schedule.'}
-          </p>
+        <div className="relative flex justify-center">
+          <span className="bg-bg px-3 text-[13px] text-text-muted">or</span>
         </div>
+      </div>
 
-        {error && (
-          <div className={`mb-6 p-4 rounded-2xl flex items-start gap-3 text-sm font-bold border ${
-            error.includes('Check your email') ? 'bg-green-50 text-green-600 border-green-100' : 'bg-red-50 text-red-600 border-red-100'
-          }`}>
-            <AlertCircle size={18} className="shrink-0 mt-0.5" />
-            <p className="leading-relaxed">{error}</p>
-          </div>
-        )}
+      <button
+        onClick={handleGoogle}
+        disabled={isLoading}
+        className="w-full border border-border rounded-[var(--radius-pill)] py-3 text-[15px] text-text hover:bg-surface transition-colors disabled:opacity-50 flex items-center justify-center gap-2 font-medium"
+      >
+        Continue with Google
+      </button>
 
-        <form onSubmit={handleAuth} className="space-y-6">
-          <div className="space-y-4">
-            <div className="relative">
-              <Mail className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
-              <input 
-                type="email" 
-                placeholder="Aviation Email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full bg-gray-50 border border-gray-100 pl-14 pr-6 py-5 rounded-2xl font-bold placeholder:text-gray-300 focus:outline-none focus:ring-2 focus:ring-rausch/20 focus:bg-white transition-all text-gray-900"
-              />
-            </div>
-            <div className="relative">
-              <Lock className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
-              <input 
-                type="password" 
-                placeholder="Password"
-                required
-                minLength={6}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full bg-gray-50 border border-gray-100 pl-14 pr-6 py-5 rounded-2xl font-bold placeholder:text-gray-300 focus:outline-none focus:ring-2 focus:ring-rausch/20 focus:bg-white transition-all text-gray-900"
-              />
-            </div>
-          </div>
-
-          <button 
-            disabled={isLoading}
-            className="w-full bg-rausch text-white py-5 rounded-2xl font-black text-lg shadow-xl shadow-rausch/20 hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50 disabled:scale-100 flex items-center justify-center gap-3"
-          >
-            {isLoading ? <Loader2 className="animate-spin" /> : isLogin ? 'Log In →' : 'Sign Up →'}
-          </button>
-        </form>
-
-        <div className="mt-10 pt-8 border-t border-gray-50 text-center">
-          <p className="text-gray-500 font-medium">
-            {isLogin ? "Don't have an account?" : "Already a member?"}
-            <button 
-              onClick={() => {
-                setAuthView(isLogin ? 'signup' : 'login');
-                setError(null);
-              }}
-              className="ml-2 text-rausch font-black hover:underline"
-            >
-              {isLogin ? 'Sign up' : 'Login'}
-            </button>
-          </p>
-        </div>
-      </motion.div>
-    </div>
+      <p className="mt-6 text-center text-[13px] text-text-muted">
+        {isLogin ? "Don't have an account?" : 'Already have an account?'}{' '}
+        <button
+          onClick={() => { setAuthView(isLogin ? 'signup' : 'login'); setError(null); }}
+          className="text-accent font-medium hover:underline underline-offset-4"
+        >
+          {isLogin ? 'Sign up' : 'Sign in'}
+        </button>
+      </p>
+    </Modal>
   );
 };
-
-export default AuthModal;

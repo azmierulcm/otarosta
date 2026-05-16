@@ -8,40 +8,72 @@ import { useRoster } from '@/lib/contexts/RosterContext';
 import { useAuth } from '@/lib/contexts/AuthContext';
 import { parseRoster } from '@/lib/actions/parseRoster';
 
-const FileUploader = () => {
+interface FileUploaderProps {
+  onSuccess?: () => void;
+}
+
+export const FileUploader = ({ onSuccess }: FileUploaderProps) => {
   const shouldReduceMotion = useReducedMotion();
   const { isLoading, setLoading, error, setError, setRoster } = useRoster();
   const { user } = useAuth();
+  const userId = user?.uid;
 
-  const onDrop = useCallback(async (acceptedFiles: File[]) => {
+  const classifyError = (err: unknown): string => {
+    const msg = err instanceof Error ? err.message : String(err);
+    const lower = msg.toLowerCase();
+    if (lower.includes('not a pdf') || lower.includes('invalid pdf') || lower.includes('unsupported')) {
+      return 'This file isn\'t a PDF roster. Please export your AIMS roster as a PDF and try again.';
+    }
+    if (lower.includes('no flights') || lower.includes('no events') || lower.includes('could not parse') || lower.includes('empty')) {
+      return 'We couldn\'t read any flights from this PDF. Make sure it\'s a Malaysia Airlines AIMS roster, not a scanned image.';
+    }
+    if (lower.includes('network') || lower.includes('fetch') || lower.includes('failed to fetch')) {
+      return 'Network error — check your connection and try again.';
+    }
+    if (lower.includes('too large') || lower.includes('size')) {
+      return 'This PDF is too large. Try a single-month roster file instead.';
+    }
+    if (lower.includes('password') || lower.includes('encrypted')) {
+      return 'This PDF is password-protected. Please remove the password before uploading.';
+    }
+    // Firebase / server errors
+    if (lower.includes('permission') || lower.includes('unauthenticated')) {
+      return 'You need to be signed in to save a roster.';
+    }
+    return 'Something went wrong parsing your roster. Try a different month\'s PDF or contact support.';
+  };
+
+  const onDrop = useCallback(async (acceptedFiles: File[], rejectedFiles: import('react-dropzone').FileRejection[]) => {
+    if (rejectedFiles.length > 0) {
+      setError('Only PDF files are supported. Please export your AIMS roster as a PDF.');
+      return;
+    }
+
     const file = acceptedFiles[0];
     if (!file) return;
 
     setError(null);
     setLoading(true);
-    
-    // Create FormData for the Server Action
+
     const formData = new FormData();
     formData.append('file', file);
-    if (user?.id) {
-      formData.append('userId', user.id);
+    if (userId) {
+      formData.append('userId', userId);
     }
 
     try {
       const result = await parseRoster(formData);
-      setRoster(result);
-      setLoading(false);
-    } catch (err: any) {
-      setError(err.message || 'Failed to parse roster');
+      setRoster(result, result.rosterId);
+      onSuccess?.();
+    } catch (err: unknown) {
+      setError(classifyError(err));
       setLoading(false);
     }
-  }, [setLoading, setError, setRoster]);
+  }, [setLoading, setError, setRoster, userId, onSuccess]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
-    accept: {
-      'application/pdf': ['.pdf'],
-    },
+    accept: { 'application/pdf': ['.pdf'] },
     multiple: false,
     disabled: isLoading,
   });
@@ -53,36 +85,36 @@ const FileUploader = () => {
           whileHover={shouldReduceMotion ? {} : { scale: 1.01 }}
           whileTap={shouldReduceMotion ? {} : { scale: 0.99 }}
           className={`
-            relative cursor-pointer rounded-3xl border-2 border-dashed transition-all duration-300
-            p-12 flex flex-col items-center justify-center gap-4
-            ${isDragActive ? 'border-accent bg-accent/5' : 'border-border hover:border-accent/50 hover:bg-surface'}
+            relative cursor-pointer rounded-[2.5rem] border-2 border-dashed transition-all duration-300
+            p-14 flex flex-col items-center justify-center gap-6
+            ${isDragActive ? 'border-accent bg-accent/5' : 'border-border hover:border-accent/40 hover:bg-surface-2'}
             ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}
           `}
         >
           <input {...getInputProps()} />
-          
+
           <div className={`
-            w-16 h-16 rounded-2xl flex items-center justify-center transition-colors
-            ${isDragActive ? 'bg-accent text-white' : 'bg-surface-2 text-text-subtle'}
+            w-20 h-20 rounded-3xl flex items-center justify-center transition-all duration-500
+            ${isDragActive ? 'bg-accent text-white shadow-xl shadow-accent/20' : 'bg-surface-2 text-text-subtle border border-border'}
           `}>
             {isLoading ? (
-              <Loader2 className="w-8 h-8 animate-spin" />
+              <Loader2 className="w-10 h-10 animate-spin" />
             ) : (
-              <Upload className="w-8 h-8" />
+              <Upload className="w-10 h-10" strokeWidth={2.5} />
             )}
           </div>
 
           <div className="text-center">
-            <p className="text-xl font-semibold text-text">
-              {isLoading ? 'Parsing your roster...' : 'Drop your roster PDF here'}
+            <p className="text-2xl font-bold text-text tracking-tight">
+              {isLoading ? 'Parsing your mission...' : 'Drop your roster PDF here'}
             </p>
-            <p className="text-text-muted mt-1">
-              {isLoading ? 'Hold tight, we\'re decoding the flight data' : 'or click to browse from your computer'}
+            <p className="text-text-muted mt-2 font-bold tracking-tight">
+              {isLoading ? "Hold tight, we're decoding the flight data" : 'or click to browse from your computer'}
             </p>
           </div>
 
-          <div className="mt-4 flex items-center gap-2 text-xs font-medium text-text-subtle bg-surface px-4 py-2 rounded-full">
-            <FileText className="w-3 h-3" />
+          <div className="mt-6 flex items-center gap-2 text-[10px] font-black text-text-subtle bg-surface-2 border border-border px-5 py-2.5 rounded-full font-mono uppercase tracking-[0.2em]">
+            <FileText className="w-4 h-4 text-accent" />
             PDF ROSTERS ONLY
           </div>
         </motion.div>
@@ -94,15 +126,17 @@ const FileUploader = () => {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95 }}
-            className="mt-6 p-4 bg-danger/10 border border-danger/20 rounded-2xl flex items-center gap-3 text-danger"
+            role="alert"
+            className="mt-8 p-6 bg-danger/5 border border-danger/10 rounded-[2rem] flex items-center gap-4 text-danger shadow-sm"
           >
-            <AlertCircle className="w-5 h-5 shrink-0" />
-            <div className="flex-1 text-sm font-medium">{error}</div>
-            <button 
+            <AlertCircle className="w-6 h-6 shrink-0" />
+            <div className="flex-1 text-sm font-bold tracking-tight">{error}</div>
+            <button
               onClick={() => setError(null)}
-              className="p-1 hover:bg-danger/10 rounded-lg transition-colors"
+              aria-label="Dismiss error"
+              className="p-2 hover:bg-danger/10 rounded-xl transition-colors"
             >
-              <XCircle className="w-4 h-4" />
+              <XCircle className="w-5 h-5" aria-hidden="true" />
             </button>
           </motion.div>
         )}
@@ -110,5 +144,3 @@ const FileUploader = () => {
     </div>
   );
 };
-
-export default FileUploader;

@@ -1,34 +1,106 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Download, Share2, Copy, Check, Loader2, Smartphone, Monitor } from 'lucide-react';
+import { X, Download, Share2, Copy, Check, Smartphone, Monitor } from 'lucide-react';
+
+const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])';
+function trapFocus(container: HTMLElement, e: KeyboardEvent) {
+  const els = Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE));
+  if (!els.length) return;
+  if (e.key !== 'Tab') return;
+  if (e.shiftKey) {
+    if (document.activeElement === els[0]) { e.preventDefault(); els[els.length - 1].focus(); }
+  } else {
+    if (document.activeElement === els[els.length - 1]) { e.preventDefault(); els[0].focus(); }
+  }
+}
+import { recentPeriodKeys, parsePeriodKey } from '@/lib/recap/period';
+import type { RecapPeriod } from '@/lib/recap/types';
 
 interface RecapCardModalProps {
   isOpen: boolean;
   onClose: () => void;
   userId: string;
-  month: string;
-  year: string;
 }
 
-const RecapCardModal = ({ isOpen, onClose, userId, month, year }: RecapCardModalProps) => {
-  const [view, setView] = useState<'stories' | 'card'>('stories');
-  const [isCopied, setIsOldVisible] = useState(false);
-  
-  const storiesUrl = `/api/recap/${userId}/${year}/${month}/stories`;
-  const cardUrl = `/api/recap/${userId}/${year}/${month}/card`;
-  
-  const currentUrl = view === 'stories' ? storiesUrl : cardUrl;
+type RecapFormat = 'stories' | 'card';
+
+const PERIOD_TABS: { type: RecapPeriod; label: string }[] = [
+  { type: 'month', label: 'Monthly' },
+  { type: '6m', label: '6 Months' },
+  { type: '1y', label: '1 Year' },
+];
+
+/** Build the image API URL for a given period + format */
+function buildUrl(userId: string, period: RecapPeriod, key: string, format: RecapFormat): string {
+  if (period === 'month') {
+    const [year, month] = key.split('-');
+    return `/api/recap/${userId}/${year}/${month}/${format}`;
+  }
+  if (period === '6m') {
+    const [year, half] = key.split('-H');
+    return `/api/recap/${userId}/${year}/6m/${half}/${format}`;
+  }
+  // 1y
+  return `/api/recap/${userId}/${key}/1y/${format}`;
+}
+
+const RECAP_TITLE_ID = 'recap-modal-title';
+
+export function RecapCardModal({ isOpen, onClose, userId }: RecapCardModalProps) {
+  const [periodType, setPeriodType] = useState<RecapPeriod>('month');
+  const panelRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      triggerRef.current = document.activeElement as HTMLElement;
+      requestAnimationFrame(() => {
+        panelRef.current?.querySelector<HTMLElement>(FOCUSABLE)?.focus();
+      });
+    } else {
+      triggerRef.current?.focus();
+    }
+  }, [isOpen]);
+
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    if (e.key === 'Escape') { onClose(); return; }
+    if (panelRef.current) trapFocus(panelRef.current, e);
+  }, [onClose]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, handleKeyDown]);
+  const [format, setFormat] = useState<RecapFormat>('stories');
+  const [isCopied, setIsCopied] = useState(false);
+
+  const periodKeys = recentPeriodKeys(periodType, 6);
+  const [selectedKey, setSelectedKey] = useState<string>(periodKeys[0] ?? '');
+
+  // Reset selected key when period type changes
+  const handlePeriodChange = (type: RecapPeriod) => {
+    setPeriodType(type);
+    setSelectedKey(recentPeriodKeys(type, 6)[0] ?? '');
+  };
+
+  const currentPeriodKeys = recentPeriodKeys(periodType, 6);
+  const effectiveKey = currentPeriodKeys.includes(selectedKey) ? selectedKey : currentPeriodKeys[0] ?? '';
+  const imageUrl = buildUrl(userId, periodType, effectiveKey, format);
+
+  const periodLabel = effectiveKey
+    ? parsePeriodKey(periodType, effectiveKey).label
+    : '';
 
   const handleCopy = async () => {
     try {
-      const fullUrl = `${window.location.origin}${currentUrl}`;
-      await navigator.clipboard.writeText(fullUrl);
-      setIsOldVisible(true);
-      setTimeout(() => setIsOldVisible(false), 2000);
-    } catch (err) {
-      console.error('Failed to copy:', err);
+      await navigator.clipboard.writeText(window.location.origin + imageUrl);
+      setIsCopied(true);
+      setTimeout(() => setIsCopied(false), 2000);
+    } catch {
+      /* ignore */
     }
   };
 
@@ -36,12 +108,12 @@ const RecapCardModal = ({ isOpen, onClose, userId, month, year }: RecapCardModal
     if (navigator.share) {
       try {
         await navigator.share({
-          title: `My ${month} Mission Recap`,
+          title: `My ${periodLabel} Mission Recap`,
           text: 'Check out my flight stats on Cemrosta!',
-          url: `${window.location.origin}${currentUrl}`,
+          url: window.location.origin + imageUrl,
         });
-      } catch (err) {
-        console.error('Share failed:', err);
+      } catch {
+        /* ignore */
       }
     }
   };
@@ -50,104 +122,184 @@ const RecapCardModal = ({ isOpen, onClose, userId, month, year }: RecapCardModal
     <AnimatePresence>
       {isOpen && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 md:p-8">
+          {/* Backdrop */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="fixed inset-0 bg-bg/95 backdrop-blur-xl"
+            className="fixed inset-0 bg-white/80 backdrop-blur-md"
           />
-          
+
           <motion.div
-            initial={{ opacity: 0, scale: 0.9, y: 20 }}
+            ref={panelRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={RECAP_TITLE_ID}
+            initial={{ opacity: 0, scale: 0.92, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.9, y: 20 }}
-            className="w-full max-w-5xl bg-surface border border-border rounded-[3rem] overflow-hidden shadow-2xl relative z-10 flex flex-col md:flex-row"
+            exit={{ opacity: 0, scale: 0.92, y: 20 }}
+            className="w-full max-w-5xl bg-white border border-border rounded-[3rem] overflow-hidden shadow-2xl relative z-10 flex flex-col md:flex-row max-h-[90vh] md:max-h-[85vh]"
           >
-            {/* Left: Preview */}
-            <div className="flex-1 bg-bg/50 p-8 md:p-12 flex flex-col items-center justify-center border-b md:border-b-0 md:border-r border-border min-h-[400px]">
-               <div className="flex items-center gap-3 mb-8 bg-surface p-1 rounded-full border border-border">
-                  <button 
-                    onClick={() => setView('stories')}
-                    className={`px-6 py-2 rounded-full text-xs font-bold transition-all flex items-center gap-2 ${view === 'stories' ? 'bg-accent text-accent-fg shadow-lg' : 'text-text-muted hover:text-text'}`}
-                  >
-                    <Smartphone size={14} /> Stories
-                  </button>
-                  <button 
-                    onClick={() => setView('card')}
-                    className={`px-6 py-2 rounded-full text-xs font-bold transition-all flex items-center gap-2 ${view === 'card' ? 'bg-accent text-accent-fg shadow-lg' : 'text-text-muted hover:text-text'}`}
-                  >
-                    <Monitor size={14} /> Card
-                  </button>
-               </div>
+            {/* ── Left: Preview ── */}
+            <div className="flex-1 bg-surface-2 p-8 md:p-12 flex flex-col items-center border-b md:border-b-0 md:border-r border-border overflow-y-auto">
 
-               <div className={`relative bg-surface rounded-2xl overflow-hidden shadow-2xl border border-border transition-all duration-500 ${view === 'stories' ? 'aspect-[9/16] h-[500px]' : 'aspect-[1.91/1] w-full max-w-md'}`}>
-                  <img 
-                    src={currentUrl} 
-                    alt="Recap Preview" 
-                    className="w-full h-full object-cover"
-                    loading="lazy"
-                  />
-               </div>
-            </div>
+              {/* Period type tabs */}
+              <div className="flex items-center gap-1 mb-6 bg-white p-1 rounded-full border border-border shadow-sm self-stretch justify-center">
+                {PERIOD_TABS.map((tab) => (
+                  <button
+                    key={tab.type}
+                    onClick={() => handlePeriodChange(tab.type)}
+                    className="flex-1 px-4 py-2 rounded-full text-[11px] font-[700] uppercase tracking-widest transition-all"
+                    style={{
+                      background: periodType === tab.type ? 'var(--accent)' : 'transparent',
+                      color: periodType === tab.type ? 'var(--accent-fg)' : 'var(--text-muted)',
+                    }}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
 
-            {/* Right: Actions */}
-            <div className="w-full md:w-[380px] p-8 md:p-12 flex flex-col">
-              <div className="flex justify-between items-center mb-10">
-                <div className="flex flex-col gap-1">
-                  <div className="w-8 h-1 bg-accent/30" />
-                  <div className="w-8 h-2 bg-accent/60" />
-                  <div className="w-8 h-4 bg-accent" />
-                </div>
-                <button onClick={onClose} className="p-2 hover:bg-surface-2 rounded-full transition-colors text-text-muted hover:text-text">
-                  <X size={24} />
+              {/* Period key picker */}
+              <div className="flex flex-wrap gap-2 mb-6 justify-center">
+                {currentPeriodKeys.map((key) => {
+                  const cfg = parsePeriodKey(periodType, key);
+                  return (
+                    <button
+                      key={key}
+                      onClick={() => setSelectedKey(key)}
+                      className="px-3 py-1.5 rounded-full text-[11px] font-[600] border transition-all"
+                      style={{
+                        background: effectiveKey === key ? 'var(--text)' : 'transparent',
+                        color: effectiveKey === key ? 'var(--bg)' : 'var(--text-muted)',
+                        borderColor: effectiveKey === key ? 'var(--text)' : 'var(--border)',
+                      }}
+                    >
+                      {cfg.label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Format toggle */}
+              <div className="flex items-center gap-2 mb-8 bg-white p-1 rounded-full border border-border shadow-sm">
+                <button
+                  onClick={() => setFormat('stories')}
+                  className="flex items-center gap-2 px-6 py-2 rounded-full text-[10px] font-[800] uppercase tracking-widest transition-all"
+                  style={{
+                    background: format === 'stories' ? 'var(--accent)' : 'transparent',
+                    color: format === 'stories' ? 'var(--accent-fg)' : 'var(--text-muted)',
+                  }}
+                >
+                  <Smartphone size={13} /> Stories
+                </button>
+                <button
+                  onClick={() => setFormat('card')}
+                  className="flex items-center gap-2 px-6 py-2 rounded-full text-[10px] font-[800] uppercase tracking-widest transition-all"
+                  style={{
+                    background: format === 'card' ? 'var(--accent)' : 'transparent',
+                    color: format === 'card' ? 'var(--accent-fg)' : 'var(--text-muted)',
+                  }}
+                >
+                  <Monitor size={13} /> Card
                 </button>
               </div>
 
-              <h2 className="text-3xl font-bold tracking-tighter text-text mb-4">Share your mission.</h2>
-              <p className="text-text-muted font-medium leading-relaxed mb-10">
-                Your monthly highlights are ready for takeoff. Share your card to update your crew and family.
+              {/* Image preview */}
+              <div
+                className="relative bg-white rounded-2xl overflow-hidden shadow-xl border border-border transition-all duration-500"
+                style={
+                  format === 'stories'
+                    ? { aspectRatio: '9/16', height: 480 }
+                    : { aspectRatio: '1.91/1', width: '100%', maxWidth: 440 }
+                }
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  key={imageUrl}
+                  src={imageUrl}
+                  alt="Recap preview"
+                  className="w-full h-full object-cover"
+                  loading="lazy"
+                />
+              </div>
+            </div>
+
+            {/* ── Right: Actions ── */}
+            <div className="w-full md:w-[400px] p-8 md:p-12 flex flex-col bg-white shrink-0">
+              <div className="flex justify-between items-start mb-8">
+                <div className="flex flex-col gap-1.5 mt-1">
+                  <div style={{ width: 40, height: 6, background: 'var(--accent)', opacity: 0.2 }} />
+                  <div style={{ width: 40, height: 10, background: 'var(--accent)', opacity: 0.5 }} />
+                  <div style={{ width: 40, height: 20, background: 'var(--accent)' }} />
+                </div>
+                <button
+                  onClick={onClose}
+                  aria-label="Close mission recap"
+                  className="p-2.5 hover:bg-surface-2 rounded-full transition-colors text-text-muted hover:text-text"
+                >
+                  <X size={24} aria-hidden="true" />
+                </button>
+              </div>
+
+              <h2 id={RECAP_TITLE_ID} className="font-[700] text-text leading-tight mb-3" style={{ fontSize: 32 }}>
+                Share your mission.
+              </h2>
+              <p className="text-text-muted font-[500] leading-snug mb-8" style={{ fontSize: 15 }}>
+                Your {periodLabel} highlights are ready. Download or share with your crew.
               </p>
 
-              <div className="space-y-4 mt-auto">
-                <a 
-                  href={`${currentUrl}?download=1`}
-                  className="w-full bg-accent text-accent-fg py-5 rounded-2xl font-bold text-lg flex items-center justify-center gap-3 shadow-xl shadow-accent/20 hover:bg-accent-hover transition-all"
+              <div className="flex flex-col gap-3 mt-auto">
+                <a
+                  href={`${imageUrl}?download=1`}
+                  className="flex items-center justify-center gap-3 rounded-[var(--radius-pill)] font-[700] transition-all active:scale-95"
+                  style={{
+                    background: 'var(--accent)',
+                    color: 'var(--accent-fg)',
+                    fontSize: 16,
+                    padding: '16px 24px',
+                  }}
                 >
-                  <Download size={20} strokeWidth={3} />
+                  <Download size={20} strokeWidth={2.5} />
                   Download PNG
                 </a>
 
-                <button 
+                <button
                   onClick={handleCopy}
-                  className="w-full bg-surface border border-border text-text py-5 rounded-2xl font-bold text-lg flex items-center justify-center gap-3 hover:bg-surface-2 transition-all active:scale-95"
+                  className="flex items-center justify-center gap-3 rounded-[var(--radius-pill)] font-[600] border border-border transition-all active:scale-95 hover:bg-surface-2"
+                  style={{ fontSize: 15, padding: '14px 24px', color: 'var(--text)' }}
                 >
-                  {isCopied ? <Check size={20} className="text-success" /> : <Copy size={20} />}
-                  {isCopied ? 'Copied Link' : 'Copy Link'}
+                  {isCopied
+                    ? <Check size={18} className="text-success" strokeWidth={2.5} />
+                    : <Copy size={18} />}
+                  {isCopied ? 'Link copied!' : 'Copy link'}
                 </button>
 
                 {typeof navigator !== 'undefined' && !!navigator.share && (
-                  <button 
+                  <button
                     onClick={handleShare}
-                    className="w-full bg-surface border border-border text-text py-5 rounded-2xl font-bold text-lg flex items-center justify-center gap-3 hover:bg-surface-2 transition-all"
+                    className="flex items-center justify-center gap-3 rounded-[var(--radius-pill)] font-[600] border border-border transition-all active:scale-95 hover:bg-surface-2"
+                    style={{ fontSize: 15, padding: '14px 24px', color: 'var(--text)' }}
                   >
-                    <Share2 size={20} />
-                    Share Directly
+                    <Share2 size={18} />
+                    Share directly
                   </button>
                 )}
               </div>
 
-              <div className="mt-12 text-center">
-                 <p className="text-[10px] font-bold text-text-subtle uppercase tracking-[0.4em] font-mono">
-                   // CEMROSTA RECAP ENGINE
-                 </p>
-              </div>
+              <p
+                className="text-center font-mono font-[700] uppercase tracking-widest mt-8"
+                style={{ fontSize: 10, color: 'var(--text-subtle)' }}
+              >
+                {"// MISSION RECAP ENGINE"}
+              </p>
             </div>
           </motion.div>
         </div>
       )}
     </AnimatePresence>
   );
-};
+}
 
 export default RecapCardModal;

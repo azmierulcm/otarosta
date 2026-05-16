@@ -3,27 +3,29 @@
 import { getDocumentProxy, extractText } from 'unpdf';
 import { parseRosterText } from '@/lib/parser';
 import { RosterData, DutyEvent } from '@/lib/types';
-import { supabase } from '@/lib/utils/supabase';
-// Server-side tracking would normally go here
-// import { trackServerEvent } from '@/lib/analytics/server';
+import { saveRoster } from '@/lib/actions/rosters';
 
-export async function parseRoster(formData: FormData): Promise<RosterData> {
+export interface ParsedRosterResult extends RosterData {
+  rosterId: string;
+}
+
+export async function parseRoster(formData: FormData): Promise<ParsedRosterResult> {
   const file = formData.get('file') as File;
   const userId = formData.get('userId') as string;
-  
+
   if (!file) throw new Error('No file uploaded');
+  if (!userId) throw new Error('You must be signed in to upload a roster.');
 
   const arrayBuffer = await file.arrayBuffer();
   const buffer = new Uint8Array(arrayBuffer);
-  
+
   try {
     const pdf = await getDocumentProxy(buffer);
     const { text } = await extractText(pdf, { mergePages: true });
-    
+
     const parsed = parseRosterText(text);
-    
-    // Map ParsedRoster to RosterData (legacy support)
-    const events: DutyEvent[] = parsed.duties.map(d => ({
+
+    const events: DutyEvent[] = parsed.duties.map((d) => ({
       id: d.id,
       type: d.type as any,
       date: d.date,
@@ -38,23 +40,16 @@ export async function parseRoster(formData: FormData): Promise<RosterData> {
       description: d.description,
     }));
 
-    // Verification Logic: Set verified_at and airline if userId is provided
-    if (userId) {
-      await supabase
-        .from('profiles')
-        .update({ 
-          verified_at: new Date().toISOString(),
-          airline: parsed.airline 
-        })
-        .eq('id', userId);
-    }
-
-    return {
+    const rosterData: RosterData = {
       events,
       month: parsed.month,
       year: parsed.year,
       crewName: parsed.crewName,
     };
+
+    const rosterId = await saveRoster(userId, rosterData);
+
+    return { ...rosterData, rosterId };
   } catch (err: any) {
     console.error('PDF Parse Error:', err);
     throw new Error(err.message || 'Could not read PDF roster.');

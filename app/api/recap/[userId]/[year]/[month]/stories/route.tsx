@@ -1,47 +1,33 @@
 import { ImageResponse } from 'next/og';
 import { NextRequest } from 'next/server';
 import { StoriesTemplate } from '@/lib/recap/templates';
-import { getTopSuperlative } from '@/lib/recap/superlatives';
-import { formatBlockHours, formatKilometers } from '@/lib/utils/format';
+import { computeRecap } from '@/lib/recap/compute';
+import { parsePeriodKey } from '@/lib/recap/period';
+import { getRecapFonts } from '@/lib/recap/og-fonts';
 
-export const runtime = 'edge';
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: Promise<{ userId: string; year: string; month: string }> }
+  { params }: { params: Promise<{ userId: string; year: string; month: string }> },
 ) {
   const { userId, year, month } = await params;
-  const { searchParams } = new URL(req.url);
-  const download = searchParams.get('download') === '1';
+  const download = new URL(req.url).searchParams.get('download') === '1';
 
-  // In a real app: fetch from Supabase
-  // For Phase 5, we'll use slightly randomized "impressive" data for the user
-  const data = {
-    month,
-    year,
-    heroValue: '82',
-    heroLabel: 'BLOCK HOURS',
-    sectors: '18',
-    hours: '82',
-    km: '142k',
-    handle: '@azmierul.fo'
-  };
-
-  const mockEvents = [
-    { type: 'FLIGHT', depPort: 'KUL', arrPort: 'LHR', flightNumber: 'MH 4' },
-    { type: 'FLIGHT', depPort: 'LHR', arrPort: 'KUL', flightNumber: 'MH 1' },
-  ];
-
-  const superlative = getTopSuperlative(mockEvents);
+  const periodKey = `${year}-${month.padStart(2, '0')}`;
+  const period = parsePeriodKey('month', periodKey);
+  const [data, fonts] = await Promise.all([computeRecap(userId, period), getRecapFonts()]);
 
   return new ImageResponse(
-    <StoriesTemplate data={data} superlative={superlative} />,
+    <StoriesTemplate data={data} />,
     {
       width: 1080,
       height: 1920,
-      headers: download ? {
-        'Content-Disposition': `attachment; filename="Recap-${month}-${year}-Stories.png"`,
-      } : {},
-    }
+      fonts,
+      headers: download
+        ? { 'Content-Disposition': `attachment; filename="Recap-${periodKey}-Stories.png"` }
+        : {},
+    },
   );
 }

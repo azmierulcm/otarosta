@@ -1,42 +1,47 @@
 'use client';
 
 import React from 'react';
-import ProfileHeader from './ProfileHeader';
-import StatsStrip from './StatsStrip';
-import MonthlyRecap from './MonthlyRecap';
-import DestinationsGrid from './DestinationsGrid';
+import { ProfileHeader } from './ProfileHeader';
+import { StatsStrip } from './StatsStrip';
+import { MonthlyRecap } from './MonthlyRecap';
+import { DestinationsGrid } from './DestinationsGrid';
+import type { SampleProfileData } from '@/lib/fixtures/sample-profile';
 
-interface ProfileFilledProps {
-  data: any;
-}
+export type ProfileFilledProps = Omit<SampleProfileData, 'monthlyRecap'> & {
+  monthlyRecap: SampleProfileData['monthlyRecap'] | null;
+  avatarUrl?: string | null;
+  onShare?: () => void;
+};
 
-const ProfileFilled = ({ data }: ProfileFilledProps) => {
+export function ProfileFilled({
+  displayName,
+  rank,
+  base,
+  aircraft,
+  avatarUrl,
+  lifetimeStats,
+  monthlyRecap,
+  earnedDestinations,
+  onShare,
+}: ProfileFilledProps) {
   return (
-    <div className="max-w-7xl mx-auto px-4 pt-32 pb-32 space-y-12 md:space-y-16">
-      <ProfileHeader 
-        name={data.name}
-        role={data.role}
-        homeBase={data.homeBase}
-        aircraftType={data.aircraftType}
+    <div className="max-w-4xl mx-auto px-4 pt-28 pb-24 space-y-4">
+      <ProfileHeader
+        displayName={displayName}
+        rank={rank}
+        base={base}
+        aircraft={aircraft}
+        avatarUrl={avatarUrl}
+        onShare={onShare}
       />
 
-      <StatsStrip stats={data.lifetimeStats} />
+      <StatsStrip stats={lifetimeStats} />
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 md:gap-12 items-start">
-        <div className="lg:col-span-12">
-          <MonthlyRecap recap={data.monthlyRecap} />
-        </div>
-        
-        <div className="lg:col-span-12 mt-8">
-          <DestinationsGrid 
-            destinations={data.destinations}
-            collectedCount={data.lifetimeStats.citiesCollected}
-            totalCount={data.lifetimeStats.totalAvailableCities}
-          />
-        </div>
+      {monthlyRecap && <MonthlyRecap recap={monthlyRecap} onGenerate={onShare} />}
+
+      <div className="pt-4">
+        <DestinationsGrid earnedDestinations={earnedDestinations} />
       </div>
     </div>
   );
-};
-
-export default ProfileFilled;
+}

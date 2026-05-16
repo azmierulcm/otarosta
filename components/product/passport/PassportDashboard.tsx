@@ -87,7 +87,7 @@ const PassportDashboard = ({ stats, earnedAchievements = [] }: DashboardProps) =
         <ShareModal 
           isOpen={isShareModalOpen} 
           onClose={() => setIsShareModalOpen(false)} 
-          crewId={user?.id || 'demo'} 
+          crewId={user?.uid || 'demo'}
         />
 
         {/* Stats Grid */}

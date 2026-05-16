@@ -1,77 +1,38 @@
 /**
- * PATCH EARNING RULES
- * 
- * 1. UNLOCKING (The Patch):
- *    - A patch is unlocked on the FIRST LANDING (arrPort) at any airport.
- *    - Includes active duty, deadheads (positioning), and diversions.
- *    - Technical stops unlock the patch but don't count as visits.
- * 
- * 2. VISIT COUNTING:
- *    - Outstations: Increments by 1 for every distinct OVERNIGHT stay.
- *    - Overnight = Sign-off on Day N, Sign-on on Day N+1 or later.
- *    - Turnarounds (KUL-SIN-KUL): 0 visits for outstation (SIN).
- *    - Home Base (KUL): Increments by 1 for every return to base (final arrPort of a duty).
- * 
- * 3. RARITY TIERS:
- *    - Bronze: 1 visit (The Explorer)
- *    - Silver: 5+ visits (The Regular)
- *    - Gold: 25+ visits (The Veteran)
- *    - Platinum: 100+ visits (The Legend)
+ * PATCH EARNING RULES — authoritative source of truth
+ *
+ * 1. UNLOCKING
+ *    A patch unlocks on the FIRST landing at an airport, determined by the
+ *    arrPort field of any FLIGHT event. Both operated and deadhead flights
+ *    count — the crew was physically transported there.
+ *
+ * 2. DIVERSIONS
+ *    We treat the roster entry as authoritative. If the PDF says KUL→SIN,
+ *    SIN is awarded. Diversions that were corrected in the roster are handled
+ *    automatically; real-time diversion detection is out of scope.
+ *
+ * 3. TECHNICAL STOPS
+ *    If MAS records a technical stop as a separate leg (KUL→DOH, DOH→LHR),
+ *    DOH earns a patch. The crew physically landed there, and we cannot
+ *    reliably distinguish a fuel stop from a crew-change layover from PDF data.
+ *    Simpler rules → fewer surprises.
+ *
+ * 4. VISIT COUNTING
+ *    visits = number of times the airport appears as arrPort across ALL
+ *    flight events. Every landing = +1 visit, whether it was a turnaround
+ *    (SIN in a KUL→SIN→KUL sequence) or a 3-night RON. This matches the
+ *    server-side logic in lib/actions/destinations.ts.
+ *
+ * 5. RARITY TIERS
+ *    Bronze  : 1+ visits   (The Explorer)
+ *    Silver  : 5+ visits   (The Regular)
+ *    Gold    : 25+ visits  (The Veteran)
+ *    Platinum: 100+ visits (The Legend — typically home base only)
  */
 
-export type Region = 'Southeast Asia' | 'East Asia' | 'South Asia' | 'Oceania' | 'Middle East' | 'Europe' | 'Americas';
+import type { DestinationRegion } from '@/lib/data/destination-catalog';
 
-export interface RegionColorBand {
-  bg: string;     // 50
-  border: string; // 200
-  accent: string; // 600
-  text: string;   // 900
-}
-
-export const REGION_TAXONOMY: Record<Region, RegionColorBand> = {
-  'Southeast Asia': {
-    bg: '#FFFBEB',    // Amber 50
-    border: '#FDE68A', // Amber 200
-    accent: '#D97706', // Amber 600
-    text: '#78350F',   // Amber 900
-  },
-  'East Asia': {
-    bg: '#FFF1F2',    // Coral/Rose 50
-    border: '#FECDD3', // Coral/Rose 200
-    accent: '#E11D48', // Coral/Rose 600
-    text: '#881337',   // Coral/Rose 900
-  },
-  'South Asia': {
-    bg: '#FDF2F8',    // Pink 50
-    border: '#FBCFE8', // Pink 200
-    accent: '#DB2777', // Pink 600
-    text: '#831843',   // Pink 900
-  },
-  'Oceania': {
-    bg: '#F0FDFA',    // Teal 50
-    border: '#CCFBF1', // Teal 200
-    accent: '#0D9488', // Teal 600
-    text: '#134E4A',   // Teal 900
-  },
-  'Middle East': {
-    bg: '#FDF4FF',    // Magenta/Fuchsia 50
-    border: '#FAE8FF', // Magenta/Fuchsia 200
-    accent: '#C026D3', // Magenta/Fuchsia 600
-    text: '#701A75',   // Magenta/Fuchsia 900
-  },
-  'Europe': {
-    bg: '#EEF2FF',    // Indigo 50
-    border: '#C7D2FE', // Indigo 200
-    accent: '#4F46E5', // Indigo 600
-    text: '#312E81',   // Indigo 900
-  },
-  'Americas': {
-    bg: '#EFF6FF',    // Blue 50
-    border: '#BFDBFE', // Blue 200
-    accent: '#2563EB', // Blue 600
-    text: '#1E3A8A',   // Blue 900
-  },
-};
+// ── Rarity ────────────────────────────────────────────────────────────────────
 
 export type RarityTier = 'Bronze' | 'Silver' | 'Gold' | 'Platinum';
 
@@ -82,40 +43,52 @@ export function getRarityTier(visits: number): RarityTier {
   return 'Bronze';
 }
 
-export const RARITY_COLORS: Record<RarityTier, string> = {
-  Bronze: '#A8A29E',   // Warm gray/Stone
-  Silver: '#94A3B8',   // Cool gray/Slate
-  Gold: '#EAB308',     // Yellow
-  Platinum: '#93C5FD', // Light blue/white metallic
+/**
+ * CSS custom property for each rarity tier's border accent.
+ * Applied as box-shadow: inset 0 0 0 1px <value>
+ */
+export const RARITY_CSS: Record<RarityTier, string> = {
+  Bronze:   'var(--patch-saf)',    // warm teak tan
+  Silver:   'var(--text-subtle)', // cool gray
+  Gold:     'var(--warning)',     // warm amber
+  Platinum: 'var(--info)',        // cool blue-white
 };
 
+// ── Region color ──────────────────────────────────────────────────────────────
+
 /**
- * Logic to calculate visits from a list of duty events
+ * Maps a DestinationRegion key to its CSS patch color variable.
+ * Use this as `color` / `stroke` / `currentColor` driver on illustrations.
  */
-export function calculateVisits(iata: string, events: any[]): number {
-  if (iata === 'KUL') {
-    // Count every time KUL is the final arrPort of a day or duty period
-    return events.filter(e => e.type === 'FLIGHT' && e.arrPort === 'KUL').length;
-  }
+export const REGION_PATCH_VAR: Record<DestinationRegion, string> = {
+  sea:  'var(--patch-sea)',
+  east: 'var(--patch-east)',
+  oce:  'var(--patch-oce)',
+  mena: 'var(--patch-mena)',
+  eur:  'var(--patch-eur)',
+  saf:  'var(--patch-saf)',
+};
 
-  let visits = 0;
-  // Simplified logic: count distinct sign-offs at this port that lead to a next-day sign-on
-  // (In a real app, we'd use signOff/signOn times for higher precision)
-  const portEvents = events.filter(e => e.arrPort === iata || e.depPort === iata);
-  
-  // Sort events by date
-  const sorted = [...portEvents].sort((a, b) => a.date.localeCompare(b.date));
+// ── Visit calculation (client-side helper, mirrors server action logic) ────────
 
-  for (let i = 0; i < sorted.length; i++) {
-    const current = sorted[i];
-    const next = sorted[i + 1];
+interface FlightEvent {
+  type: string;
+  depPort: string;
+  arrPort: string;
+  date: string;
+}
 
-    if (current.arrPort === iata && next && next.depPort === iata) {
-      if (current.date !== next.date) {
-        visits++; // Distinct calendar day overnight
-      }
-    }
-  }
-
-  return visits;
+/**
+ * Count how many times `iata` appears as arrPort across the provided events.
+ * Matches the server-side counting logic in lib/actions/destinations.ts.
+ *
+ * Edge cases:
+ * - Turnaround (KUL→SIN→KUL same day): SIN gets 1 visit (one landing)
+ * - RON layover (KUL→LHR → KUL the next day): LHR gets 1 visit
+ * - Home base (KUL): counts every return landing
+ */
+export function calculateVisits(iata: string, events: FlightEvent[]): number {
+  return events.filter(
+    (e) => e.type === 'FLIGHT' && e.arrPort?.toUpperCase() === iata.toUpperCase(),
+  ).length;
 }

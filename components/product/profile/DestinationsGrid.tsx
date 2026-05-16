@@ -1,121 +1,206 @@
 'use client';
 
 import React, { useState } from 'react';
-import { MapPin, Lock } from 'lucide-react';
-import { motion, useReducedMotion } from 'framer-motion';
-import { REGION_TAXONOMY, RARITY_COLORS, getRarityTier } from '@/lib/patches/rules';
+import { Lock } from 'lucide-react';
+import { useReducedMotion, motion } from 'framer-motion';
+import {
+  DESTINATION_CATALOG,
+  REGION_COLORS,
+  type CatalogEntry,
+} from '@/lib/data/destination-catalog';
+import type { EarnedDestination } from '@/lib/actions/destinations';
+import { formatVisitCount } from '@/lib/utils/format';
 import { ILLUSTRATIONS } from '@/lib/patches/illustrations';
-import PatchDetailModal from './PatchDetailModal';
+import { getRarityTier, RARITY_CSS } from '@/lib/patches/rules';
+import { PatchDetailModal } from './PatchDetailModal';
 
-interface Destination {
-  iata: string;
-  name: string;
-  country: string;
-  region: string;
-  visits: number;
-  isHome?: boolean;
-  isNew?: boolean;
-  unlocked: boolean;
+interface PatchCardProps {
+  entry: CatalogEntry;
+  earned?: EarnedDestination;
+  index: number;
+  reduceMotion: boolean;
+  onClick: () => void;
 }
 
-interface DestinationsGridProps {
-  destinations: Destination[];
-  collectedCount: number;
-  totalCount: number;
-}
+function PatchCard({ entry, earned, index, reduceMotion, onClick }: PatchCardProps) {
+  const isUnlocked = !!earned;
+  const regionColor = REGION_COLORS[entry.region];
 
-const Patch = ({ destination, onClick }: { destination: Destination, onClick: () => void }) => {
-  const shouldReduceMotion = useReducedMotion();
-  const regionData = REGION_TAXONOMY[destination.region as keyof typeof REGION_TAXONOMY] || REGION_TAXONOMY['Southeast Asia'];
-  const rarity = getRarityTier(destination.visits);
-  const rarityColor = RARITY_COLORS[rarity];
-  const Illustration = ILLUSTRATIONS[destination.iata] || MapPin;
+  const rarity = isUnlocked ? getRarityTier(earned.visits) : null;
+  const rarityBorder = rarity ? RARITY_CSS[rarity] : null;
 
-  if (!destination.unlocked) {
-    return (
-      <div className="bg-surface border border-border rounded-3xl aspect-[1/1.2] flex flex-col overflow-hidden opacity-100 grayscale cursor-not-allowed">
-        <div className="h-[60%] bg-bg/50 flex items-center justify-center border-b border-border/50">
-          <Lock size={24} className="text-text-subtle" strokeWidth={1.5} />
-        </div>
-        <div className="p-4 flex-1 flex flex-col justify-center">
-          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-text-subtle font-mono mb-1">Locked</p>
-          <p className="text-xs font-bold text-text-subtle/50">{destination.iata}</p>
-        </div>
-      </div>
-    );
-  }
+  const Illustration = ILLUSTRATIONS[entry.iata] ?? ILLUSTRATIONS['Generic'];
+
+  const label = isUnlocked
+    ? `${entry.city} (${entry.iata}) — visited ${earned!.visits} time${earned!.visits !== 1 ? 's' : ''}`
+    : `${entry.city} (${entry.iata}) — locked`;
 
   return (
-    <motion.button 
+    <motion.button
+      type="button"
+      initial={reduceMotion ? false : { opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ delay: reduceMotion ? 0 : Math.min(index * 0.025, 0.5) }}
       onClick={onClick}
-      whileHover={shouldReduceMotion ? {} : { y: -4, scale: 1.02 }}
-      whileTap={shouldReduceMotion ? {} : { scale: 0.98 }}
-      className="bg-surface border border-border rounded-[2rem] aspect-[1/1.2] flex flex-col overflow-hidden group shadow-xl transition-all hover:border-accent/30 text-left outline-none focus:ring-2 focus:ring-accent/50"
+      aria-label={label}
+      className="rounded-[var(--radius-lg)] overflow-hidden flex flex-col cursor-pointer text-left w-full"
+      style={{
+        border: '0.5px solid var(--border)',
+        boxShadow: rarityBorder ? `0 0 0 1px ${rarityBorder}` : undefined,
+      }}
     >
-      <div 
-        className="h-[60%] flex flex-col items-center justify-center border-b border-white/5 relative"
-        style={{ backgroundColor: regionData.bg }}
+      {/* Top section — illustration */}
+      <div
+        className="relative flex items-center justify-center"
+        style={{
+          background: isUnlocked ? 'var(--surface)' : 'var(--surface-2)',
+          borderBottom: '0.5px solid var(--border)',
+          paddingBlock: '33px',
+          minHeight: '180px',
+        }}
       >
-        {/* Rarity Border */}
-        <div className="absolute inset-0 border-2 rounded-[2rem] pointer-events-none opacity-40" style={{ borderColor: rarityColor }} />
-        
-        {destination.isNew && (
-           <div className="absolute top-3 left-3 bg-accent text-accent-fg text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-tighter shadow-sm z-10">New</div>
+        {/* Local script name — top-left, stamp-style */}
+        {entry.localName && (
+          <span
+            className="absolute top-2.5 left-2.5 leading-none font-[500]"
+            dir="auto"
+            style={{
+              fontSize: '14px',
+              color: isUnlocked ? regionColor : 'var(--text-subtle)',
+              opacity: isUnlocked ? 0.7 : 0.4,
+              maxWidth: '60px',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {entry.localName}
+          </span>
         )}
-        {destination.isHome && (
-           <div className="absolute top-3 left-3 bg-white text-bg text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-tighter shadow-sm z-10">Home</div>
+
+        {/* Home / New badge — top-right */}
+        {isUnlocked && earned.isHome && (
+          <span
+            className="absolute top-2.5 right-2.5 px-2 py-0.5 rounded-full text-[10px] font-[600] leading-none"
+            style={{ background: 'var(--warning-soft)', color: 'var(--warning)' }}
+          >
+            home
+          </span>
         )}
-        
-        <div className="mb-2 transition-transform group-hover:scale-110 duration-500" style={{ color: regionData.accent }}>
-           <Illustration />
-        </div>
-        <span className="text-xl font-black font-mono tracking-tighter" style={{ color: regionData.accent }}>{destination.iata}</span>
+        {isUnlocked && earned.isNew && !earned.isHome && (
+          <span
+            className="absolute top-2.5 right-2.5 px-2 py-0.5 rounded-full text-[10px] font-[600] leading-none"
+            style={{ background: 'var(--accent-soft)', color: 'var(--accent)' }}
+          >
+            new
+          </span>
+        )}
+
+        {/* Illustration or lock */}
+        {isUnlocked ? (
+          <div
+            className="w-[72px] h-[72px]"
+            style={{ color: regionColor }}
+            aria-hidden="true"
+          >
+            <Illustration size={72} />
+          </div>
+        ) : (
+          <Lock
+            size={33}
+            strokeWidth={1.5}
+            aria-hidden="true"
+            style={{ color: 'var(--text-subtle)', opacity: 0.35 }}
+          />
+        )}
+
       </div>
 
-      <div className="p-4 flex-1 flex flex-col justify-center">
-        <p className="text-[13px] font-bold text-text leading-tight mb-1 truncate">{destination.name}</p>
-        <p className="text-[11px] font-medium text-text-muted flex items-center gap-1 truncate">
-          {destination.country} <span className="w-0.5 h-0.5 rounded-full bg-border" /> {destination.visits} visits
+      {/* Bottom section — identity */}
+      <div className="bg-bg px-3.5 py-3 flex-1 flex flex-col gap-0.5">
+        <p
+          className="font-mono font-[500] leading-none"
+          style={{
+            fontSize: '22px',
+            color: isUnlocked ? 'var(--text)' : 'var(--text-muted)',
+            letterSpacing: '0.04em',
+          }}
+        >
+          {entry.iata}
+        </p>
+        <p
+          className="font-[500] leading-snug truncate"
+          style={{
+            fontSize: '13px',
+            color: isUnlocked ? 'var(--text)' : 'var(--text-muted)',
+          }}
+        >
+          {entry.city}
+        </p>
+        <p
+          className="leading-snug truncate"
+          style={{ fontSize: '11px', color: 'var(--text-subtle)' }}
+        >
+          {isUnlocked
+            ? earned.isHome
+              ? entry.country
+              : formatVisitCount(earned.visits)
+            : 'Locked'}
         </p>
       </div>
     </motion.button>
   );
-};
+}
 
-const DestinationsGrid = ({ destinations, collectedCount, totalCount }: DestinationsGridProps) => {
-  const [selectedDest, setSelectedDest] = useState<Destination | null>(null);
+interface DestinationsGridProps {
+  earnedDestinations: EarnedDestination[];
+}
+
+export function DestinationsGrid({ earnedDestinations }: DestinationsGridProps) {
+  const reduceMotion = useReducedMotion() ?? false;
+  const earnedMap = new Map(earnedDestinations.map((d) => [d.iata, d]));
+  const collected = earnedDestinations.length;
+
+  const [selectedEntry, setSelectedEntry] = useState<CatalogEntry | null>(null);
 
   return (
-    <div className="space-y-12">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 border-b border-border pb-8">
-        <div>
-          <h3 className="text-2xl font-bold text-text tracking-tight mb-2">Destinations</h3>
-          <p className="text-text-muted font-medium text-sm">
-            You&apos;ve collected <span className="text-accent font-bold">{collectedCount} cities</span> across the globe.
-          </p>
-        </div>
-        <div className="text-[10px] font-black uppercase tracking-[0.4em] text-text-subtle font-mono">
-          {totalCount - collectedCount} Cities to unlock
-        </div>
+    <section>
+      {/* Section header */}
+      <div className="flex items-baseline justify-between mb-4">
+        <h2 className="font-[600] text-text" style={{ fontSize: '18px' }}>
+          Destinations
+        </h2>
+        <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
+          <span className="font-[500] text-text">{collected}</span> collected
+          {' · '}
+          <span>{DESTINATION_CATALOG.length - collected}</span> to unlock
+        </p>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-        {destinations.map((dest) => (
-          <Patch 
-            key={dest.iata} 
-            destination={dest} 
-            onClick={() => setSelectedDest(dest)}
+      {/* Patch grid */}
+      <div
+        className="grid gap-3"
+        style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))' }}
+      >
+        {DESTINATION_CATALOG.map((entry, i) => (
+          <PatchCard
+            key={entry.iata}
+            entry={entry}
+            earned={earnedMap.get(entry.iata)}
+            index={i}
+            reduceMotion={reduceMotion}
+            onClick={() => setSelectedEntry(entry)}
           />
         ))}
       </div>
 
-      <PatchDetailModal 
-        isOpen={!!selectedDest} 
-        onClose={() => setSelectedDest(null)} 
-        destination={selectedDest} 
+      {/* Patch detail modal */}
+      <PatchDetailModal
+        isOpen={!!selectedEntry}
+        onClose={() => setSelectedEntry(null)}
+        entry={selectedEntry}
+        earned={selectedEntry ? (earnedMap.get(selectedEntry.iata) ?? null) : null}
       />
-    </div>
+    </section>
   );
-};
-
-export default DestinationsGrid;
+}

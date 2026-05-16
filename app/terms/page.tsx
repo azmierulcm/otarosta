@@ -1,8 +1,17 @@
-import Navbar from "@/components/shared/Navbar";
-import Footer from "@/components/shared/Footer";
+import { Navbar } from "@/components/shared/Navbar";
+import { Footer } from "@/components/shared/Footer";
 
-export const metadata = {
-  title: "Terms of Service",
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Terms of Service — Cemrosta",
+  description: "The rules and guidelines governing your use of Cemrosta and its crew marketplace.",
+  alternates: { canonical: "/terms" },
+  openGraph: {
+    title: "Terms of Service — Cemrosta",
+    description: "The rules and guidelines governing your use of Cemrosta and its crew marketplace.",
+    url: "https://cemrosta.vercel.app/terms",
+  },
 };
 
 export default function TermsPage() {
@@ -11,7 +20,7 @@ export default function TermsPage() {
       <Navbar />
       <div className="max-w-3xl mx-auto px-4 pt-40 pb-32">
         <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.4em] text-accent mb-6 font-mono">
-          // OPERATIONAL STANDARDS
+          {"// OPERATIONAL STANDARDS"}
         </div>
         <h1 className="text-5xl font-bold text-text tracking-tighter mb-12">Terms of Service</h1>
         
@@ -33,7 +42,7 @@ export default function TermsPage() {
           <section>
             <h2 className="text-2xl font-bold text-text mb-4 tracking-tight">3. Disclaimer of Liability</h2>
             <p>
-              Cemrosta is provided "as is". We are not responsible for errors in calendar synchronization, missed flights, or inaccuracies in the destination passport. Always verify your roster with your airline's official system.
+              Cemrosta is provided &quot;as is&quot;. We are not responsible for errors in calendar synchronization, missed flights, or inaccuracies in the destination passport. Always verify your roster with your airline&apos;s official system.
             </p>
           </section>
 

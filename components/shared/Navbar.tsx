@@ -1,163 +1,151 @@
-'use client';
+'use client'
 
-import React, { useState } from 'react';
-import { User, Menu, X, Upload, LayoutDashboard, Calendar, MapPinned, ShoppingBag, Settings as SettingsIcon } from 'lucide-react';
-import Link from 'next/link';
-import { useAuth } from '@/lib/contexts/AuthContext';
-import { supabase } from '@/lib/utils/supabase';
-import { AnimatePresence, motion } from 'framer-motion';
-import { usePathname } from 'next/navigation';
+import React, { useState, useEffect } from 'react'
+import { Menu, X, Upload, LayoutDashboard, MapPinned, ShoppingBag } from 'lucide-react'
+import Link from 'next/link'
+import { useAuth } from '@/lib/contexts/AuthContext'
+import { AnimatePresence, motion } from 'framer-motion'
+import { usePathname } from 'next/navigation'
 
-const Navbar = () => {
-  const { user, setUser, openAuthModal } = useAuth();
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const pathname = usePathname();
+export const Navbar = () => {
+  const { user, signOutUser, openAuthModal } = useAuth()
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const pathname = usePathname()
 
-  const handleSignOut = async () => {
-    await supabase.auth.signOut();
-    setUser(null);
-  };
-
-  const scrollToTop = () => {
-    if (pathname === '/') {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
-  };
+  // Close mobile menu on Escape
+  useEffect(() => {
+    if (!isMobileMenuOpen) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setIsMobileMenuOpen(false); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [isMobileMenuOpen]);
 
   const navLinks = [
-    { label: 'Dashboard', href: '/', icon: LayoutDashboard, authRequired: true },
-    { label: 'Calendar', href: '/calendar', icon: Calendar, authRequired: true },
-    { label: 'Passport', href: '/profile', icon: MapPinned, authRequired: true },
-    { label: 'Marketplace', href: '/marketplace', icon: ShoppingBag, authRequired: true },
-    { label: 'Settings', href: '/settings', icon: SettingsIcon, authRequired: true },
-  ];
+    { label: 'Timeline', href: '/', icon: LayoutDashboard },
+    { label: 'Passport', href: '/profile', icon: MapPinned },
+    { label: 'Marketplace', href: '/marketplace', icon: ShoppingBag },
+  ]
 
   return (
-    <nav className="fixed top-0 w-full bg-bg/80 backdrop-blur-md border-b border-border z-50">
+    <nav className="sticky top-0 w-full bg-bg border-b border-border z-[100]" style={{ borderBottomWidth: '0.5px' }}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-20">
-          <Link 
-            href="/" 
-            className="flex items-center gap-2 hover:opacity-80 transition-opacity"
-            onClick={scrollToTop}
+        <div className="flex justify-between items-center h-16">
+
+          {/* Wordmark */}
+          <Link
+            href="/"
+            className="text-[22px] font-semibold text-text tracking-tight hover:opacity-75 transition-opacity"
           >
-            {/* Abstract Runway Logo */}
-            <div className="flex flex-col gap-1">
-              <div className="w-6 h-1.5 bg-accent/30" />
-              <div className="w-6 h-3 bg-accent/60" />
-              <div className="w-6 h-6 bg-accent" />
-            </div>
-            <span className="text-2xl font-bold tracking-tight text-text">Cemrosta</span>
+            Cemrosta
           </Link>
 
-          {/* Desktop Nav */}
-          <div className="hidden md:flex items-center gap-4 font-medium text-sm text-text-muted">
+          {/* Desktop right */}
+          <div className="hidden md:flex items-center gap-2">
             {user ? (
               <>
-                <div className="flex items-center gap-2 mr-4">
-                  {navLinks.map((link) => (
-                    <Link 
-                      key={link.href}
-                      href={link.href}
-                      className={`flex items-center gap-2 px-4 py-2 rounded-xl transition-all ${pathname === link.href ? 'text-accent bg-accent/10' : 'hover:text-text hover:bg-surface'}`}
-                    >
-                      <link.icon size={18} />
-                      {link.label}
-                    </Link>
-                  ))}
-                </div>
-                <button 
-                  onClick={handleSignOut}
-                  className="bg-surface text-text border border-border px-6 py-2.5 rounded-xl hover:bg-surface-2 transition-all active:scale-95 font-bold"
+                {navLinks.map((link) => (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-[var(--radius-pill)] text-[14px] font-medium transition-colors ${
+                      pathname === link.href
+                        ? 'text-accent bg-accent-soft'
+                        : 'text-text-muted hover:text-text hover:bg-surface'
+                    }`}
+                  >
+                    <link.icon size={16} />
+                    {link.label}
+                  </Link>
+                ))}
+                <button
+                  onClick={signOutUser}
+                  className="ml-2 px-4 py-2 rounded-[var(--radius-pill)] text-[14px] text-text-muted hover:text-text hover:bg-surface transition-colors"
                 >
-                  Sign Out
+                  Sign out
                 </button>
               </>
             ) : (
               <>
-                <button 
+                <button
                   onClick={() => openAuthModal('login')}
-                  className="text-text-muted hover:text-text px-4 py-2.5 transition-colors font-bold"
+                  className="px-4 py-2 rounded-[var(--radius-pill)] text-[14px] text-text hover:bg-surface transition-colors"
                 >
-                  Sign In
+                  Sign in
                 </button>
-                <button 
-                  onClick={scrollToTop}
-                  className="bg-accent text-accent-fg px-6 py-2.5 rounded-xl hover:bg-accent-hover transition-all active:scale-95 shadow-lg shadow-accent/20 font-bold flex items-center gap-2"
+                <Link
+                  href="#upload"
+                  className="flex items-center gap-2 px-5 py-2 rounded-[var(--radius-pill)] bg-accent text-accent-fg text-[14px] font-medium hover:bg-accent-hover transition-colors shadow-[var(--shadow-sm)]"
                 >
-                  <Upload size={16} strokeWidth={3} />
-                  Upload Roster
-                </button>
+                  <Upload size={15} />
+                  Upload roster
+                </Link>
               </>
             )}
           </div>
 
-          {/* Mobile Menu Toggle */}
-          <div className="md:hidden">
-            <button 
-              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className="p-3 -mr-3 text-text-muted hover:text-text transition-colors"
-            >
-              {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
-            </button>
-          </div>
+          {/* Mobile toggle */}
+          <button
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            className="md:hidden p-2 text-text-muted hover:text-text transition-colors"
+            aria-label={isMobileMenuOpen ? 'Close menu' : 'Open menu'}
+            aria-expanded={isMobileMenuOpen}
+            aria-controls="mobile-nav"
+          >
+            {isMobileMenuOpen ? <X size={22} /> : <Menu size={22} />}
+          </button>
         </div>
       </div>
 
-      {/* Mobile Menu Overlay */}
+      {/* Mobile sheet */}
       <AnimatePresence>
         {isMobileMenuOpen && (
           <motion.div
-            initial={{ opacity: 0, y: -10 }}
+            initial={{ opacity: 0, y: -8 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            className="absolute top-20 left-0 w-full bg-bg border-b border-border md:hidden p-4 space-y-4"
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ type: 'spring', stiffness: 200, damping: 24 }}
+            id="mobile-nav"
+            className="absolute top-16 left-0 w-full bg-bg border-b border-border md:hidden p-4 space-y-2 shadow-[var(--shadow-md)]"
           >
             {user ? (
               <>
-                <div className="grid grid-cols-1 gap-2">
-                  {navLinks.map((link) => (
-                    <Link 
-                      key={link.href}
-                      href={link.href}
-                      onClick={() => setIsMobileMenuOpen(false)}
-                      className={`flex items-center gap-3 px-4 py-4 rounded-2xl font-bold ${pathname === link.href ? 'text-accent bg-accent/10' : 'text-text bg-surface'}`}
-                    >
-                      <link.icon size={20} />
-                      {link.label}
-                    </Link>
-                  ))}
-                </div>
-                <button 
-                  onClick={() => {
-                    handleSignOut();
-                    setIsMobileMenuOpen(false);
-                  }}
-                  className="w-full px-4 py-4 text-text-muted font-bold text-left"
+                {navLinks.map((link) => (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className={`flex items-center gap-3 px-4 py-3 rounded-[var(--radius-lg)] text-[15px] font-medium ${
+                      pathname === link.href
+                        ? 'text-accent bg-accent-soft'
+                        : 'text-text hover:bg-surface'
+                    }`}
+                  >
+                    <link.icon size={18} />
+                    {link.label}
+                  </Link>
+                ))}
+                <button
+                  onClick={() => { signOutUser(); setIsMobileMenuOpen(false) }}
+                  className="w-full text-left px-4 py-3 rounded-[var(--radius-lg)] text-[15px] text-text-muted hover:bg-surface transition-colors"
                 >
-                  Sign Out
+                  Sign out
                 </button>
               </>
             ) : (
               <>
-                <button 
-                  onClick={() => {
-                    scrollToTop();
-                    setIsMobileMenuOpen(false);
-                  }}
-                  className="flex items-center gap-3 w-full px-4 py-4 text-accent-fg font-bold bg-accent rounded-2xl"
+                <Link
+                  href="#upload"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="flex items-center gap-3 w-full px-4 py-3 bg-accent text-accent-fg rounded-[var(--radius-lg)] text-[15px] font-medium"
                 >
-                  <Upload size={20} strokeWidth={3} />
-                  Upload Roster
-                </button>
-                <button 
-                  onClick={() => {
-                    openAuthModal('login');
-                    setIsMobileMenuOpen(false);
-                  }}
-                  className="w-full px-4 py-4 text-text font-bold text-left"
+                  <Upload size={18} />
+                  Upload roster
+                </Link>
+                <button
+                  onClick={() => { openAuthModal('login'); setIsMobileMenuOpen(false) }}
+                  className="w-full text-left px-4 py-3 rounded-[var(--radius-lg)] text-[15px] text-text hover:bg-surface transition-colors"
                 >
-                  Sign In
+                  Sign in
                 </button>
               </>
             )}
@@ -165,7 +153,5 @@ const Navbar = () => {
         )}
       </AnimatePresence>
     </nav>
-  );
-};
-
-export default Navbar;
+  )
+}
