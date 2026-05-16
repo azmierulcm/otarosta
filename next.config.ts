@@ -4,8 +4,6 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   compress: true,
   reactStrictMode: true,
-  // Keep these CJS packages out of the Turbopack bundle — load via native require
-  serverExternalPackages: ['pdf-parse'],
   images: {
     remotePatterns: [
       {

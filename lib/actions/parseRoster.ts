@@ -1,17 +1,19 @@
 'use server';
 
-// pdf-parse is CJS-only — require() avoids Turbopack ESM resolution errors
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const pdfParse = require('pdf-parse') as (
-  buffer: Buffer,
-  options?: Record<string, unknown>
-) => Promise<{ text: string; numpages: number }>;
+import { getDocumentProxy, extractText } from 'unpdf';
 import { parseRosterText } from '@/lib/parser';
 import { RosterData, DutyEvent } from '@/lib/types';
 import { saveRoster } from '@/lib/actions/rosters';
 
 export interface ParsedRosterResult extends RosterData {
   rosterId: string;
+}
+
+/** Remove undefined fields so Firestore doesn't reject the document */
+function stripUndefined<T extends object>(obj: T): T {
+  return Object.fromEntries(
+    Object.entries(obj).filter(([, v]) => v !== undefined)
+  ) as T;
 }
 
 export async function parseRoster(formData: FormData): Promise<ParsedRosterResult> {
@@ -21,17 +23,18 @@ export async function parseRoster(formData: FormData): Promise<ParsedRosterResul
   if (!file) throw new Error('No file uploaded.');
   if (!userId) throw new Error('You must be signed in to upload a roster.');
 
-  // 1. Extract raw text from PDF
+  // 1. Extract text from PDF
   let text = '';
   try {
     const arrayBuffer = await file.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
-    const result = await pdfParse(buffer);
+    const buffer = new Uint8Array(arrayBuffer);
+    const pdf = await getDocumentProxy(buffer);
+    const result = await extractText(pdf, { mergePages: true });
     text = result.text ?? '';
   } catch (err: any) {
     console.error('[parseRoster] PDF extraction failed:', err);
     throw new Error(
-      'Could not read this PDF file. Make sure it is a text-based (not scanned) roster PDF.'
+      'Could not read this PDF. Make sure it is a text-based (not scanned) roster PDF exported from AIMS.'
     );
   }
 
@@ -41,13 +44,12 @@ export async function parseRoster(formData: FormData): Promise<ParsedRosterResul
     );
   }
 
-  // 2. Parse roster structure from extracted text
+  // 2. Parse roster structure
   let parsed;
   try {
     parsed = parseRosterText(text);
   } catch (err: any) {
     console.error('[parseRoster] Parser failed:', err);
-    // Surface the parser's own message — it's already user-friendly
     throw new Error(err.message || 'Could not recognise this roster format.');
   }
 
@@ -57,21 +59,23 @@ export async function parseRoster(formData: FormData): Promise<ParsedRosterResul
     );
   }
 
-  // 3. Map parsed duties to DutyEvent[]
-  const events: DutyEvent[] = parsed.duties.map((d) => ({
-    id: d.id,
-    type: d.type as DutyEvent['type'],
-    date: d.date,
-    flightNumber: d.flight?.flightNumber,
-    depPort: d.flight?.depPort,
-    arrPort: d.flight?.arrPort,
-    std: d.flight?.std,
-    sta: d.flight?.sta,
-    signOn: d.signOn ?? d.flight?.signOn,
-    signOff: d.signOff ?? d.flight?.signOff,
-    hotel: d.flight?.hotel,
-    description: d.description,
-  }));
+  // 3. Map to DutyEvent[], stripping undefined so Firestore accepts the document
+  const events: DutyEvent[] = parsed.duties.map((d) =>
+    stripUndefined({
+      id: d.id,
+      type: d.type as DutyEvent['type'],
+      date: d.date,
+      flightNumber: d.flight?.flightNumber,
+      depPort: d.flight?.depPort,
+      arrPort: d.flight?.arrPort,
+      std: d.flight?.std,
+      sta: d.flight?.sta,
+      signOn: d.signOn ?? d.flight?.signOn,
+      signOff: d.signOff ?? d.flight?.signOff,
+      hotel: d.flight?.hotel,
+      description: d.description,
+    })
+  );
 
   const rosterData: RosterData = {
     events,
@@ -85,7 +89,7 @@ export async function parseRoster(formData: FormData): Promise<ParsedRosterResul
     const rosterId = await saveRoster(userId, rosterData);
     return { ...rosterData, rosterId };
   } catch (err: any) {
-    console.error('[parseRoster] Save failed:', err);
+    console.error('[parseRoster] Firestore save failed:', err);
     throw new Error(
       'Roster was parsed successfully but could not be saved. Please try again.'
     );
