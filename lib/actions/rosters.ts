@@ -39,27 +39,30 @@ export async function saveRoster(userId: string, rosterData: RosterData, icsCont
 }
 
 export async function getUserRosters(userId: string): Promise<RosterSummary[]> {
+  // Single-field query only — avoids needing a composite Firestore index.
+  // Sort by uploadedAt descending in JS instead.
   const snap = await adminDb
     .collection('rosters')
     .where('userId', '==', userId)
-    .orderBy('uploadedAt', 'desc')
     .get();
 
-  return snap.docs.map((doc) => {
-    const d = doc.data();
-    return {
-      id: doc.id,
-      month: d.month,
-      year: d.year,
-      crewName: d.crewName ?? null,
-      airline: d.airline ?? 'MH',
-      uploadedAt: (d.uploadedAt as Timestamp).toDate().toISOString(),
-      eventCount: d.eventCount ?? 0,
-      totalSectors: d.totalSectors ?? 0,
-      totalKm: d.totalKm ?? 0,
-      uniqueDestinations: d.uniqueDestinations ?? 0,
-    };
-  });
+  return snap.docs
+    .map((doc) => {
+      const d = doc.data();
+      return {
+        id: doc.id,
+        month: d.month,
+        year: d.year,
+        crewName: d.crewName ?? null,
+        airline: d.airline ?? 'MH',
+        uploadedAt: (d.uploadedAt as Timestamp).toDate().toISOString(),
+        eventCount: d.eventCount ?? 0,
+        totalSectors: d.totalSectors ?? 0,
+        totalKm: d.totalKm ?? 0,
+        uniqueDestinations: d.uniqueDestinations ?? 0,
+      };
+    })
+    .sort((a, b) => b.uploadedAt.localeCompare(a.uploadedAt)); // newest first
 }
 
 export async function getRoster(rosterId: string): Promise<RosterData & { id: string }> {
