@@ -1,6 +1,11 @@
 'use server';
 
-import pdfParse from 'pdf-parse';
+// pdf-parse is CJS-only — require() avoids Turbopack ESM resolution errors
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const pdfParse = require('pdf-parse') as (
+  buffer: Buffer,
+  options?: Record<string, unknown>
+) => Promise<{ text: string; numpages: number }>;
 import { parseRosterText } from '@/lib/parser';
 import { RosterData, DutyEvent } from '@/lib/types';
 import { saveRoster } from '@/lib/actions/rosters';
