@@ -1,10 +1,19 @@
 import { adminDb } from '@/lib/firebase/admin';
-import { Timestamp } from 'firebase-admin/firestore';
 import { calculateKilometers } from '@/lib/utils/geo/haversine';
 import { getTopSuperlative } from './superlatives';
 import type { PeriodConfig, RecapData, TopDestination } from './types';
 import type { DutyEvent } from '@/lib/types';
 import type { FirestoreRoster } from '@/lib/types/roster';
+
+/** Convert month stored as 3-letter abbreviation ("MAY") or number ("05") to "05" */
+const MONTH_ABBR: Record<string, string> = {
+  JAN: '01', FEB: '02', MAR: '03', APR: '04', MAY: '05', JUN: '06',
+  JUL: '07', AUG: '08', SEP: '09', OCT: '10', NOV: '11', DEC: '12',
+};
+function normalizeMonth(m: string): string {
+  const upper = m.trim().toUpperCase();
+  return MONTH_ABBR[upper] ?? String(m).padStart(2, '0');
+}
 
 /**
  * Fetch all roster documents for a user that fall within the period,
@@ -14,17 +23,22 @@ export async function computeRecap(
   userId: string,
   period: PeriodConfig,
 ): Promise<RecapData> {
-  // Fetch all rosters for this user in the period year
+  // Query by userId only — avoids needing a composite Firestore index.
+  // Year + month filtering is done in JS below.
   const snap = await adminDb
     .collection('rosters')
     .where('userId', '==', userId)
-    .where('year', '==', period.year)
     .get();
 
-  // Filter to rosters whose month falls in the period
+  // Filter to rosters whose year AND month fall within the period.
+  // Handles month stored as abbreviation ("MAY") or zero-padded number ("05").
   const rosters = snap.docs
     .map((doc) => ({ id: doc.id, ...doc.data() } as FirestoreRoster))
-    .filter((r) => period.months.includes(r.month.padStart(2, '0')));
+    .filter((r) => {
+      const yearMatch = String(r.year) === String(period.year);
+      const monthMatch = period.months.includes(normalizeMonth(String(r.month)));
+      return yearMatch && monthMatch;
+    });
 
   // Aggregate top-level stats from summaries (fast — no full event load needed)
   const totalSectors = rosters.reduce((s, r) => s + (r.totalSectors ?? 0), 0);
