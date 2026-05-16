@@ -1,12 +1,14 @@
 'use client';
 
-import React, { useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { Upload, FileText, Loader2, AlertCircle, XCircle } from 'lucide-react';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { useRoster } from '@/lib/contexts/RosterContext';
 import { useAuth } from '@/lib/contexts/AuthContext';
-import { parseRoster } from '@/lib/actions/parseRoster';
+import { parseRosterPreview, saveConfirmedRoster } from '@/lib/actions/parseRoster';
+import { RosterConfirmModal } from '@/components/product/RosterConfirmModal';
+import type { RosterData } from '@/lib/types';
 
 interface FileUploaderProps {
   onSuccess?: () => void;
@@ -17,6 +19,9 @@ export const FileUploader = ({ onSuccess }: FileUploaderProps) => {
   const { isLoading, setLoading, error, setError, setRoster } = useRoster();
   const { user } = useAuth();
   const userId = user?.uid;
+
+  const [previewData, setPreviewData] = useState<RosterData | null>(null);
+  const [savedRosterId, setSavedRosterId] = useState<string | null>(null);
 
   const classifyError = (err: unknown): string => {
     const msg = err instanceof Error ? err.message : String(err);
@@ -74,23 +79,51 @@ export const FileUploader = ({ onSuccess }: FileUploaderProps) => {
     if (!file) return;
 
     setError(null);
+    setPreviewData(null);
+    setSavedRosterId(null);
     setLoading(true);
 
     const formData = new FormData();
     formData.append('file', file);
-    if (userId) {
-      formData.append('userId', userId);
-    }
 
     try {
-      const result = await parseRoster(formData);
-      setRoster(result, result.rosterId);
-      onSuccess?.();
+      const result = await parseRosterPreview(formData);
+      setPreviewData(result);
     } catch (err: unknown) {
       setError(classifyError(err));
+    } finally {
       setLoading(false);
     }
-  }, [setLoading, setError, setRoster, userId, onSuccess]);
+  }, [setLoading, setError]);
+
+  const handleConfirm = async () => {
+    if (!previewData || !userId) return;
+    setLoading(true);
+    try {
+      const { rosterId } = await saveConfirmedRoster(userId, previewData);
+      setSavedRosterId(rosterId);
+    } catch (err) {
+      setError(classifyError(err));
+      setPreviewData(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDone = () => {
+    if (previewData && savedRosterId) {
+      setRoster(previewData, savedRosterId);
+    }
+    setPreviewData(null);
+    setSavedRosterId(null);
+    onSuccess?.();
+  };
+
+  const handleReupload = () => {
+    setPreviewData(null);
+    setSavedRosterId(null);
+    setError(null);
+  };
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
@@ -98,6 +131,8 @@ export const FileUploader = ({ onSuccess }: FileUploaderProps) => {
     multiple: false,
     disabled: isLoading,
   });
+
+  const modalOpen = Boolean(previewData) || Boolean(savedRosterId);
 
   return (
     <div className="max-w-2xl mx-auto px-4">
@@ -162,6 +197,16 @@ export const FileUploader = ({ onSuccess }: FileUploaderProps) => {
           </motion.div>
         )}
       </AnimatePresence>
+
+      <RosterConfirmModal
+        isOpen={modalOpen}
+        previewData={previewData}
+        isSaving={isLoading}
+        savedRosterId={savedRosterId}
+        onConfirm={handleConfirm}
+        onReupload={handleReupload}
+        onDone={handleDone}
+      />
     </div>
   );
 };

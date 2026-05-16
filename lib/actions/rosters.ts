@@ -8,7 +8,7 @@ import { calculateKilometers } from '@/lib/utils/geo/haversine';
 import { extractDestinations } from '@/lib/utils/destinations';
 import { setVerifiedAt } from '@/lib/actions/users';
 
-export async function saveRoster(userId: string, rosterData: RosterData): Promise<string> {
+export async function saveRoster(userId: string, rosterData: RosterData, icsContent?: string): Promise<string> {
   const flights = rosterData.events.filter((e) => e.type === 'FLIGHT');
   const totalSectors = flights.length;
   const totalKm = flights.reduce((acc, e) => {
@@ -29,6 +29,7 @@ export async function saveRoster(userId: string, rosterData: RosterData): Promis
     totalSectors,
     totalKm,
     uniqueDestinations,
+    ...(icsContent ? { icsContent } : {}),
   });
 
   // Mark user as verified crew on first successful roster parse (idempotent)
