@@ -76,6 +76,7 @@ export function RecapCardModal({ isOpen, onClose, userId }: RecapCardModalProps)
   }, [isOpen, handleKeyDown]);
   const [format, setFormat] = useState<RecapFormat>('stories');
   const [isCopied, setIsCopied] = useState(false);
+  const [imgState, setImgState] = useState<'loading' | 'ok' | 'error'>('loading');
 
   const periodKeys = recentPeriodKeys(periodType, 6);
   const [selectedKey, setSelectedKey] = useState<string>(periodKeys[0] ?? '');
@@ -89,6 +90,13 @@ export function RecapCardModal({ isOpen, onClose, userId }: RecapCardModalProps)
   const currentPeriodKeys = recentPeriodKeys(periodType, 6);
   const effectiveKey = currentPeriodKeys.includes(selectedKey) ? selectedKey : currentPeriodKeys[0] ?? '';
   const imageUrl = buildUrl(userId, periodType, effectiveKey, format);
+
+  // Reset image state whenever the URL changes (period, format, key switch)
+  const prevUrlRef = React.useRef(imageUrl);
+  if (prevUrlRef.current !== imageUrl) {
+    prevUrlRef.current = imageUrl;
+    setImgState('loading');
+  }
 
   const periodLabel = effectiveKey
     ? parsePeriodKey(periodType, effectiveKey).label
@@ -208,20 +216,39 @@ export function RecapCardModal({ isOpen, onClose, userId }: RecapCardModalProps)
 
               {/* Image preview */}
               <div
-                className="relative bg-white rounded-2xl overflow-hidden shadow-xl border border-border transition-all duration-500"
+                className="relative bg-surface-2 rounded-2xl overflow-hidden shadow-xl border border-border transition-all duration-500 flex items-center justify-center"
                 style={
                   format === 'stories'
                     ? { aspectRatio: '9/16', height: 480 }
                     : { aspectRatio: '1.91/1', width: '100%', maxWidth: 440 }
                 }
               >
+                {/* Loading spinner */}
+                {imgState === 'loading' && (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 z-10">
+                    <div className="w-8 h-8 rounded-full border-2 border-accent border-t-transparent animate-spin" />
+                    <p className="text-[11px] font-[600] text-text-muted uppercase tracking-widest">Rendering…</p>
+                  </div>
+                )}
+
+                {/* Error state */}
+                {imgState === 'error' && (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-6 text-center z-10">
+                    <p className="text-[13px] font-[700] text-text">Preview unavailable</p>
+                    <p className="text-[11px] text-text-muted leading-snug">No roster data found for this period. Upload a roster first.</p>
+                  </div>
+                )}
+
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   key={imageUrl}
                   src={imageUrl}
                   alt="Recap preview"
                   className="w-full h-full object-cover"
-                  loading="lazy"
+                  style={{ opacity: imgState === 'ok' ? 1 : 0 }}
+                  loading="eager"
+                  onLoad={() => setImgState('ok')}
+                  onError={() => setImgState('error')}
                 />
               </div>
             </div>
