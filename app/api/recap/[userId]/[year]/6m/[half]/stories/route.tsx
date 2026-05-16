@@ -1,9 +1,9 @@
-import { ImageResponse } from 'next/og';
 import { NextRequest, NextResponse } from 'next/server';
 import { StoriesTemplate } from '@/lib/recap/templates';
 import { computeRecap } from '@/lib/recap/compute';
 import { parsePeriodKey } from '@/lib/recap/period';
 import { getRecapFonts } from '@/lib/recap/og-fonts';
+import { renderImage } from '@/lib/recap/render';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -20,17 +20,12 @@ export async function GET(
     const period = parsePeriodKey('6m', periodKey);
     const [data, fonts] = await Promise.all([computeRecap(userId, period), getRecapFonts()]);
 
-    return new ImageResponse(
-      <StoriesTemplate data={data} />,
-      {
-        width: 1080,
-        height: 1920,
-        fonts,
-        headers: download
-          ? { 'Content-Disposition': `attachment; filename="Recap-${periodKey}-Stories.png"` }
-          : {},
-      },
-    );
+    return renderImage(<StoriesTemplate data={data} />, {
+      width: 1080,
+      height: 1920,
+      fonts,
+      filename: download ? `Recap-${periodKey}-Stories.png` : undefined,
+    });
   } catch (err) {
     console.error('[recap/6m/stories] Error:', err);
     return NextResponse.json(
