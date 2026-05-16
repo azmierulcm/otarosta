@@ -98,8 +98,9 @@ export function RosterProvider({ children }: { children: React.ReactNode }) {
       });
 
     return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.uid, selectRoster]);
+  // selectRoster is useCallback([]) — stable reference, intentionally omitted.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.uid]);
 
   const setRoster = useCallback((roster: RosterData, rosterId: string) => {
     setActiveRoster(enrichRoster(roster));

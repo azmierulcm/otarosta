@@ -40,15 +40,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       setUser(firebaseUser)
+      // Unblock the UI as soon as auth state is known — don't wait for
+      // the profile fetch. If getDoc throws or hangs, setIsLoading(false)
+      // would never run and the spinner would be stuck forever.
+      setIsLoading(false)
+
       if (firebaseUser) {
-        const snap = await getDoc(doc(db, 'profiles', firebaseUser.uid))
-        if (snap.exists()) {
-          setProfile({ id: firebaseUser.uid, ...snap.data() } as Profile)
+        try {
+          const snap = await getDoc(doc(db, 'profiles', firebaseUser.uid))
+          if (snap.exists()) {
+            setProfile({ id: firebaseUser.uid, ...snap.data() } as Profile)
+          }
+        } catch {
+          // Profile unavailable — proceed without it, fallbacks handle display
         }
       } else {
         setProfile(null)
       }
-      setIsLoading(false)
     })
     return unsubscribe
   }, [])
