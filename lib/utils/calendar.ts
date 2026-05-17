@@ -1,7 +1,24 @@
-import * as ics from 'ics';
 import { RosterData, DutyEvent } from '@/lib/types';
 
-/** Parse "HH:MM" or "--:--" safely. Returns { h, m } defaulting to 0. */
+/** Format a date+time as ICS DTSTART/DTEND string: 20260502T083000 */
+function toICSDateTime(year: number, month: number, day: number, h: number, m: number): string {
+  return (
+    String(year) +
+    String(month).padStart(2, '0') +
+    String(day).padStart(2, '0') +
+    'T' +
+    String(h).padStart(2, '0') +
+    String(m).padStart(2, '0') +
+    '00'
+  );
+}
+
+/** Format a date as all-day ICS date: 20260502 */
+function toICSDate(year: number, month: number, day: number): string {
+  return String(year) + String(month).padStart(2, '0') + String(day).padStart(2, '0');
+}
+
+/** Parse "HH:MM" safely, returns { h, m } defaulting to 0. */
 function parseTime(timeStr?: string): { h: number; m: number } {
   if (!timeStr) return { h: 0, m: 0 };
   const parts = timeStr.split(':').map((p) => parseInt(p, 10));
@@ -11,26 +28,31 @@ function parseTime(timeStr?: string): { h: number; m: number } {
   };
 }
 
-/** Advance date by one day if duty crosses midnight. */
-function nextDay(year: number, month: number, day: number) {
-  const d = new Date(year, month - 1, day);
-  d.setDate(d.getDate() + 1);
-  return { year: d.getFullYear(), month: d.getMonth() + 1, day: d.getDate() };
+/** Escape ICS text values (commas, semicolons, backslashes, newlines). */
+function icsEscape(str: string): string {
+  return str
+    .replace(/\\/g, '\\\\')
+    .replace(/;/g, '\\;')
+    .replace(/,/g, '\\,')
+    .replace(/\n/g, '\\n');
 }
 
-function buildEventTitle(event: DutyEvent): string {
+/** Unique ID for each event */
+function uid(event: DutyEvent): string {
+  return `cemrosta-${event.date}-${event.id ?? Math.random().toString(36).slice(2)}@cemrosta.app`;
+}
+
+function buildSummary(event: DutyEvent): string {
   switch (event.type) {
     case 'FLIGHT':
       return [
         event.flightNumber,
-        event.depPort && event.arrPort ? `(${event.depPort}–${event.arrPort})` : null,
-      ]
-        .filter(Boolean)
-        .join(' ') || 'Flight';
+        event.depPort && event.arrPort ? `(${event.depPort}-${event.arrPort})` : null,
+      ].filter(Boolean).join(' ') || 'Flight';
     case 'LAYOVER':
-      return event.hotel ? `Layover — ${event.hotel}` : `Layover${event.arrPort ? ` (${event.arrPort})` : ''}`;
+      return event.hotel ? `Layover - ${event.hotel}` : `Layover${event.arrPort ? ` (${event.arrPort})` : ''}`;
     case 'STANDBY':
-      return `Standby${event.description ? ` — ${event.description}` : ''}`;
+      return `Standby${event.description ? ` - ${event.description}` : ''}`;
     case 'OFF':
       return 'Day Off';
     default:
@@ -41,80 +63,92 @@ function buildEventTitle(event: DutyEvent): string {
 function buildDescription(event: DutyEvent): string {
   const lines: string[] = [];
   if (event.flightNumber) lines.push(`Flight: ${event.flightNumber}`);
-  if (event.depPort && event.arrPort) lines.push(`Route: ${event.depPort} → ${event.arrPort}`);
-  if (event.std) lines.push(`Departure: ${event.std}`);
-  if (event.sta) lines.push(`Arrival: ${event.sta}`);
+  if (event.depPort && event.arrPort) lines.push(`Route: ${event.depPort} to ${event.arrPort}`);
+  if (event.std) lines.push(`STD: ${event.std}`);
+  if (event.sta) lines.push(`STA: ${event.sta}`);
   if (event.signOn) lines.push(`Sign-on: ${event.signOn}`);
   if (event.signOff) lines.push(`Sign-off: ${event.signOff}`);
   if (event.hotel) lines.push(`Hotel: ${event.hotel}`);
   if (event.description && event.type !== 'FLIGHT') lines.push(event.description);
-  return lines.join('\n') || event.type;
+  return lines.join('\\n');
+}
+
+function buildVEvent(event: DutyEvent): string {
+  const dateParts = event.date.split('-').map(Number);
+  const year = dateParts[0] ?? new Date().getFullYear();
+  const month = dateParts[1] ?? 1;
+  const day = dateParts[2] ?? 1;
+
+  const startTimeStr = event.signOn || event.std;
+  const endTimeStr = event.signOff || event.sta;
+
+  let dtStart: string;
+  let dtEnd: string;
+
+  if (!startTimeStr && !endTimeStr) {
+    // All-day event
+    dtStart = `DTSTART;VALUE=DATE:${toICSDate(year, month, day)}`;
+    dtEnd   = `DTEND;VALUE=DATE:${toICSDate(year, month, day)}`;
+  } else {
+    const { h: sH, m: sM } = parseTime(startTimeStr);
+    const { h: eH, m: eM } = parseTime(endTimeStr || '23:59');
+
+    // Handle midnight crossover
+    let eYear = year, eMonth = month, eDay = day;
+    if ((eH * 60 + eM) > 0 && (eH * 60 + eM) < (sH * 60 + sM)) {
+      const d = new Date(year, month - 1, day);
+      d.setDate(d.getDate() + 1);
+      eYear = d.getFullYear();
+      eMonth = d.getMonth() + 1;
+      eDay = d.getDate();
+    }
+
+    dtStart = `DTSTART:${toICSDateTime(year, month, day, sH, sM)}`;
+    dtEnd   = `DTEND:${toICSDateTime(eYear, eMonth, eDay, eH, eM)}`;
+  }
+
+  const summary     = icsEscape(buildSummary(event));
+  const description = buildDescription(event); // already escaped inline
+  const location    = event.arrPort ?? event.hotel ?? '';
+
+  const lines = [
+    'BEGIN:VEVENT',
+    `UID:${uid(event)}`,
+    dtStart,
+    dtEnd,
+    `SUMMARY:${summary}`,
+    description ? `DESCRIPTION:${description}` : null,
+    location ? `LOCATION:${icsEscape(location)}` : null,
+    'STATUS:CONFIRMED',
+    event.type === 'OFF' ? 'TRANSP:TRANSPARENT' : 'TRANSP:OPAQUE',
+    'END:VEVENT',
+  ].filter(Boolean) as string[];
+
+  return lines.join('\r\n');
 }
 
 export function generateICS(roster: RosterData): string | null {
-  // Skip OFF days — they clutter the calendar and have no actionable info
-  const relevantEvents = roster.events.filter((e) => e.type !== 'OFF');
+  if (!roster.events || roster.events.length === 0) return null;
 
-  if (relevantEvents.length === 0) return null;
+  // Skip OFF days — they clutter the calendar
+  const events = roster.events.filter((e) => e.type !== 'OFF');
+  if (events.length === 0) return null;
 
-  const icsEvents: ics.EventAttributes[] = relevantEvents.map((event) => {
-    const dateParts = event.date.split('-').map(Number);
-    const year = dateParts[0] ?? new Date().getFullYear();
-    const month = dateParts[1] ?? 1;
-    const day = dateParts[2] ?? 1;
+  const vEvents = events.map(buildVEvent).join('\r\n');
 
-    const startTimeStr = event.signOn || event.std;
-    const endTimeStr = event.signOff || event.sta;
+  const calendar = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'CALSCALE:GREGORIAN',
+    'PRODID:-//Cemrosta//Roster//EN',
+    'METHOD:PUBLISH',
+    'X-WR-CALNAME:Cemrosta Roster',
+    `X-WR-CALDESC:${roster.month} ${roster.year} roster`,
+    vEvents,
+    'END:VCALENDAR',
+  ].join('\r\n');
 
-    // All-day event if no time info available
-    if (!startTimeStr && !endTimeStr) {
-      return {
-        start: [year, month, day] as ics.DateArray,
-        end: [year, month, day] as ics.DateArray,
-        title: buildEventTitle(event),
-        description: buildDescription(event),
-        status: 'CONFIRMED' as const,
-        busyStatus: event.type === 'OFF' ? ('FREE' as const) : ('BUSY' as const),
-        categories: [event.type],
-      };
-    }
-
-    const { h: startH, m: startM } = parseTime(startTimeStr);
-    const { h: endH, m: endM } = parseTime(endTimeStr);
-
-    // Handle midnight crossover
-    let endYear = year, endMonth = month, endDay = day;
-    const startMins = startH * 60 + startM;
-    const endMins = endH * 60 + endM;
-    if (endMins > 0 && endMins < startMins) {
-      ({ year: endYear, month: endMonth, day: endDay } = nextDay(year, month, day));
-    }
-
-    return {
-      start: [year, month, day, startH, startM] as ics.DateArray,
-      end: [endYear, endMonth, endDay, endH, endM] as ics.DateArray,
-      title: buildEventTitle(event),
-      description: buildDescription(event),
-      location: event.arrPort || (event.hotel ?? undefined),
-      status: 'CONFIRMED' as const,
-      busyStatus: 'BUSY' as const,
-      categories: [event.type],
-    };
-  });
-
-  console.log('[generateICS] events to create:', JSON.stringify(icsEvents, null, 2));
-
-  const { error, value } = ics.createEvents(icsEvents);
-
-  if (error) {
-    console.error('[generateICS] ICS validation error message:', (error as Error).message ?? JSON.stringify(error));
-    console.error('[generateICS] ICS error full:', error);
-    // Still try to use the value if it was produced despite validation warnings
-    if (!value) return null;
-  }
-
-  console.log('[generateICS] success, value length:', value?.length);
-  return value || null;
+  return calendar;
 }
 
 export function downloadICS(content: string, filename: string) {
@@ -125,8 +159,6 @@ export function downloadICS(content: string, filename: string) {
   link.setAttribute('download', filename);
   document.body.appendChild(link);
   link.click();
-  document.body.removeChild(link);
-  // Clean up
   setTimeout(() => {
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
