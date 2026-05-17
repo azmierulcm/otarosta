@@ -37,7 +37,7 @@ export const LandingHero = () => {
           </h1>
 
           <p className="text-xl md:text-2xl text-text-muted mb-16 max-w-2xl mx-auto font-bold leading-tight tracking-tight">
-            Drop your Malaysia Airlines roster PDF. Get a synced calendar and a digital passport of every city you&apos;ve flown to.
+            Drop your roster PDF. Get a synced calendar, a digital passport of every city you&apos;ve flown to and plan off days like an adult with a calendar.
           </p>
         </motion.div>
 
