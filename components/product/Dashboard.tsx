@@ -439,7 +439,7 @@ export const Dashboard = () => {
           )}
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-16">
-            <div className="lg:col-span-8 relative">
+            <div className="order-2 lg:order-1 lg:col-span-8 relative">
               <div className="flex items-center gap-4 mb-12">
                 <h3 className="text-3xl font-bold text-text tracking-tighter uppercase italic">Timeline.</h3>
                 <div className="h-px flex-1 bg-border/50" />
@@ -451,7 +451,7 @@ export const Dashboard = () => {
               ))}
             </div>
 
-            <div className="lg:col-span-4">
+            <div className="order-1 lg:order-2 lg:col-span-4">
               <div className="sticky top-32">
                 <div className="flex items-center gap-4 mb-12">
                   <h3 className="text-3xl font-bold text-text tracking-tighter uppercase italic">Calendar.</h3>
