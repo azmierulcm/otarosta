@@ -1,7 +1,7 @@
 import { ImageResponse } from 'next/og';
 import type { ReactElement } from 'react';
 
-type FontOptions = ConstructorParameters<typeof ImageResponse>[1]['fonts'];
+type FontOptions = NonNullable<ConstructorParameters<typeof ImageResponse>[1]>['fonts'];
 
 /**
  * Renders a Satori JSX tree to a PNG Response, forcing eager evaluation so
