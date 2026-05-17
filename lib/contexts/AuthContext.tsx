@@ -2,8 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react'
 import { User, onAuthStateChanged, signOut } from 'firebase/auth'
-import { doc, getDoc } from 'firebase/firestore'
-import { auth, db } from '@/lib/firebase/client'
+import { auth } from '@/lib/firebase/client'
 
 export interface Profile {
   id: string
@@ -48,9 +47,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (firebaseUser) {
         try {
-          const snap = await getDoc(doc(db, 'profiles', firebaseUser.uid))
-          if (snap.exists()) {
-            setProfile({ id: firebaseUser.uid, ...snap.data() } as Profile)
+          // Use the API route (Admin SDK) so Firestore security rules
+          // don't block the read — same approach as writing the profile.
+          const token = await firebaseUser.getIdToken()
+          const res = await fetch('/api/profile', {
+            headers: { Authorization: `Bearer ${token}` },
+          })
+          if (res.ok) {
+            const json = await res.json()
+            if (json.exists && json.data) {
+              setProfile({ id: firebaseUser.uid, ...json.data } as Profile)
+            }
           }
         } catch {
           // Profile unavailable — proceed without it, fallbacks handle display
