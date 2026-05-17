@@ -20,7 +20,8 @@ export async function GET(
     const period = parsePeriodKey('month', periodKey);
     const [data, fonts] = await Promise.all([computeRecap(userId, period), getRecapFonts()]);
 
-    return renderImage(<StoriesTemplate data={data} />, {
+    const baseUrl = new URL(req.url).origin;
+    return renderImage(<StoriesTemplate data={data} baseUrl={baseUrl} />, {
       width: 1080,
       height: 1920,
       fonts,

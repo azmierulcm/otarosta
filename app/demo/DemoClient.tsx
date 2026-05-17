@@ -113,55 +113,200 @@ function PatchCard({ entry, visits }: { entry: typeof DESTINATION_CATALOG[0]; vi
 }
 
 /* ── Fake recap card ─────────────────────────────────────────────────────── */
+const GOLD = '#C8A84B';
+const PARCHMENT = '#F5EDD8';
+
+const PERF_LINE: React.CSSProperties = {
+  height: 1,
+  width: '100%',
+  background: `repeating-linear-gradient(90deg, rgba(200,168,75,0.45) 0px, rgba(200,168,75,0.45) 5px, transparent 5px, transparent 13px)`,
+};
+
 function DemoRecapCard() {
+  const TOP_DESTINATIONS = [
+    { iata: 'KUL', patch: getPatchImageUrl('KUL') },
+    { iata: 'SIN', patch: getPatchImageUrl('SIN') },
+    { iata: 'LHR', patch: getPatchImageUrl('LHR') },
+  ];
+
   return (
     <div
-      className="rounded-[2rem] overflow-hidden border border-border shadow-xl max-w-lg mx-auto"
-      style={{ background: '#0f0f0f' }}
+      className="rounded-[1.75rem] overflow-hidden max-w-[400px] mx-auto"
+      style={{
+        background: 'linear-gradient(160deg, #0E1E30 0%, #0A1520 55%, #0D1A28 100%)',
+        border: `1px solid rgba(200,168,75,0.22)`,
+        boxShadow: `0 24px 72px rgba(0,0,0,0.65), 0 0 0 1px rgba(200,168,75,0.06)`,
+      }}
     >
+      {/* Top perf */}
+      <div className="px-6 pt-5">
+        <div style={PERF_LINE} />
+      </div>
+
       {/* Header */}
-      <div className="px-8 pt-8 pb-6 flex items-center justify-between border-b border-white/10">
+      <div className="px-6 pt-4 pb-3 flex items-end justify-between">
         <div>
-          <p className="text-[10px] font-[800] uppercase tracking-[0.35em] font-mono" style={{ color: '#ffffff40' }}>Cemrosta</p>
-          <p className="text-[22px] font-[700] text-white tracking-tight leading-none mt-0.5">Mission Recap</p>
+          <p
+            className="font-mono font-[800] uppercase tracking-[0.38em] leading-none"
+            style={{ fontSize: 8, color: `${GOLD}70` }}
+          >
+            Cemrosta
+          </p>
+          <p className="font-[700] leading-tight mt-1" style={{ fontSize: 18, color: PARCHMENT }}>
+            Crew Logbook
+          </p>
         </div>
         <div className="text-right">
-          <p className="text-[11px] font-mono" style={{ color: '#ffffff50' }}>MAY 2026</p>
-          <p className="text-[11px] font-mono" style={{ color: 'var(--accent)' }}>Monthly</p>
+          <p
+            className="font-mono font-[700] uppercase tracking-[0.2em]"
+            style={{ fontSize: 9, color: `${GOLD}80` }}
+          >
+            Monthly
+          </p>
+          <p className="font-mono font-[600]" style={{ fontSize: 13, color: PARCHMENT }}>
+            May 2026
+          </p>
         </div>
       </div>
 
-      {/* Hero stat */}
-      <div className="px-8 py-8">
-        <p className="font-mono font-[900] leading-none" style={{ fontSize: 96, color: 'white' }}>18</p>
-        <p className="text-[13px] font-[800] uppercase tracking-[0.35em] font-mono mt-1" style={{ color: 'var(--accent)' }}>Sectors Flown</p>
-      </div>
-
-      {/* Stats grid */}
-      <div className="grid grid-cols-3 border-t border-white/10">
-        {[
-          { label: 'Block Hours', value: '147h' },
-          { label: 'Cities', value: '9' },
-          { label: 'KM Flown', value: '42,300' },
-        ].map((stat) => (
-          <div key={stat.label} className="px-6 py-5 border-r border-white/10 last:border-r-0">
-            <p className="font-mono font-[700] text-white text-[20px] leading-none">{stat.value}</p>
-            <p className="text-[10px] uppercase tracking-widest font-mono mt-1" style={{ color: '#ffffff40' }}>{stat.label}</p>
+      {/* City patch medallions */}
+      <div className="px-6 pb-5 flex items-center gap-3">
+        {TOP_DESTINATIONS.map(({ iata, patch }) => (
+          <div key={iata} className="flex flex-col items-center gap-1.5">
+            <div
+              className="rounded-full flex items-center justify-center overflow-hidden"
+              style={{
+                width: 68,
+                height: 68,
+                background: 'rgba(255,255,255,0.04)',
+                border: `1.5px solid rgba(200,168,75,0.3)`,
+                boxShadow: `0 0 16px rgba(200,168,75,0.08)`,
+              }}
+            >
+              {patch && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={patch} alt={iata} className="w-[52px] h-[52px] object-contain" />
+              )}
+            </div>
+            <p
+              className="font-mono font-[700] tracking-[0.1em]"
+              style={{ fontSize: 8, color: `${GOLD}60` }}
+            >
+              {iata}
+            </p>
           </div>
         ))}
+        <div className="ml-auto flex flex-col items-end gap-0.5">
+          <p className="font-mono font-[600]" style={{ fontSize: 9, color: `${GOLD}35` }}>
+            +6 destinations
+          </p>
+          <p style={{ fontSize: 8, color: `${GOLD}25` }}>this month</p>
+        </div>
       </div>
 
-      {/* Superlative */}
-      <div className="px-8 py-6 border-t border-white/10">
-        <p className="text-[10px] uppercase tracking-widest font-mono mb-1" style={{ color: '#ffffff40' }}>Mission Award</p>
-        <p className="text-[18px] font-[700] text-white">🌍 Globe Trotter</p>
-        <p className="text-[12px] mt-0.5" style={{ color: '#ffffff50' }}>Visited 5+ continents this month</p>
+      {/* Mid perf */}
+      <div className="px-6">
+        <div style={PERF_LINE} />
+      </div>
+
+      {/* Hero stat + secondary stats */}
+      <div className="px-6 pt-5 pb-4 flex items-end gap-0">
+        {/* Big number */}
+        <div className="flex-1">
+          <p
+            className="font-mono font-[900] leading-none"
+            style={{ fontSize: 82, color: PARCHMENT, letterSpacing: '-0.03em' }}
+          >
+            18
+          </p>
+          <p
+            className="font-mono font-[800] uppercase tracking-[0.35em] mt-1.5"
+            style={{ fontSize: 9, color: GOLD }}
+          >
+            Sectors Flown
+          </p>
+        </div>
+
+        {/* Vertical divider + side stats */}
+        <div
+          className="flex flex-col gap-3 pb-0.5"
+          style={{
+            borderLeft: `1px solid rgba(200,168,75,0.18)`,
+            paddingLeft: 18,
+          }}
+        >
+          {[
+            { value: '147h', label: 'Block Hrs' },
+            { value: '9', label: 'Cities' },
+            { value: '42.3K', label: 'KM Flown' },
+          ].map((s) => (
+            <div key={s.label}>
+              <p
+                className="font-mono font-[700] leading-none"
+                style={{ fontSize: 14, color: PARCHMENT }}
+              >
+                {s.value}
+              </p>
+              <p
+                className="font-mono uppercase tracking-widest mt-0.5"
+                style={{ fontSize: 7, color: `${GOLD}55` }}
+              >
+                {s.label}
+              </p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Mission award stamp */}
+      <div
+        className="mx-5 mb-4 rounded-2xl px-5 py-4 flex items-center gap-4"
+        style={{
+          background: 'rgba(200,168,75,0.07)',
+          border: `1px solid rgba(200,168,75,0.18)`,
+        }}
+      >
+        <div
+          className="rounded-full shrink-0 flex items-center justify-center"
+          style={{
+            width: 40,
+            height: 40,
+            border: `1.5px solid rgba(200,168,75,0.55)`,
+            background: 'rgba(200,168,75,0.1)',
+            fontSize: 18,
+          }}
+        >
+          🌍
+        </div>
+        <div>
+          <p
+            className="font-mono font-[800] uppercase tracking-[0.2em]"
+            style={{ fontSize: 8, color: GOLD }}
+          >
+            Mission Award
+          </p>
+          <p className="font-[700] leading-snug" style={{ fontSize: 14, color: PARCHMENT }}>
+            Globe Trotter
+          </p>
+          <p style={{ fontSize: 10, color: `rgba(245,237,216,0.45)` }}>
+            Visited 5+ continents this month
+          </p>
+        </div>
+      </div>
+
+      {/* Bottom perf */}
+      <div className="px-6">
+        <div style={PERF_LINE} />
       </div>
 
       {/* Footer */}
-      <div className="px-8 pb-8 pt-2 flex items-center justify-between">
-        <p className="text-[13px] font-[700] text-white">Muhammad Azmierul</p>
-        <p className="text-[11px] font-mono" style={{ color: '#ffffff30' }}>cemrosta.com</p>
+      <div className="px-6 pt-3 pb-5 flex items-center justify-between">
+        <p className="font-[700]" style={{ fontSize: 12, color: PARCHMENT }}>
+          Muhammad Azmierul
+        </p>
+        <p className="font-mono" style={{ fontSize: 9, color: `rgba(200,168,75,0.35)` }}>
+          cemrosta.com
+        </p>
       </div>
     </div>
   );
