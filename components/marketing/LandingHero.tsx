@@ -33,7 +33,7 @@ export const LandingHero = () => {
           <HeroAnimation />
 
           <h1 className="text-5xl md:text-8xl font-black tracking-tighter text-text mb-8 mt-12 max-w-5xl mx-auto leading-[0.95]">
-            Your roster, <span className="text-accent">reimagined.</span>
+            Roster screenshots? <span className="text-accent">Sudah-lah.</span>
           </h1>
 
           <p className="text-xl md:text-2xl text-text-muted mb-16 max-w-2xl mx-auto font-bold leading-tight tracking-tight">
