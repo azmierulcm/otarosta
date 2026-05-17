@@ -20,7 +20,7 @@ export async function GET(
     const [data, fonts] = await Promise.all([computeRecap(userId, period), getRecapFonts()]);
 
     const baseUrl = new URL(req.url).origin;
-    return renderImage(<CardTemplate data={data} baseUrl={baseUrl} />, {
+    return await renderImage(<CardTemplate data={data} baseUrl={baseUrl} />, {
       width: 1200,
       height: 630,
       fonts,

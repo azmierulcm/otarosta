@@ -21,7 +21,7 @@ export async function GET(
     const [data, fonts] = await Promise.all([computeRecap(userId, period), getRecapFonts()]);
 
     const baseUrl = new URL(req.url).origin;
-    return renderImage(<StoriesTemplate data={data} baseUrl={baseUrl} />, {
+    return await renderImage(<StoriesTemplate data={data} baseUrl={baseUrl} />, {
       width: 1080,
       height: 1920,
       fonts,
