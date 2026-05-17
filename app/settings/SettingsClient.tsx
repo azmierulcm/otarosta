@@ -3,7 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/lib/contexts/AuthContext';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { saveProfile } from '@/lib/actions/profile';
+import { doc, setDoc } from 'firebase/firestore';
+import { db } from '@/lib/firebase/client';
 import {
   User2, Plane, Building2, MapPin, FileText,
   Loader2, Check, ChevronDown, ArrowRight, Sparkles,
@@ -116,7 +117,9 @@ export default function SettingsClient() {
     setSaving(true);
     setError(null);
     try {
-      await saveProfile(user.uid, form);
+      // Write directly with the client SDK — no Admin SDK dependency,
+      // no server action round-trip, works with standard Firestore rules.
+      await setDoc(doc(db, 'profiles', user.uid), form, { merge: true });
       // Update context so Navbar / Dashboard see the new name immediately
       setProfile({ id: user.uid, ...form });
       setSaved(true);
