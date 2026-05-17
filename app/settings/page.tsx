@@ -1,5 +1,7 @@
 import { Metadata } from 'next';
 import { Suspense } from 'react';
+import { Navbar } from '@/components/shared/Navbar';
+import { Footer } from '@/components/shared/Footer';
 import SettingsClient from './SettingsClient';
 
 export const metadata: Metadata = {
@@ -9,8 +11,14 @@ export const metadata: Metadata = {
 
 export default function SettingsPage() {
   return (
-    <Suspense>
-      <SettingsClient />
-    </Suspense>
+    <>
+      <Navbar />
+      <main id="main-content" className="flex-1">
+        <Suspense>
+          <SettingsClient />
+        </Suspense>
+      </main>
+      <Footer />
+    </>
   );
 }
