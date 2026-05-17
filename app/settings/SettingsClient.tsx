@@ -3,7 +3,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/lib/contexts/AuthContext';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { saveProfile } from '@/lib/actions/profile';
 import {
   User2, Plane, Building2, MapPin, FileText,
   Loader2, Check, ChevronDown, ArrowRight, Sparkles,
@@ -116,13 +115,24 @@ export default function SettingsClient() {
     setSaving(true);
     setError(null);
     try {
-      // Use the Admin SDK server action — bypasses Firestore security rules,
-      // returns { ok, error } so failures are always visible to the user.
-      const result = await saveProfile(user.uid, form);
-      if (!result.ok) {
-        throw new Error(result.error || 'Server returned an error');
+      // Get a fresh Firebase ID token to authenticate the API call server-side
+      const idToken = await user.getIdToken();
+
+      const res = await fetch('/api/profile', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${idToken}`,
+        },
+        body: JSON.stringify(form),
+      });
+
+      const json = await res.json();
+      if (!res.ok) {
+        throw new Error(json.error || `Server error ${res.status}`);
       }
-      // Mirror into context so Dashboard / Passport update without a page reload
+
+      // Mirror into context so Dashboard / Passport update without a reload
       setProfile({ id: user.uid, ...form });
       setSaved(true);
       if (isOnboarding) {
@@ -130,8 +140,8 @@ export default function SettingsClient() {
       } else {
         setTimeout(() => setSaved(false), 2500);
       }
-    } catch {
-      setError('Could not save. Check your connection and try again.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not save. Try again.');
     } finally {
       setSaving(false);
     }
