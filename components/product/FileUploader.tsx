@@ -16,12 +16,17 @@ interface FileUploaderProps {
 
 export const FileUploader = ({ onSuccess }: FileUploaderProps) => {
   const shouldReduceMotion = useReducedMotion();
-  const { isLoading, setLoading, error, setError, setRoster } = useRoster();
+  const { error, setError, setRoster } = useRoster();
   const { user } = useAuth();
   const userId = user?.uid;
 
   const [previewData, setPreviewData] = useState<RosterData | null>(null);
   const [savedRosterId, setSavedRosterId] = useState<string | null>(null);
+  // Local states — never touch the shared RosterContext isLoading.
+  // If we did, HomeClient's showLoading would flip true and AnimatePresence
+  // would unmount this component mid-request, making setPreviewData a no-op.
+  const [isParsing, setIsParsing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   const classifyError = (err: unknown): string => {
     const msg = err instanceof Error ? err.message : String(err);
@@ -81,24 +86,25 @@ export const FileUploader = ({ onSuccess }: FileUploaderProps) => {
     setError(null);
     setPreviewData(null);
     setSavedRosterId(null);
-    setLoading(true);
+    setIsParsing(true);
 
     const formData = new FormData();
     formData.append('file', file);
 
     try {
       const result = await parseRosterPreview(formData);
+      if (!result) throw new Error('No response — request may have timed out.');
       setPreviewData(result);
     } catch (err: unknown) {
       setError(classifyError(err));
     } finally {
-      setLoading(false);
+      setIsParsing(false);
     }
-  }, [setLoading, setError]);
+  }, [setError]);
 
   const handleConfirm = async () => {
     if (!previewData || !userId) return;
-    setLoading(true);
+    setIsSaving(true);
     try {
       const { rosterId } = await saveConfirmedRoster(userId, previewData);
       setSavedRosterId(rosterId);
@@ -106,7 +112,7 @@ export const FileUploader = ({ onSuccess }: FileUploaderProps) => {
       setError(classifyError(err));
       setPreviewData(null);
     } finally {
-      setLoading(false);
+      setIsSaving(false);
     }
   };
 
@@ -125,11 +131,13 @@ export const FileUploader = ({ onSuccess }: FileUploaderProps) => {
     setError(null);
   };
 
+  const isBusy = isParsing || isSaving;
+
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: { 'application/pdf': ['.pdf'] },
     multiple: false,
-    disabled: isLoading,
+    disabled: isBusy,
   });
 
   const modalOpen = Boolean(previewData) || Boolean(savedRosterId);
@@ -144,7 +152,7 @@ export const FileUploader = ({ onSuccess }: FileUploaderProps) => {
             relative cursor-pointer rounded-[2.5rem] border-2 border-dashed transition-all duration-300
             p-14 flex flex-col items-center justify-center gap-6
             ${isDragActive ? 'border-accent bg-accent/5' : 'border-border hover:border-accent/40 hover:bg-surface-2'}
-            ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}
+            ${isBusy ? 'opacity-50 cursor-not-allowed' : ''}
           `}
         >
           <input {...getInputProps()} />
@@ -153,7 +161,7 @@ export const FileUploader = ({ onSuccess }: FileUploaderProps) => {
             w-20 h-20 rounded-3xl flex items-center justify-center transition-all duration-500
             ${isDragActive ? 'bg-accent text-white shadow-xl shadow-accent/20' : 'bg-surface-2 text-text-subtle border border-border'}
           `}>
-            {isLoading ? (
+            {isBusy ? (
               <Loader2 className="w-10 h-10 animate-spin" />
             ) : (
               <Upload className="w-10 h-10" strokeWidth={2.5} />
@@ -162,10 +170,10 @@ export const FileUploader = ({ onSuccess }: FileUploaderProps) => {
 
           <div className="text-center">
             <p className="text-2xl font-bold text-text tracking-tight">
-              {isLoading ? 'Parsing your mission...' : 'Drop your roster PDF here'}
+              {isBusy ? 'Parsing your mission...' : 'Drop your roster PDF here'}
             </p>
             <p className="text-text-muted mt-2 font-bold tracking-tight">
-              {isLoading ? "Hold tight, we're decoding the flight data" : 'or click to browse from your computer'}
+              {isBusy ? "Hold tight, we're decoding the flight data" : 'or click to browse from your computer'}
             </p>
           </div>
 
@@ -201,7 +209,7 @@ export const FileUploader = ({ onSuccess }: FileUploaderProps) => {
       <RosterConfirmModal
         isOpen={modalOpen}
         previewData={previewData}
-        isSaving={isLoading}
+        isSaving={isSaving}
         savedRosterId={savedRosterId}
         onConfirm={handleConfirm}
         onReupload={handleReupload}
