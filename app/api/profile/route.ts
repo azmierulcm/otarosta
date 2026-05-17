@@ -1,6 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminAuth, adminDb } from '@/lib/firebase/admin';
 
+export async function GET(req: NextRequest) {
+  try {
+    const authHeader = req.headers.get('Authorization') ?? '';
+    const idToken = authHeader.replace('Bearer ', '');
+    if (!idToken) return NextResponse.json({ error: 'Missing auth token' }, { status: 401 });
+    const decoded = await adminAuth.verifyIdToken(idToken);
+    const snap = await adminDb.collection('profiles').doc(decoded.uid).get();
+    return NextResponse.json({ exists: snap.exists, data: snap.data() ?? null });
+  } catch (err) {
+    return NextResponse.json({ error: String(err) }, { status: 500 });
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     // Verify the caller is authenticated
