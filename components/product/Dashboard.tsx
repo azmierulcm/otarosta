@@ -1,14 +1,28 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plane, Clock, MapPin, Hotel, Download, Upload, ChevronDown, Calendar, Trash2, AlertTriangle, Pencil, Check, X } from 'lucide-react';
 import { useRoster } from '@/lib/contexts/RosterContext';
+import { useAuth } from '@/lib/contexts/AuthContext';
 import { DutyEvent } from '@/lib/types';
 import { generateICS, downloadICS } from '@/lib/utils/calendar';
 import { DutyCalendar } from './DutyCalendar';
 import { DestinationPatch } from './DestinationPatch';
 import { FileUploader } from './FileUploader';
+
+const GREETINGS = [
+  'Hello',      // English
+  '你好',        // Chinese (Mandarin)
+  'Guten Tag',  // German
+  'مرحباً',     // Arabic
+  'Hej',        // Swedish
+  'Hei',        // Norsk (Norwegian)
+  'สวัสดี',     // Thai
+  'Kamusta',    // Tagalog
+  'Bonjour',    // French
+  'Salut',      // Romanian / informal French
+];
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -242,10 +256,18 @@ export const EventCard = ({ event, index }: { event: DutyEvent; index: number })
 
 export const Dashboard = () => {
   const { activeRoster, rosters, activeRosterId, selectRoster, deleteRoster, isLoading } = useRoster();
+  const { profile } = useAuth();
   const [showUpload, setShowUpload] = useState(false);
   const [showRosterPicker, setShowRosterPicker] = useState(false);
-  // ID of the roster currently pending delete confirmation (null = none)
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+
+  // Pick a random greeting on mount (useEffect avoids SSR/client hydration mismatch)
+  const [greeting, setGreeting] = useState('Hello');
+  useEffect(() => {
+    setGreeting(GREETINGS[Math.floor(Math.random() * GREETINGS.length)]);
+  }, []);
+
+  const firstName = profile?.full_name?.split(' ')[0] || 'Crew';
 
   if (!activeRoster) return null;
 
@@ -267,7 +289,11 @@ export const Dashboard = () => {
             <MapPin size={12} className="text-accent" />
             Mission Control
           </div>
-          <h2 className="text-5xl md:text-7xl font-bold tracking-tighter text-text">Your Schedule.</h2>
+          <h2 className="text-5xl md:text-7xl font-bold tracking-tighter text-text">
+            <span className="text-accent">{greeting}</span>
+            {', '}
+            {firstName}.
+          </h2>
 
           {/* Roster Selector */}
           <div className="relative mt-4">

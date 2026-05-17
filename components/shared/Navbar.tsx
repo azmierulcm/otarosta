@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { Menu, X, LayoutDashboard, MapPinned, ShoppingBag } from 'lucide-react'
+import { Menu, X, LayoutDashboard, MapPinned, ShoppingBag, Settings2 } from 'lucide-react'
 import Link from 'next/link'
 import { useAuth } from '@/lib/contexts/AuthContext'
 import { AnimatePresence, motion } from 'framer-motion'
@@ -24,6 +24,7 @@ export const Navbar = () => {
     { label: 'Timeline', href: '/', icon: LayoutDashboard },
     { label: 'Passport', href: '/profile', icon: MapPinned },
     { label: 'Marketplace', href: '/marketplace', icon: ShoppingBag },
+    { label: 'Settings', href: '/settings', icon: Settings2 },
   ]
 
   return (

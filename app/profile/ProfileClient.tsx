@@ -85,7 +85,7 @@ export default function ProfileClient() {
           <ProfileFilled
             displayName={displayName}
             rank={profile?.rank || 'Crew Member'}
-            base="KUL"
+            base={profile?.base || 'KUL'}
             aircraft={profile?.fleet || 'A350'}
             avatarUrl={profile?.avatar_url}
             lifetimeStats={lifetimeStats}

@@ -11,6 +11,7 @@ export interface Profile {
   rank?: string
   airline?: string
   fleet?: string
+  base?: string
   bio?: string
   avatar_url?: string
 }

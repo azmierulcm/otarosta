@@ -11,11 +11,13 @@ import {
 import { auth } from '@/lib/firebase/client';
 import { useAuth } from '@/lib/contexts/AuthContext';
 import { Modal } from '@/components/shared/Modal';
+import { useRouter } from 'next/navigation';
 
 const TITLE_ID = 'auth-modal-title';
 
 export const AuthModal = () => {
   const { isAuthModalOpen, closeAuthModal, authView, setAuthView } = useAuth();
+  const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -30,10 +32,12 @@ export const AuthModal = () => {
     try {
       if (isLogin) {
         await signInWithEmailAndPassword(auth, email, password);
+        closeAuthModal();
       } else {
         await createUserWithEmailAndPassword(auth, email, password);
+        closeAuthModal();
+        router.push('/settings?onboarding=1');
       }
-      closeAuthModal();
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Something went wrong';
       setError(message.replace('Firebase: ', '').replace(/ \(auth\/[^)]+\)/, ''));
@@ -46,8 +50,14 @@ export const AuthModal = () => {
     setIsLoading(true);
     setError(null);
     try {
-      await signInWithPopup(auth, new GoogleAuthProvider());
+      const result = await signInWithPopup(auth, new GoogleAuthProvider());
       closeAuthModal();
+      // Only redirect to settings on a truly new Google signup (no existing profile)
+      // We detect this by checking if it's a new user via metadata
+      const isNewUser = result.user.metadata.creationTime === result.user.metadata.lastSignInTime;
+      if (isNewUser) {
+        router.push('/settings?onboarding=1');
+      }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Something went wrong';
       setError(message.replace('Firebase: ', '').replace(/ \(auth\/[^)]+\)/, ''));
