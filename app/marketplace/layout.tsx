@@ -27,7 +27,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
               Crew-only Marketplace
             </h1>
             <p className="text-[14px] text-text-muted leading-relaxed">
-              Sign in to browse and list gear. Only verified Malaysia Airlines crew can access the marketplace.
+              Sign in to browse and list gear. Only verified crew can access the marketplace.
             </p>
           </div>
           <button

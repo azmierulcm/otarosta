@@ -3,7 +3,7 @@ import PassportClient from "./PassportClient";
 
 export const metadata: Metadata = {
   title: "Your Passport — Cemrosta",
-  description: "View your lifetime flight statistics, destination stamps, and career milestones. Built for Malaysia Airlines crew.",
+  description: "View your lifetime flight statistics, destination stamps, and career milestones. Built for crew.",
   alternates: { canonical: "/passport" },
   openGraph: {
     title: "Your Passport — Cemrosta",

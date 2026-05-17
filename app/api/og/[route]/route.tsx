@@ -226,7 +226,7 @@ function HomeOG() {
               lineHeight: 1.45,
             }}
           >
-            Built for Malaysia Airlines crew
+            Built for crew, by crew
           </div>
         </div>
       </div>
@@ -356,7 +356,7 @@ function MarketplaceOG() {
               lineHeight: 1.45,
             }}
           >
-            Verified Malaysia Airlines crew sellers only
+            Verified crew sellers only
           </div>
         </div>
       </div>

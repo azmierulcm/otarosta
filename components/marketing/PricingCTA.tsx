@@ -25,7 +25,7 @@ export const PricingCTA = () => {
             Ready for <br /> <span className="text-accent italic font-serif font-light">takeoff.</span>
           </h2>
           <p className="text-xl md:text-2xl text-text-muted font-bold leading-snug tracking-tight mb-16">
-            Join the Malaysia Airlines crew already using Cemrosta to own their mission data.
+            Join the crew already using Cemrosta to own their mission data.
           </p>
 
           <button

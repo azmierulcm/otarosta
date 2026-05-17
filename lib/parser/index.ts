@@ -16,7 +16,7 @@ export function parseRosterText(text: string): ParsedRoster {
   }
 
   throw new UnsupportedAirlineError(
-    'This roster format is not yet supported. Currently only Malaysia Airlines AIMS rosters are accepted.'
+    'This roster format is not yet supported. Currently only AIMS rosters are accepted.'
   );
 }
 

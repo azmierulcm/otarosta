@@ -51,7 +51,7 @@ export const LandingHero = () => {
             onClick={() => openAuthModal('signup')}
             className="w-full bg-accent text-accent-fg px-10 py-6 rounded-full text-xl font-black shadow-2xl shadow-accent/20 hover:scale-[1.03] hover:bg-accent-hover transition-all active:scale-95 flex items-center justify-center gap-4"
           >
-            Create your free account
+            Ditch the PDF Roster
             <ArrowRight size={24} strokeWidth={3} />
           </button>
           <button

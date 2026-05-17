@@ -38,7 +38,7 @@ export async function parseRosterPreview(formData: FormData): Promise<RosterData
   }
 
   if (!parsed.duties || parsed.duties.length === 0) {
-    throw new Error('No duties were found. Make sure this is a Malaysia Airlines AIMS roster PDF.');
+    throw new Error('No duties were found. Make sure this is an AIMS roster PDF.');
   }
 
   const events: DutyEvent[] = parsed.duties.map((d) =>

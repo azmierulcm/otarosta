@@ -30,7 +30,7 @@ export function parseMasAims(text: string): ParsedRoster {
   const matches = Array.from(text.matchAll(dateRegex));
 
   if (matches.length === 0) {
-    throw new Error('No dates found in the roster. Please ensure this is a text-based Malaysia Airlines PDF.');
+    throw new Error('No dates found in the roster. Please ensure this is a text-based AIMS roster PDF.');
   }
 
   const months: Record<string, string> = {

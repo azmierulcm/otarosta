@@ -8,7 +8,7 @@ const STEPS = [
   {
     icon: FileUp,
     title: "Drop Roster",
-    desc: "Drag your Malaysia Airlines AIMS PDF into the dash. We extract every flight and duty instantly.",
+    desc: "Drag your AIMS PDF into the dash. We extract every flight and duty instantly.",
   },
   {
     icon: CalendarSync,

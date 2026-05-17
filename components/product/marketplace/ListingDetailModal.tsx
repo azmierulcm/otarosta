@@ -187,7 +187,7 @@ export const ListingDetailModal = ({ listing, isOpen, onClose }: { listing: List
                     <div className="flex-1">
                       <p className="text-[10px] font-black text-text-subtle uppercase tracking-widest mb-1 font-mono">Listed By</p>
                       <p className="text-xl font-bold text-text tracking-tight">{listing.profiles?.full_name || "Crew Member"}</p>
-                      <p className="text-xs text-accent font-black uppercase tracking-widest">{listing.profiles?.rank || 'Malaysia Airlines'}</p>
+                      <p className="text-xs text-accent font-black uppercase tracking-widest">{listing.profiles?.rank || 'Crew Member'}</p>
                     </div>
                  </div>
 
