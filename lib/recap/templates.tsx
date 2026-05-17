@@ -5,21 +5,28 @@ import type { RecapData } from './types';
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
 // Passport / travel-stamp aesthetic — matches city patch artwork language
-const BG_GRAD  = 'linear-gradient(160deg, #0E1E30 0%, #0A1520 55%, #0D1A28 100%)';
-const BG_SOLID = '#0A1520'; // fallback for Satori gradient issues
-const GOLD     = '#C8A84B';
+//
+// NOTE: Satori (used by @vercel/og) does NOT support:
+//   - repeating-linear-gradient  → use dashed borders instead
+//   - background shorthand with gradient → use backgroundImage + backgroundColor
+const BG_GRAD   = 'linear-gradient(160deg, #0E1E30 0%, #0A1520 55%, #0D1A28 100%)';
+const BG_SOLID  = '#0A1520';
+const GOLD      = '#C8A84B';
 const PARCHMENT = '#F5EDD8';
-const GOLD_DIM  = 'rgba(200,168,75,0.55)';
-const GOLD_FAINT = 'rgba(200,168,75,0.2)';
-const PARCHMENT_DIM = 'rgba(245,237,216,0.5)';
+const GOLD_DIM   = 'rgba(200,168,75,0.55)';
+const GOLD_FAINT = 'rgba(200,168,75,0.22)';
+const PARCHMENT_DIM   = 'rgba(245,237,216,0.5)';
 const PARCHMENT_FAINT = 'rgba(245,237,216,0.35)';
-const SURFACE  = 'rgba(255,255,255,0.04)';
-const AWARD_BG = 'rgba(200,168,75,0.08)';
+const SURFACE   = 'rgba(255,255,255,0.04)';
+const AWARD_BG  = 'rgba(200,168,75,0.08)';
 const MONO = 'IBM Plex Mono';
 
-// Perforated-line background — stamp/passport feel
-const PERF_BG =
-  'repeating-linear-gradient(90deg, rgba(200,168,75,0.45) 0px, rgba(200,168,75,0.45) 5px, transparent 5px, transparent 13px)';
+// Perforated line — use dashed border (Satori-safe), NOT repeating-linear-gradient
+const PERF_STYLE = {
+  width: '100%',
+  height: 0,
+  borderTop: `1.5px dashed rgba(200,168,75,0.4)`,
+} as const;
 
 // ── Patch medallion ───────────────────────────────────────────────────────────
 
@@ -103,16 +110,15 @@ export function StoriesTemplate({
         width: '100%',
         display: 'flex',
         flexDirection: 'column',
-        background: BG_GRAD,
+        backgroundImage: BG_GRAD,
         backgroundColor: BG_SOLID,
-        padding: '0',
         color: PARCHMENT,
         fontFamily: 'sans-serif',
       }}
     >
       {/* Top perf */}
       <div style={{ padding: '56px 80px 0' }}>
-        <div style={{ height: 2, width: '100%', backgroundImage: PERF_BG }} />
+        <div style={PERF_STYLE} />
       </div>
 
       {/* Header */}
@@ -162,7 +168,7 @@ export function StoriesTemplate({
 
       {/* Mid perf */}
       <div style={{ padding: '0 80px' }}>
-        <div style={{ height: 2, width: '100%', backgroundImage: PERF_BG }} />
+        <div style={PERF_STYLE} />
       </div>
 
       {/* Patch medallions row */}
@@ -174,29 +180,27 @@ export function StoriesTemplate({
           padding: '72px 80px 64px',
         }}
       >
-        {top3.map(({ iata }) => (
-          <PatchMedallion key={iata} iata={iata} size={180} baseUrl={baseUrl} labelSize={20} />
-        ))}
-        {top3.length === 0 && (
-          /* placeholder rings when no data */
-          [0, 1, 2].map((i) => (
-            <div
-              key={i}
-              style={{
-                width: 180,
-                height: 180,
-                borderRadius: 90,
-                border: `1.5px solid ${GOLD_FAINT}`,
-                background: SURFACE,
-              }}
-            />
-          ))
-        )}
+        {top3.length > 0
+          ? top3.map(({ iata }) => (
+              <PatchMedallion key={iata} iata={iata} size={180} baseUrl={baseUrl} labelSize={20} />
+            ))
+          : [0, 1, 2].map((i) => (
+              <div
+                key={i}
+                style={{
+                  width: 180,
+                  height: 180,
+                  borderRadius: 90,
+                  border: `1.5px solid ${GOLD_FAINT}`,
+                  backgroundColor: SURFACE,
+                }}
+              />
+            ))}
       </div>
 
       {/* Mid perf */}
       <div style={{ padding: '0 80px' }}>
-        <div style={{ height: 2, width: '100%', backgroundImage: PERF_BG }} />
+        <div style={PERF_STYLE} />
       </div>
 
       {/* Hero stat */}
@@ -291,7 +295,7 @@ export function StoriesTemplate({
 
       {/* Mid perf */}
       <div style={{ padding: '0 80px' }}>
-        <div style={{ height: 2, width: '100%', backgroundImage: PERF_BG }} />
+        <div style={PERF_STYLE} />
       </div>
 
       {/* Mission award */}
@@ -302,7 +306,7 @@ export function StoriesTemplate({
           gap: 48,
           margin: '64px 80px',
           padding: '52px 56px',
-          background: AWARD_BG,
+          backgroundColor: AWARD_BG,
           border: `1.5px solid ${GOLD_FAINT}`,
           borderRadius: 32,
         }}
@@ -314,12 +318,14 @@ export function StoriesTemplate({
             height: 100,
             borderRadius: 50,
             border: `2px solid ${GOLD}`,
-            background: 'rgba(200,168,75,0.12)',
+            backgroundColor: 'rgba(200,168,75,0.12)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             fontSize: 44,
             flexShrink: 0,
+            color: GOLD,
+            fontWeight: 700,
           }}
         >
           ✦
@@ -351,7 +357,7 @@ export function StoriesTemplate({
 
       {/* Bottom perf */}
       <div style={{ padding: '0 80px' }}>
-        <div style={{ height: 2, width: '100%', backgroundImage: PERF_BG }} />
+        <div style={PERF_STYLE} />
       </div>
 
       {/* Footer */}
@@ -402,7 +408,7 @@ export function CardTemplate({
         width: '100%',
         display: 'flex',
         flexDirection: 'column',
-        background: BG_GRAD,
+        backgroundImage: BG_GRAD,
         backgroundColor: BG_SOLID,
         color: PARCHMENT,
         fontFamily: 'sans-serif',
@@ -410,7 +416,7 @@ export function CardTemplate({
     >
       {/* Top perf */}
       <div style={{ padding: '28px 60px 0' }}>
-        <div style={{ height: 1, width: '100%', backgroundImage: PERF_BG }} />
+        <div style={PERF_STYLE} />
       </div>
 
       {/* Header row */}
@@ -456,7 +462,7 @@ export function CardTemplate({
 
       {/* Mid perf */}
       <div style={{ padding: '0 60px' }}>
-        <div style={{ height: 1, width: '100%', backgroundImage: PERF_BG }} />
+        <div style={PERF_STYLE} />
       </div>
 
       {/* Main body — two columns */}
@@ -479,7 +485,7 @@ export function CardTemplate({
                       height: 96,
                       borderRadius: 48,
                       border: `1.5px solid ${GOLD_FAINT}`,
-                      background: SURFACE,
+                      backgroundColor: SURFACE,
                     }}
                   />
                 ))}
@@ -490,7 +496,7 @@ export function CardTemplate({
             style={{
               display: 'flex',
               flexDirection: 'column',
-              background: AWARD_BG,
+              backgroundColor: AWARD_BG,
               border: `1px solid ${GOLD_FAINT}`,
               borderRadius: 20,
               padding: '20px 22px',
@@ -506,12 +512,14 @@ export function CardTemplate({
                   height: 36,
                   borderRadius: 18,
                   border: `1.5px solid ${GOLD}`,
-                  background: 'rgba(200,168,75,0.12)',
+                  backgroundColor: 'rgba(200,168,75,0.12)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   fontSize: 16,
                   flexShrink: 0,
+                  color: GOLD,
+                  fontWeight: 700,
                 }}
               >
                 ✦
@@ -538,14 +546,12 @@ export function CardTemplate({
           </div>
         </div>
 
-        {/* Vertical separator */}
+        {/* Vertical separator — dashed border (Satori-safe) */}
         <div
           style={{
-            width: 1,
+            width: 0,
             alignSelf: 'stretch',
-            backgroundImage: PERF_BG,
-            backgroundSize: 'auto 100%',
-            backgroundRepeat: 'no-repeat',
+            borderLeft: `1px dashed rgba(200,168,75,0.3)`,
           }}
         />
 
@@ -634,7 +640,7 @@ export function CardTemplate({
 
       {/* Bottom perf */}
       <div style={{ padding: '0 60px' }}>
-        <div style={{ height: 1, width: '100%', backgroundImage: PERF_BG }} />
+        <div style={PERF_STYLE} />
       </div>
 
       {/* Footer */}
