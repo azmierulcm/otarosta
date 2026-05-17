@@ -271,10 +271,23 @@ export const Dashboard = () => {
 
   if (!activeRoster) return null;
 
+  const [exportState, setExportState] = useState<'idle' | 'ok' | 'error'>('idle');
+
   const handleExport = () => {
-    const icsContent = generateICS(activeRoster);
-    if (icsContent) {
+    try {
+      const icsContent = generateICS(activeRoster);
+      if (!icsContent) {
+        setExportState('error');
+        setTimeout(() => setExportState('idle'), 3000);
+        return;
+      }
       downloadICS(icsContent, `roster-${activeRoster.month}-${activeRoster.year}.ics`);
+      setExportState('ok');
+      setTimeout(() => setExportState('idle'), 2500);
+    } catch (err) {
+      console.error('[handleExport]', err);
+      setExportState('error');
+      setTimeout(() => setExportState('idle'), 3000);
     }
   };
 
@@ -387,13 +400,28 @@ export const Dashboard = () => {
           </button>
           <button
             onClick={handleExport}
-            className="bg-accent text-accent-fg px-10 py-4 rounded-full font-bold text-lg flex items-center gap-3 shadow-xl shadow-accent/10 hover:bg-accent-hover transition-all active:scale-95"
+            disabled={exportState !== 'idle'}
+            className={`px-10 py-4 rounded-full font-bold text-lg flex items-center gap-3 shadow-xl transition-all active:scale-95 disabled:opacity-80 ${
+              exportState === 'ok'
+                ? 'bg-green-500 text-white shadow-green-200'
+                : exportState === 'error'
+                  ? 'bg-red-500 text-white shadow-red-200'
+                  : 'bg-accent text-accent-fg shadow-accent/10 hover:bg-accent-hover'
+            }`}
           >
-            <Calendar className="w-5 h-5" strokeWidth={2.5} />
-            <span className="flex flex-col items-start leading-tight">
-              <span>Add to Calendar</span>
-              <span className="text-[10px] font-[600] opacity-70 tracking-wide">Google · Apple · Outlook</span>
-            </span>
+            {exportState === 'ok' ? (
+              <><Check className="w-5 h-5" strokeWidth={2.5} /> Downloaded!</>
+            ) : exportState === 'error' ? (
+              <><X className="w-5 h-5" strokeWidth={2.5} /> Failed — try again</>
+            ) : (
+              <>
+                <Calendar className="w-5 h-5" strokeWidth={2.5} />
+                <span className="flex flex-col items-start leading-tight">
+                  <span>Add to Calendar</span>
+                  <span className="text-[10px] font-[600] opacity-70 tracking-wide">Google · Apple · Outlook</span>
+                </span>
+              </>
+            )}
           </button>
         </div>
       </div>
