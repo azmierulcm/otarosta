@@ -94,7 +94,7 @@ export const LandingHero = () => {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.8 }}
-        className="w-full max-w-7xl mx-auto mt-auto pt-16 border-t border-border flex flex-wrap justify-center md:justify-between items-center gap-10 text-[10px] md:text-[11px] font-black uppercase tracking-[0.3em] text-text-subtle font-mono"
+        className="w-full max-w-7xl mx-auto mt-auto pt-16 border-t border-border flex flex-wrap justify-center md:justify-between items-center gap-10 text-[11px] md:text-[13px] font-black uppercase tracking-[0.3em] text-text-muted font-mono"
       >
         <div className="flex items-center gap-3">
           <Zap size={16} className="text-accent" />
