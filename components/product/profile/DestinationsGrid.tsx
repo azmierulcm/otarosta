@@ -57,8 +57,8 @@ function PatchCard({ entry, earned, index, reduceMotion, onClick }: PatchCardPro
         style={{
           background: isUnlocked ? 'var(--surface)' : 'var(--surface-2)',
           borderBottom: '0.5px solid var(--border)',
-          paddingBlock: '33px',
-          minHeight: '180px',
+          paddingBlock: patchImageUrl ? '8px' : '33px',
+          minHeight: patchImageUrl ? 'unset' : '180px',
         }}
       >
         {/* Local script name — top-left, stamp-style */}
@@ -106,7 +106,7 @@ function PatchCard({ entry, earned, index, reduceMotion, onClick }: PatchCardPro
               src={patchImageUrl}
               alt={`${entry.city} patch`}
               aria-hidden="true"
-              className="w-[120px] h-[120px] object-contain"
+              className="w-full h-auto object-contain"
             />
           ) : (
             <div
