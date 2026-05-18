@@ -3,12 +3,12 @@
 import React from 'react';
 import { ProfileHeader } from './ProfileHeader';
 import { StatsStrip } from './StatsStrip';
-import { MonthlyRecap } from './MonthlyRecap';
+import { RosterSummaryCard } from './RosterSummaryCard';
 import { DestinationsGrid } from './DestinationsGrid';
 import type { SampleProfileData } from '@/lib/fixtures/sample-profile';
 
 export type ProfileFilledProps = Omit<SampleProfileData, 'monthlyRecap'> & {
-  monthlyRecap: SampleProfileData['monthlyRecap'] | null;
+  monthlyRecap?: SampleProfileData['monthlyRecap'] | null;
   avatarUrl?: string | null;
   onShare?: () => void;
 };
@@ -20,7 +20,6 @@ export function ProfileFilled({
   aircraft,
   avatarUrl,
   lifetimeStats,
-  monthlyRecap,
   earnedDestinations,
   onShare,
 }: ProfileFilledProps) {
@@ -37,7 +36,7 @@ export function ProfileFilled({
 
       <StatsStrip stats={lifetimeStats} />
 
-      {monthlyRecap && <MonthlyRecap recap={monthlyRecap} onGenerate={onShare} />}
+      <RosterSummaryCard earnedDestinations={earnedDestinations} onGenerateCard={onShare} />
 
       <div className="pt-4">
         <DestinationsGrid earnedDestinations={earnedDestinations} />
