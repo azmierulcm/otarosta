@@ -641,31 +641,30 @@ function LiveRosterCard({ data, profile }: { data: CardData; profile: CardProfil
                 {data.topDests.slice(0, 2).map((d) => (
                   <div
                     key={d.code}
-                    className="relative overflow-hidden rounded-2xl flex flex-col items-center justify-center"
-                    style={{ background: '#F7F5F0', minHeight: 100 }}
+                    className="relative flex flex-col items-center justify-center"
+                    style={{ minHeight: 100 }}
                   >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={`/images/city_patches/${IATA_PATCH[d.code] ?? `${d.code.toLowerCase()}_patch.png`}`}
                       alt={`${d.city} stamp`}
-                      className="h-full w-full object-cover"
+                      className="w-full h-full object-contain"
                       onError={(e) => {
                         (e.target as HTMLImageElement).style.display = 'none';
                         (e.target as HTMLImageElement).nextElementSibling?.removeAttribute('hidden');
                       }}
                     />
-                    <div hidden className="absolute inset-0 flex flex-col items-center justify-center gap-1">
+                    <div hidden className="flex flex-col items-center justify-center gap-1 p-3">
                       <span className="text-[28px]">{d.flag}</span>
                       <span className="text-[11px] font-bold" style={{ color: '#222' }}>{d.code}</span>
                       <span className="text-[8px]" style={{ color: '#717171' }}>{d.city}</span>
                     </div>
-                    {/* City label overlay at the bottom */}
-                    <div className="absolute bottom-0 left-0 right-0 px-2 py-1.5"
-                         style={{ background: 'linear-gradient(to top, rgba(247,245,240,0.96) 55%, transparent)' }}>
-                      <p className="text-[8px] font-bold text-center leading-tight" style={{ color: '#222' }}>
+                    {/* City + visit count below the stamp */}
+                    <div className="mt-1 text-center">
+                      <p className="text-[8px] font-bold leading-tight" style={{ color: '#222' }}>
                         {d.city}
                       </p>
-                      <p className="text-[7px] text-center" style={{ color: '#717171' }}>
+                      <p className="text-[7px]" style={{ color: '#717171' }}>
                         {d.visits} visit{d.visits !== 1 ? 's' : ''}
                       </p>
                     </div>
