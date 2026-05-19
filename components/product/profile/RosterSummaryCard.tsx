@@ -433,7 +433,7 @@ export function RosterSummaryCard({ earnedDestinations, onGenerateCard }: Roster
 
           {/* Map */}
           <div className="flex-1 rounded-none overflow-hidden border-b border-border"
-               style={{ background: 'var(--surface)', minHeight: 240 }}>
+               style={{ background: 'var(--surface)', minHeight: 300 }}>
             <SummaryMap mapCoords={stats.mapCoords} topRoute={stats.topRoute} />
           </div>
 
@@ -535,7 +535,7 @@ function SummaryMap({
 
   return (
     <ComposableMap
-      projectionConfig={{ rotate: [-80, -10, 0], scale: 160 }}
+      projectionConfig={{ rotate: [-90, -5, 0], scale: 320 }}
       style={{ width: '100%', height: '100%' }}
     >
       <Geographies geography={GEO_URL}>
