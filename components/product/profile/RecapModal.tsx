@@ -378,7 +378,7 @@ export function RecapModal({ isOpen, onClose, userId, earnedDestinations }: Reca
     const name     = profile?.full_name || 'Crew Member';
     const rankLine = [profile?.rank, profile?.fleet].filter(Boolean).join(' · ') || 'Malaysia Airlines';
     const initials = name.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase();
-    return { name, rankLine, initials };
+    return { name, rankLine, initials, avatarUrl: profile?.avatar_url ?? null };
   }, [profile]);
 
   const downloadUrl = buildDownloadUrl(userId, period);
@@ -561,7 +561,7 @@ export function RecapModal({ isOpen, onClose, userId, earnedDestinations }: Reca
 // LiveRosterCard — v3 9:16 card with real data
 // ─────────────────────────────────────────────────────────────────────────────
 
-interface CardProfile { name: string; rankLine: string; initials: string }
+interface CardProfile { name: string; rankLine: string; initials: string; avatarUrl: string | null }
 
 function LiveRosterCard({ data, profile }: { data: CardData; profile: CardProfile }) {
   const delta      = data.prevHours > 0
@@ -595,12 +595,21 @@ function LiveRosterCard({ data, profile }: { data: CardData; profile: CardProfil
         <header className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2.5 min-w-0">
             {/* Avatar */}
-            <div
-              className="grid h-9 w-9 place-items-center rounded-full text-[11px] font-bold text-white shadow-md shrink-0"
-              style={{ background: 'linear-gradient(135deg, #FF385C, #E61E4D)' }}
-            >
-              {profile.initials}
-            </div>
+            {profile.avatarUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={profile.avatarUrl}
+                alt={profile.name}
+                className="h-9 w-9 rounded-full object-cover shadow-md shrink-0"
+              />
+            ) : (
+              <div
+                className="grid h-9 w-9 place-items-center rounded-full text-[11px] font-bold text-white shadow-md shrink-0"
+                style={{ background: 'linear-gradient(135deg, #FF385C, #E61E4D)' }}
+              >
+                {profile.initials}
+              </div>
+            )}
             <div className="leading-tight min-w-0">
               <div className="flex items-center gap-1">
                 <p className="text-[12px] font-bold tracking-tight truncate">{profile.name}</p>

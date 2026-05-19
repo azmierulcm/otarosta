@@ -1,11 +1,17 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import Link from 'next/link';
 import { useAuth } from '@/lib/contexts/AuthContext';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { sendPasswordResetEmail } from 'firebase/auth';
+import { auth } from '@/lib/firebase/client';
+import { getUserListings } from '@/lib/actions/listings';
+import type { Listing } from '@/lib/types/marketplace';
 import {
   User2, Plane, Building2, MapPin, FileText,
   Loader2, Check, ChevronDown, ArrowRight, Sparkles, Camera, Trash2,
+  Lock, ShoppingBag, ExternalLink,
 } from 'lucide-react';
 
 /* ── Options ──────────────────────────────────────────────────────────────── */
@@ -91,6 +97,10 @@ export default function SettingsClient() {
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [deletingPhoto, setDeletingPhoto] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [pwResetSent, setPwResetSent] = useState(false);
+  const [pwResetLoading, setPwResetLoading] = useState(false);
+  const [listings, setListings] = useState<Listing[]>([]);
+  const [listingsLoading, setListingsLoading] = useState(false);
 
   // Pre-fill from existing profile
   useEffect(() => {
@@ -106,6 +116,16 @@ export default function SettingsClient() {
       setAvatarUrl(profile.avatar_url ?? null);
     }
   }, [profile]);
+
+  // Load user's listings
+  useEffect(() => {
+    if (!user) return;
+    setListingsLoading(true);
+    getUserListings(user.uid)
+      .then(setListings)
+      .catch(() => setListings([]))
+      .finally(() => setListingsLoading(false));
+  }, [user]);
 
   // Only redirect after auth has resolved — user starts null before Firebase responds
   useEffect(() => {
@@ -161,6 +181,19 @@ export default function SettingsClient() {
       setPhotoError(err instanceof Error ? err.message : 'Could not remove photo.');
     } finally {
       setDeletingPhoto(false);
+    }
+  };
+
+  const handlePasswordReset = async () => {
+    if (!user?.email) return;
+    setPwResetLoading(true);
+    try {
+      await sendPasswordResetEmail(auth, user.email);
+      setPwResetSent(true);
+    } catch {
+      // silently ignore — email might not exist for OAuth users
+    } finally {
+      setPwResetLoading(false);
     }
   };
 
@@ -435,6 +468,94 @@ export default function SettingsClient() {
           </p>
         )}
       </form>
+
+      {/* ── Password ── */}
+      {!isOnboarding && (
+        <div className="mt-6 bg-white border border-border rounded-[2rem] p-8 shadow-sm space-y-4">
+          <div className="text-[10px] font-black uppercase tracking-[0.35em] text-text-subtle font-mono">
+            Security
+          </div>
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-[13px] font-black text-text">Password</p>
+              <p className="text-[12px] text-text-muted font-bold mt-0.5">
+                {pwResetSent
+                  ? 'Reset link sent — check your inbox.'
+                  : 'Send a password reset link to your email.'}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handlePasswordReset}
+              disabled={pwResetLoading || pwResetSent}
+              className="shrink-0 flex items-center gap-2 px-5 py-2.5 rounded-full border border-border text-[12px] font-black text-text hover:bg-surface-2 transition-colors disabled:opacity-60"
+            >
+              {pwResetLoading ? <Loader2 size={13} className="animate-spin" /> : <Lock size={13} />}
+              {pwResetSent ? 'Email sent' : 'Reset password'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── My listings ── */}
+      {!isOnboarding && (
+        <div className="mt-6 bg-white border border-border rounded-[2rem] p-8 shadow-sm space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="text-[10px] font-black uppercase tracking-[0.35em] text-text-subtle font-mono">
+              My Listings
+            </div>
+            <Link
+              href="/marketplace/new"
+              className="text-[11px] font-black text-accent hover:underline underline-offset-4"
+            >
+              + New listing
+            </Link>
+          </div>
+
+          {listingsLoading ? (
+            <div className="flex justify-center py-6">
+              <Loader2 size={18} className="animate-spin text-text-muted" />
+            </div>
+          ) : listings.length === 0 ? (
+            <div className="flex flex-col items-center gap-2 py-6 text-center">
+              <ShoppingBag size={28} className="text-text-subtle opacity-40" />
+              <p className="text-[13px] font-bold text-text-muted">No listings yet.</p>
+              <Link
+                href="/marketplace/new"
+                className="text-[12px] font-black text-accent hover:underline underline-offset-4"
+              >
+                Post something for sale
+              </Link>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {listings.map((l) => (
+                <Link
+                  key={l.id}
+                  href={`/marketplace/${l.id}`}
+                  className="flex items-center justify-between gap-4 px-4 py-3 rounded-2xl hover:bg-surface-2 transition-colors group"
+                >
+                  <div className="min-w-0">
+                    <p className="text-[13px] font-black text-text truncate">{l.title}</p>
+                    <p className="text-[11px] font-bold text-text-muted mt-0.5">
+                      RM {l.price.toLocaleString()} ·{' '}
+                      <span className={
+                        l.status === 'active'  ? 'text-success' :
+                        l.status === 'sold'    ? 'text-text-muted' :
+                        l.status === 'expired' ? 'text-text-subtle' :
+                        'text-danger'
+                      }>
+                        {l.status.charAt(0).toUpperCase() + l.status.slice(1)}
+                      </span>
+                    </p>
+                  </div>
+                  <ExternalLink size={14} className="text-text-subtle shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

@@ -106,7 +106,7 @@ function PatchCard({ entry, earned, index, reduceMotion, onClick }: PatchCardPro
               src={patchImageUrl}
               alt={`${entry.city} patch`}
               aria-hidden="true"
-              className="w-[120px] h-[120px] object-contain"
+              className="w-[150px] h-[150px] object-contain"
             />
           ) : (
             <div
@@ -189,11 +189,8 @@ export function DestinationsGrid({ earnedDestinations }: DestinationsGridProps) 
         </p>
       </div>
 
-      {/* Patch grid */}
-      <div
-        className="grid gap-3"
-        style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))' }}
-      >
+      {/* Patch grid — max 4 columns so artwork has breathing room */}
+      <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4">
         {DESTINATION_CATALOG.map((entry, i) => (
           <PatchCard
             key={entry.iata}
