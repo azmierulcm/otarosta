@@ -6,6 +6,7 @@ import {
   ComposableMap,
   Geographies,
   Geography,
+  ZoomableGroup,
   Line,
   Marker,
 } from 'react-simple-maps';
@@ -432,8 +433,8 @@ export function RosterSummaryCard({ earnedDestinations, onGenerateCard }: Roster
         <div className="flex flex-col">
 
           {/* Map */}
-          <div className="flex-1 rounded-none overflow-hidden border-b border-border"
-               style={{ background: 'var(--surface)', minHeight: 300 }}>
+          <div className="flex-1 overflow-hidden border-b border-border"
+               style={{ background: 'var(--surface)' }}>
             <SummaryMap mapCoords={stats.mapCoords} topRoute={stats.topRoute} />
           </div>
 
@@ -518,7 +519,7 @@ function SmallStat({ icon, value, label }: { icon: string; value: string; label:
   );
 }
 
-// ── react-simple-maps world map ───────────────────────────────────────────────
+// ── react-simple-maps world map with zoom/pan ─────────────────────────────────
 
 function SummaryMap({
   mapCoords,
@@ -527,88 +528,115 @@ function SummaryMap({
   mapCoords: { code: string; coords: [number, number] }[];
   topRoute: { from: string; to: string; count: number } | null;
 }) {
-  const kulCoords  = IATA_COORDS['KUL'];
-  const dests      = mapCoords.filter((p) => p.code !== 'KUL');
+  const [zoom, setZoom] = React.useState(1);
+  const kulCoords     = IATA_COORDS['KUL'];
+  const dests         = mapCoords.filter((p) => p.code !== 'KUL');
   const topDestCoords = topRoute
     ? mapCoords.find((p) => p.code === topRoute.to)?.coords ?? null
     : null;
 
+  const zoomIn  = () => setZoom((z) => Math.min(z * 1.5, 12));
+  const zoomOut = () => setZoom((z) => Math.max(z / 1.5, 1));
+
   return (
-    <ComposableMap
-      projectionConfig={{ rotate: [-90, -5, 0], scale: 320 }}
-      style={{ width: '100%', height: '100%' }}
-    >
-      <Geographies geography={GEO_URL}>
-        {({ geographies }) =>
-          geographies.map((geo) => (
-            <Geography
-              key={geo.rsmKey}
-              geography={geo}
-              style={{
-                default: { outline: 'none' },
-                hover:   { outline: 'none' },
-                pressed: { outline: 'none' },
-              }}
-              fill="var(--border)"
-              stroke="var(--surface)"
-              strokeWidth={0.5}
+    <div className="relative w-full h-full" style={{ minHeight: 300 }}>
+      {/* Zoom controls */}
+      <div className="absolute top-3 right-3 z-10 flex flex-col gap-1">
+        <button
+          onClick={zoomIn}
+          className="w-7 h-7 rounded-lg border border-border bg-bg text-text-muted hover:text-text hover:bg-surface flex items-center justify-center text-[14px] font-black transition-colors shadow-sm"
+          aria-label="Zoom in"
+        >+</button>
+        <button
+          onClick={zoomOut}
+          className="w-7 h-7 rounded-lg border border-border bg-bg text-text-muted hover:text-text hover:bg-surface flex items-center justify-center text-[14px] font-black transition-colors shadow-sm"
+          aria-label="Zoom out"
+        >−</button>
+      </div>
+
+      {/* Hint */}
+      <p className="absolute bottom-2 left-1/2 -translate-x-1/2 text-[9px] font-bold text-text-subtle pointer-events-none select-none z-10">
+        Scroll to zoom · Drag to pan
+      </p>
+
+      <ComposableMap
+        projectionConfig={{ rotate: [-90, -5, 0], scale: 320 }}
+        style={{ width: '100%', height: '100%' }}
+      >
+        <ZoomableGroup zoom={zoom} onMoveEnd={({ zoom: z }) => setZoom(z)}>
+          <Geographies geography={GEO_URL}>
+            {({ geographies }) =>
+              geographies.map((geo) => (
+                <Geography
+                  key={geo.rsmKey}
+                  geography={geo}
+                  style={{
+                    default: { outline: 'none' },
+                    hover:   { outline: 'none' },
+                    pressed: { outline: 'none' },
+                  }}
+                  fill="var(--border)"
+                  stroke="var(--surface)"
+                  strokeWidth={0.5}
+                />
+              ))
+            }
+          </Geographies>
+
+          {/* Dashed arc: KUL → each destination */}
+          {dests.map(({ code, coords }) => (
+            <Line
+              key={code}
+              from={kulCoords}
+              to={coords}
+              stroke="var(--accent)"
+              strokeWidth={code === topRoute?.to ? 1.8 : 1}
+              strokeLinecap="round"
+              strokeDasharray={code === topRoute?.to ? '4 6' : '2 8'}
+              style={{ opacity: code === topRoute?.to ? 0.8 : 0.35 }}
             />
-          ))
-        }
-      </Geographies>
+          ))}
 
-      {/* Dashed arc: KUL → each destination */}
-      {dests.map(({ code, coords }) => (
-        <Line
-          key={code}
-          from={kulCoords}
-          to={coords}
-          stroke="var(--accent)"
-          strokeWidth={code === topRoute?.to ? 1.8 : 1}
-          strokeLinecap="round"
-          strokeDasharray={code === topRoute?.to ? '4 6' : '2 8'}
-          style={{ opacity: code === topRoute?.to ? 0.8 : 0.35 }}
-        />
-      ))}
+          {/* Destination markers */}
+          {dests.map(({ code, coords }) => {
+            const isTop = code === topRoute?.to;
+            return (
+              <Marker key={code} coordinates={coords}>
+                <circle r={isTop ? 7 : 5} fill="var(--accent)" opacity={0.18} />
+                <circle r={isTop ? 4 : 3} fill="var(--accent)" stroke="white" strokeWidth={isTop ? 1.5 : 1} />
+                {isTop && (
+                  <text textAnchor="middle" y={-8}
+                        style={{ fontSize: '7px', fontWeight: 700, fill: 'var(--text)', pointerEvents: 'none', fontFamily: 'ui-monospace, monospace' }}>
+                    {code}
+                  </text>
+                )}
+              </Marker>
+            );
+          })}
 
-      {/* Destination markers */}
-      {dests.map(({ code, coords }) => {
-        const isTop = code === topRoute?.to;
-        return (
-          <Marker key={code} coordinates={coords}>
-            <circle r={isTop ? 7 : 5} fill="var(--accent)" opacity={0.18} />
-            <circle r={isTop ? 4 : 3} fill="var(--accent)" stroke="white" strokeWidth={isTop ? 1.5 : 1} />
-            {isTop && (
-              <text textAnchor="middle" y={-8}
-                    style={{ fontSize: '7px', fontWeight: 700, fill: 'var(--text)', pointerEvents: 'none', fontFamily: 'ui-monospace, monospace' }}>
-                {code}
+          {/* KUL home marker */}
+          {kulCoords && (
+            <Marker coordinates={kulCoords}>
+              <circle r={10} fill="var(--accent)" opacity={0.18} />
+              <circle r={6}  fill="var(--accent)" stroke="white" strokeWidth={2} />
+              <text textAnchor="middle" y={-10}
+                    style={{ fontSize: '8px', fontWeight: 800, fill: 'var(--accent)', pointerEvents: 'none', fontFamily: 'ui-monospace, monospace' }}>
+                KUL
               </text>
-            )}
-          </Marker>
-        );
-      })}
+            </Marker>
+          )}
 
-      {/* KUL home marker */}
-      {kulCoords && (
-        <Marker coordinates={kulCoords}>
-          <circle r={10} fill="var(--accent)" opacity={0.18} />
-          <circle r={6}  fill="var(--accent)" stroke="white" strokeWidth={2} />
-          <text textAnchor="middle" y={-10}
-                style={{ fontSize: '8px', fontWeight: 800, fill: 'var(--accent)', pointerEvents: 'none', fontFamily: 'ui-monospace, monospace' }}>
-            KUL
-          </text>
-        </Marker>
-      )}
-
-      {/* Top dest label */}
-      {topDestCoords && topRoute && (
-        <Marker coordinates={topDestCoords}>
-          <text textAnchor="middle" y={-10}
-                style={{ fontSize: '7px', fontWeight: 700, fill: 'var(--text)', pointerEvents: 'none', fontFamily: 'ui-monospace, monospace' }}>
-            {topRoute.to}
-          </text>
-        </Marker>
-      )}
-    </ComposableMap>
+          {/* Top dest label */}
+          {topDestCoords && topRoute && (
+            <Marker coordinates={topDestCoords}>
+              <text textAnchor="middle" y={-10}
+                    style={{ fontSize: '7px', fontWeight: 700, fill: 'var(--text)', pointerEvents: 'none', fontFamily: 'ui-monospace, monospace' }}>
+                {topRoute.to}
+              </text>
+            </Marker>
+          )}
+        </ZoomableGroup>
+      </ComposableMap>
+    </div>
   );
 }

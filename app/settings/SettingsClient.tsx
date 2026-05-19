@@ -1,12 +1,14 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/lib/contexts/AuthContext';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   User2, Plane, Building2, MapPin, FileText,
-  Loader2, Check, ChevronDown, ArrowRight, Sparkles,
+  Loader2, Check, ChevronDown, ArrowRight, Sparkles, Camera,
 } from 'lucide-react';
+import { storage } from '@/lib/firebase/client';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 /* ── Options ──────────────────────────────────────────────────────────────── */
 const RANKS = [
@@ -86,6 +88,9 @@ export default function SettingsClient() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Pre-fill from existing profile
   useEffect(() => {
@@ -98,6 +103,7 @@ export default function SettingsClient() {
         base:      profile.base      ?? '',
         bio:       profile.bio       ?? '',
       });
+      setAvatarUrl(profile.avatar_url ?? null);
     }
   }, [profile]);
 
@@ -108,6 +114,35 @@ export default function SettingsClient() {
 
   const set = (k: keyof typeof form, v: string) =>
     setForm((prev) => ({ ...prev, [k]: v }));
+
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+    if (!file.type.startsWith('image/')) return;
+    setUploadingPhoto(true);
+    try {
+      const storageRef = ref(storage, `avatars/${user.uid}/profile`);
+      await uploadBytes(storageRef, file, { contentType: file.type });
+      const url = await getDownloadURL(storageRef);
+
+      // Persist to Firestore
+      const idToken = await user.getIdToken();
+      await fetch('/api/profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+        body: JSON.stringify({ avatar_url: url }),
+      });
+
+      setAvatarUrl(url);
+      setProfile({ ...(profile ?? { id: user.uid }), avatar_url: url });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Photo upload failed.');
+    } finally {
+      setUploadingPhoto(false);
+      // Reset input so the same file can be re-selected
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -194,6 +229,60 @@ export default function SettingsClient() {
         <div className="bg-white border border-border rounded-[2rem] p-8 shadow-sm space-y-6">
           <div className="text-[10px] font-black uppercase tracking-[0.35em] text-text-subtle font-mono">
             Identity
+          </div>
+
+          {/* ── Profile photo ── */}
+          <div className="flex items-center gap-5">
+            {/* Avatar preview */}
+            <div className="relative shrink-0">
+              <div className="w-20 h-20 rounded-full overflow-hidden border-2 border-border bg-surface-2 flex items-center justify-center">
+                {avatarUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={avatarUrl} alt="Profile photo" className="w-full h-full object-cover" />
+                ) : (
+                  <span className="text-[22px] font-black text-text-muted select-none">
+                    {(form.full_name || user?.email || '?').slice(0, 1).toUpperCase()}
+                  </span>
+                )}
+              </div>
+              {/* Camera overlay button */}
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploadingPhoto}
+                className="absolute bottom-0 right-0 w-7 h-7 rounded-full bg-accent text-accent-fg flex items-center justify-center shadow-md hover:bg-accent-hover transition-colors disabled:opacity-60"
+                aria-label="Upload profile photo"
+              >
+                {uploadingPhoto
+                  ? <Loader2 size={12} className="animate-spin" />
+                  : <Camera size={12} />}
+              </button>
+            </div>
+
+            {/* Info + trigger */}
+            <div className="flex flex-col gap-1.5">
+              <p className="text-[13px] font-black text-text">Profile photo</p>
+              <p className="text-[12px] text-text-muted font-bold leading-snug">
+                JPG, PNG or WebP · max 5 MB
+              </p>
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploadingPhoto}
+                className="self-start text-[12px] font-bold text-accent hover:underline underline-offset-4 transition-colors disabled:opacity-60"
+              >
+                {uploadingPhoto ? 'Uploading…' : avatarUrl ? 'Change photo' : 'Upload photo'}
+              </button>
+            </div>
+
+            {/* Hidden file input */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              className="hidden"
+              onChange={handlePhotoUpload}
+            />
           </div>
 
           <Field label="Full Name" icon={User2}>
