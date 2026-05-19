@@ -528,13 +528,16 @@ function SummaryMap({
   mapCoords: { code: string; coords: [number, number] }[];
   topRoute: { from: string; to: string; count: number } | null;
 }) {
-  const [zoom, setZoom] = React.useState(1);
+  const [zoom, setZoom]     = React.useState(1);
+  const [center, setCenter] = React.useState<[number, number]>([0, 0]);
+
   const kulCoords     = IATA_COORDS['KUL'];
   const dests         = mapCoords.filter((p) => p.code !== 'KUL');
   const topDestCoords = topRoute
     ? mapCoords.find((p) => p.code === topRoute.to)?.coords ?? null
     : null;
 
+  // Zoom keeping current pan position
   const zoomIn  = () => setZoom((z) => Math.min(z * 1.5, 12));
   const zoomOut = () => setZoom((z) => Math.max(z / 1.5, 1));
 
@@ -563,7 +566,14 @@ function SummaryMap({
         projectionConfig={{ rotate: [-90, -5, 0], scale: 320 }}
         style={{ width: '100%', height: '100%' }}
       >
-        <ZoomableGroup zoom={zoom} onMoveEnd={({ zoom: z }) => setZoom(z)}>
+        <ZoomableGroup
+          zoom={zoom}
+          center={center}
+          onMoveEnd={({ zoom: z, coordinates }) => {
+            setZoom(z);
+            setCenter(coordinates as [number, number]);
+          }}
+        >
           <Geographies geography={GEO_URL}>
             {({ geographies }) =>
               geographies.map((geo) => (
