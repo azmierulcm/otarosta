@@ -1,53 +1,56 @@
-import { initializeApp, getApps, cert, App } from 'firebase-admin/app'
-import { getFirestore, Firestore } from 'firebase-admin/firestore'
-import { getAuth, Auth } from 'firebase-admin/auth'
-import { getStorage } from 'firebase-admin/storage'
+import type { Firestore } from 'firebase-admin/firestore'
+import type { Auth } from 'firebase-admin/auth'
 import type { Bucket } from '@google-cloud/storage'
 
 // ── Lazy initialisation ───────────────────────────────────────────────────────
-// Do NOT call getFirestore / getAuth / getStorage at module-load time.
-// Next.js evaluates server modules during static-page generation (build phase),
-// and Firebase throws "Service not available" when invoked without a live
-// request context.  Instead we initialise on first property access via Proxy.
+// All Firebase Admin imports are done with require() inside factory functions
+// so they are NEVER evaluated at module-parse time.  Next.js static generation
+// (/_not-found, etc.) imports server modules without a live Firebase context;
+// any top-level SDK call throws "Service not available".
 
-function ensureApp(): App {
-  if (getApps().length) return getApps()[0]!;
-  return initializeApp({
+function ensureApp() {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { getApps, initializeApp, cert } = require('firebase-admin/app')
+  if (getApps().length) return
+  initializeApp({
     credential: cert({
       projectId:   process.env.FIREBASE_ADMIN_PROJECT_ID,
       clientEmail: process.env.FIREBASE_ADMIN_CLIENT_EMAIL,
-      // .env stores \n as literal \\n — restore actual newlines
       privateKey:  process.env.FIREBASE_ADMIN_PRIVATE_KEY?.replace(/\\n/g, '\n'),
     }),
-    // Admin SDK needs the real GCS bucket name (*.appspot.com), not the
-    // client-facing *.firebasestorage.app URL.
     storageBucket:
       process.env.FIREBASE_ADMIN_STORAGE_BUCKET ??
       process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  });
+  })
 }
 
 function makeLazy<T extends object>(factory: () => T): T {
-  let instance: T | undefined;
+  let instance: T | undefined
   return new Proxy({} as T, {
     get(_, prop) {
-      if (!instance) instance = factory();
-      return (instance as Record<string | symbol, unknown>)[prop as string | symbol];
+      if (!instance) instance = factory()
+      return (instance as Record<string | symbol, unknown>)[prop]
     },
-  });
+  })
 }
 
 export const adminDb: Firestore = makeLazy(() => {
-  ensureApp();
-  return getFirestore();
-});
+  ensureApp()
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { getFirestore } = require('firebase-admin/firestore')
+  return getFirestore() as Firestore
+})
 
 export const adminAuth: Auth = makeLazy(() => {
-  ensureApp();
-  return getAuth();
-});
+  ensureApp()
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { getAuth } = require('firebase-admin/auth')
+  return getAuth() as Auth
+})
 
 export const adminBucket: Bucket = makeLazy(() => {
-  ensureApp();
-  return getStorage().bucket();
-});
+  ensureApp()
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { getStorage } = require('firebase-admin/storage')
+  return (getStorage() as { bucket: () => Bucket }).bucket()
+})

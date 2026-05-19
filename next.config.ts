@@ -8,12 +8,11 @@ const nextConfig: NextConfig = {
   // Trim unused locales from the bundle
   i18n: undefined,
 
-  // Aggressive package-level tree-shaking for known heavy deps
+  // Tree-shake icon/animation libraries — safe for SSR
   experimental: {
     optimizePackageImports: [
       'lucide-react',
       'framer-motion',
-      '@firebase/firestore',
     ],
   },
 
