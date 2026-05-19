@@ -632,14 +632,14 @@ export const Dashboard = () => {
         <>
           {/* ── Destination stamps ──────────────────────────────────────────── */}
           {activeRoster.destinations && activeRoster.destinations.length > 0 && (
-            <section className="mb-24">
-              <div className="flex items-center justify-between mb-10 border-b border-border pb-8">
+            <section className="mb-10">
+              <div className="flex items-center justify-between mb-6 border-b border-border pb-4">
                 <h3 className="text-3xl font-bold text-text tracking-tighter uppercase italic">Recent Stamps.</h3>
                 <div className="text-[10px] font-black uppercase tracking-[0.3em] text-text-subtle font-mono bg-surface-2 px-4 py-2 rounded-full border border-border">
                   {activeRoster.destinations.length} Unlocked
                 </div>
               </div>
-              <div className="flex gap-8 overflow-x-auto pb-10 -mx-4 px-4 scrollbar-hide">
+              <div className="flex gap-6 overflow-x-auto pb-4 -mx-4 px-4 scrollbar-hide">
                 {activeRoster.destinations.map((dest) => (
                   <DestinationPatch key={dest.iata} destination={dest} />
                 ))}

@@ -10,7 +10,7 @@ export const DestinationPatch = ({ destination }: { destination: Destination }) 
   return (
     <motion.div
       whileHover={{ scale: 1.05 }}
-      className="group flex flex-col items-center shrink-0 w-36 gap-2"
+      className="group flex flex-col items-center shrink-0 w-48 gap-2"
     >
       {/* Stamp artwork — no card wrapper */}
       {patchImageUrl ? (
@@ -18,12 +18,12 @@ export const DestinationPatch = ({ destination }: { destination: Destination }) 
         <img
           src={patchImageUrl}
           alt={`${city} patch`}
-          className="w-28 h-28 object-contain drop-shadow-sm"
+          className="w-44 h-44 object-contain drop-shadow-sm"
         />
       ) : (
         /* Fallback monogram for cities without artwork */
-        <div className="w-24 h-24 rounded-full bg-surface-2 border-2 border-border/60 flex items-center justify-center">
-          <span className="font-mono font-[700] text-[16px] text-text-muted tracking-wide">{iata}</span>
+        <div className="w-40 h-40 rounded-full bg-surface-2 border-2 border-border/60 flex items-center justify-center">
+          <span className="font-mono font-[700] text-[22px] text-text-muted tracking-wide">{iata}</span>
         </div>
       )}
 
