@@ -10,7 +10,9 @@ export interface RosterSummary {
   eventCount: number;
   totalSectors: number;
   totalKm: number;
+  totalBlockMinutes: number;
   uniqueDestinations: number;
+  parserVersion?: string;
 }
 
 export interface FirestoreRoster extends RosterSummary {

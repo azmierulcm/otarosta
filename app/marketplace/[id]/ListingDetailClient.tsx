@@ -129,8 +129,8 @@ export default function ListingDetailClient({ listing }: Props) {
 
           {/* Description */}
           <div className="space-y-2">
-            <h2 className="text-[13px] font-semibold text-text-muted uppercase tracking-wide">Description</h2>
-            <p className="text-[14px] text-text leading-relaxed whitespace-pre-wrap">{listing.description}</p>
+            <h2 className="text-[10px] font-black text-text-subtle uppercase tracking-[0.3em] font-mono">{"// DESCRIPTION"}</h2>
+            <p className="text-[14px] text-text font-medium leading-relaxed whitespace-pre-wrap">{listing.description}</p>
           </div>
 
           <TrustCard />
@@ -140,7 +140,7 @@ export default function ListingDetailClient({ listing }: Props) {
         <div className="space-y-5">
           {/* Status badge */}
           {listing.status !== 'active' && (
-            <div className="px-3 py-2 rounded-[var(--radius-md)] bg-surface-2 border border-border text-[12px] font-semibold text-text-muted uppercase tracking-wide">
+            <div className="px-3 py-2 rounded-[var(--radius-md)] bg-surface-2 border border-border text-[10px] font-black text-text-muted uppercase tracking-[0.3em] font-mono">
               {listing.status}
             </div>
           )}
@@ -148,21 +148,21 @@ export default function ListingDetailClient({ listing }: Props) {
           {/* Title + price */}
           <div>
             <div className="flex items-start gap-2 flex-wrap mb-1">
-              <span className="text-[11px] font-semibold uppercase tracking-wide text-text-subtle">
+              <span className="text-[10px] font-black uppercase tracking-[0.25em] text-text-subtle font-mono">
                 {CATEGORY_LABELS[listing.category]}
               </span>
-              <span className="text-[11px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full border border-border text-text-subtle">
+              <span className="text-[10px] font-black uppercase tracking-[0.25em] px-2 py-0.5 rounded-full border border-border text-text-subtle font-mono">
                 {CONDITION_LABELS[listing.condition]}
               </span>
             </div>
-            <h1 className="text-[22px] font-bold text-text tracking-tight leading-snug">{listing.title}</h1>
+            <h1 className="text-2xl font-black text-text tracking-tight leading-snug">{listing.title}</h1>
             <p className="text-[28px] font-black text-text mt-2">RM {listing.price.toLocaleString()}</p>
           </div>
 
           {/* Seller */}
           <div className="rounded-[var(--radius-lg)] border border-border bg-surface-2 p-4 space-y-2">
             <div className="flex items-center justify-between">
-              <p className="text-[14px] font-semibold text-text">{listing.sellerName}</p>
+              <p className="text-[14px] font-bold text-text">{listing.sellerName}</p>
               {listing.sellerVerified && <VerifiedPill />}
             </div>
             <p className="text-[12px] text-text-muted">{listing.sellerBase} · Member since {new Date(listing.sellerMemberSince).getFullYear()}</p>
@@ -178,7 +178,7 @@ export default function ListingDetailClient({ listing }: Props) {
             <div className="space-y-2">
               <Link
                 href={`/marketplace/${listing.id}/edit`}
-                className="flex items-center justify-center gap-2 w-full py-2.5 rounded-[var(--radius-pill)] border border-border text-[13px] font-semibold text-text hover:bg-surface transition-colors"
+                className="flex items-center justify-center gap-2 w-full py-2.5 rounded-[var(--radius-pill)] border border-border text-[13px] font-bold text-text hover:bg-surface transition-colors"
               >
                 <Pencil size={14} />
                 Edit Listing
@@ -187,7 +187,7 @@ export default function ListingDetailClient({ listing }: Props) {
                 <button
                   onClick={handleMarkSold}
                   disabled={busy}
-                  className="flex items-center justify-center gap-2 w-full py-2.5 rounded-[var(--radius-pill)] border border-success/40 text-[13px] font-semibold text-success hover:bg-success/5 disabled:opacity-60 transition-colors"
+                  className="flex items-center justify-center gap-2 w-full py-2.5 rounded-[var(--radius-pill)] border border-success/40 text-[13px] font-bold text-success hover:bg-success/5 disabled:opacity-60 transition-colors"
                 >
                   <CheckCircle size={14} />
                   Mark as Sold
@@ -197,7 +197,7 @@ export default function ListingDetailClient({ listing }: Props) {
                 <button
                   onClick={handleRenew}
                   disabled={busy}
-                  className="flex items-center justify-center gap-2 w-full py-2.5 rounded-[var(--radius-pill)] border border-accent/40 text-[13px] font-semibold text-accent hover:bg-accent-soft disabled:opacity-60 transition-colors"
+                  className="flex items-center justify-center gap-2 w-full py-2.5 rounded-[var(--radius-pill)] border border-accent/40 text-[13px] font-bold text-accent hover:bg-accent-soft disabled:opacity-60 transition-colors"
                 >
                   <RotateCcw size={14} />
                   Renew for 30 days
@@ -206,7 +206,7 @@ export default function ListingDetailClient({ listing }: Props) {
               <button
                 onClick={handleDelete}
                 disabled={busy}
-                className="flex items-center justify-center gap-2 w-full py-2.5 rounded-[var(--radius-pill)] border border-destructive/30 text-[13px] font-semibold text-destructive hover:bg-destructive/5 disabled:opacity-60 transition-colors"
+                className="flex items-center justify-center gap-2 w-full py-2.5 rounded-[var(--radius-pill)] border border-destructive/30 text-[13px] font-bold text-destructive hover:bg-destructive/5 disabled:opacity-60 transition-colors"
               >
                 <Trash2 size={14} />
                 Delete Listing
@@ -217,7 +217,7 @@ export default function ListingDetailClient({ listing }: Props) {
               {listing.status === 'active' && (
                 <button
                   onClick={() => setContactOpen(true)}
-                  className="flex items-center justify-center gap-2 w-full py-3 rounded-[var(--radius-pill)] bg-accent text-accent-fg text-[14px] font-semibold hover:bg-accent-hover transition-colors shadow-[var(--shadow-sm)]"
+                  className="flex items-center justify-center gap-2 w-full py-3 rounded-[var(--radius-pill)] bg-accent text-accent-fg text-[14px] font-bold hover:bg-accent-hover transition-colors shadow-[var(--shadow-sm)]"
                 >
                   {listing.contactPref === 'whatsapp' ? (
                     <MessageCircle size={16} />

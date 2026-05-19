@@ -53,27 +53,27 @@ export const WaitlistSheet = ({ isOpen, onClose, airline }: WaitlistSheetProps) 
               <CheckCircle2 size={32} aria-hidden="true" />
             </div>
             <div>
-              <h3 id={TITLE_ID} className="text-[24px] font-semibold text-text mb-2">
+              <h3 id={TITLE_ID} className="text-[24px] font-black text-text tracking-tighter mb-2">
                 You&apos;re on the list.
               </h3>
-              <p className="text-text-muted text-[15px] leading-relaxed">
+              <p className="text-text-muted font-bold text-[15px] leading-relaxed">
                 We&apos;ll notify you the moment {airline} support launches.
               </p>
             </div>
           </div>
         ) : (
           <>
-            <h3 id={TITLE_ID} className="text-[28px] font-semibold text-text leading-tight tracking-tight mb-3">
+            <h3 id={TITLE_ID} className="text-[28px] font-black text-text leading-tight tracking-tighter mb-3">
               Bring Cemrosta to{' '}
               <span className="text-accent">{airline}.</span>
             </h3>
-            <p className="text-text-muted text-[16px] leading-relaxed mb-10">
+            <p className="text-text-muted font-bold text-[16px] leading-snug mb-10">
               Join the waitlist and be first to know when we support your airline&apos;s roster format.
             </p>
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label htmlFor="waitlist-email" className="block text-[12px] font-medium text-text-muted mb-2 uppercase tracking-wider">
+                <label htmlFor="waitlist-email" className="block text-[10px] font-black text-text-subtle mb-2 uppercase tracking-[0.3em] font-mono">
                   Your email
                 </label>
                 <input
@@ -95,7 +95,7 @@ export const WaitlistSheet = ({ isOpen, onClose, airline }: WaitlistSheetProps) 
               <button
                 type="submit"
                 disabled={status === 'loading'}
-                className="w-full bg-accent text-accent-fg rounded-[var(--radius-pill)] py-3 text-[15px] font-medium hover:bg-accent-hover transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                className="w-full bg-accent text-accent-fg rounded-[var(--radius-pill)] py-3 text-[15px] font-bold hover:bg-accent-hover transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {status === 'loading'
                   ? <Loader2 size={16} className="animate-spin" aria-hidden="true" />

@@ -80,10 +80,10 @@ export const AuthModal = () => {
             ? <LogIn className="text-accent" size={22} aria-hidden="true" />
             : <UserPlus className="text-accent" size={22} aria-hidden="true" />}
         </div>
-        <h2 id={TITLE_ID} className="text-[28px] font-semibold text-text leading-tight tracking-tight">
+        <h2 id={TITLE_ID} className="text-[28px] font-black text-text leading-tight tracking-tighter">
           {isLogin ? 'Welcome back.' : 'Join the crew.'}
         </h2>
-        <p className="text-text-muted text-[15px] mt-2">
+        <p className="text-text-muted font-bold text-[15px] mt-2">
           {isLogin
             ? 'Sign in to your Cemrosta account.'
             : 'Create an account to build your flight passport.'}

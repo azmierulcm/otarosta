@@ -40,14 +40,14 @@ export function ListingCard({ listing }: ListingCardProps) {
             </div>
           )}
           {/* Condition pill overlay */}
-          <span className={`absolute top-2 left-2 text-[10px] font-semibold px-2 py-0.5 rounded-full border ${conditionColor}`}>
+          <span className={`absolute top-2 left-2 text-[10px] font-bold px-2 py-0.5 rounded-full border ${conditionColor}`}>
             {CONDITION_LABELS[listing.condition]}
           </span>
         </div>
 
         {/* Info */}
         <div className="p-3 space-y-1.5">
-          <p className="text-[14px] font-semibold text-text line-clamp-2 leading-snug">{listing.title}</p>
+          <p className="text-[14px] font-bold text-text line-clamp-2 leading-snug">{listing.title}</p>
           <div className="flex items-center justify-between gap-2">
             <span className="text-[16px] font-bold text-text">
               RM {listing.price.toLocaleString()}

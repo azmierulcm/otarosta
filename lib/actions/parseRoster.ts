@@ -7,6 +7,8 @@ import { nativeTextHandler } from '@/lib/parser/handlers/native-text';
 import { isLikelyScanned, scannedFallbackHandler } from '@/lib/parser/handlers/scanned-fallback';
 import { buildReport, formatReportSummary } from '@/lib/parser/report';
 import { UnsupportedAirlineError } from '@/lib/parser/types';
+import { enrichParsedRoster, airlineNameToIata } from '@/lib/parser/enrichment';
+import { recordParseFeedback } from '@/lib/parser/feedback';
 import type { RosterData, DutyEvent } from '@/lib/types';
 import { saveRoster } from '@/lib/actions/rosters';
 
@@ -160,18 +162,32 @@ export async function parseRosterPreview(formData: FormData): Promise<RosterData
     throw new Error('No duties were found. Make sure this is an AIMS roster PDF.');
   }
 
-  // ── Stage 4: Confidence scoring ───────────────────────────────────────────
+  // ── Stage 4: Enrichment ───────────────────────────────────────────────────
+  // Runs AFTER parsing but BEFORE confidence scoring so the scorer can use
+  // enriched data (e.g. distanceKm for port integrity checks in future).
+  const enriched = enrichParsedRoster(parsed);
+
+  logger.info('orchestrator:enrichment', 'Enrichment complete', {
+    inferredBase:      enriched.inferredBase,
+    totalBlockMinutes: enriched.totalBlockMinutes,
+    totalKm:           enriched.totalKm,
+    layoverCount:      enriched.layoverCount,
+    daysOff:           enriched.daysOff,
+    trainingDays:      enriched.trainingDays,
+  });
+
+  // ── Stage 5: Confidence scoring ───────────────────────────────────────────
   const confidence = scoreRosterParse(parsed, rawText);
 
   logger.info('orchestrator:confidence', 'Confidence score computed', {
     overall: confidence.overall,
-    grade: confidence.grade,
-    flags: confidence.flags,
+    grade:   confidence.grade,
+    flags:   confidence.flags,
   });
 
-  // ── Stage 5: End-of-run report ─────────────────────────────────────────────
-  const flights   = parsed.duties.filter((d) => d.type === 'FLIGHT');
-  const standbys  = parsed.duties.filter((d) => d.type === 'STANDBY');
+  // ── Stage 6: End-of-run report ────────────────────────────────────────────
+  const flights  = parsed.duties.filter((d) => d.type === 'FLIGHT');
+  const standbys = parsed.duties.filter((d) => d.type === 'STANDBY');
 
   const report = buildReport({
     runId: logger.runId,
@@ -197,8 +213,8 @@ export async function parseRosterPreview(formData: FormData): Promise<RosterData
   console.log(JSON.stringify({ event: 'PARSE_REPORT', report }));
   console.log(formatReportSummary(report));
 
-  // ── Map parsed duties → DutyEvent[] ───────────────────────────────────────
-  const events: DutyEvent[] = parsed.duties.map((d) =>
+  // ── Map enriched duties → DutyEvent[] ────────────────────────────────────
+  const events: DutyEvent[] = enriched.duties.map((d) =>
     stripUndefined({
       id:           d.id,
       type:         d.type as DutyEvent['type'],
@@ -217,10 +233,12 @@ export async function parseRosterPreview(formData: FormData): Promise<RosterData
 
   return {
     events,
-    month:      parsed.month,
-    year:       parsed.year,
-    crewName:   parsed.crewName,
-    parseReport: report,
+    month:             parsed.month,
+    year:              parsed.year,
+    crewName:          parsed.crewName,
+    airline:           airlineNameToIata(parsed.airline),
+    totalBlockMinutes: enriched.totalBlockMinutes,
+    parseReport:       report,
   };
 }
 
@@ -246,6 +264,21 @@ export async function saveConfirmedRoster(
       previewData.year,
     );
     const rosterId = await saveRoster(userId, previewData, icsContent);
+
+    // ── Fire-and-forget parse feedback ────────────────────────────────────
+    // Runs after the roster is saved — never blocks the response to the user.
+    if (previewData.parseReport) {
+      recordParseFeedback({
+        rosterId,
+        userId,
+        report:            previewData.parseReport,
+        totalKm:           0,   // re-computed in saveRoster; feedback uses score only
+        totalBlockMinutes: previewData.totalBlockMinutes ?? 0,
+      }).catch(() => {
+        // Swallowed — feedback collection is non-critical
+      });
+    }
+
     return { rosterId, icsContent };
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);

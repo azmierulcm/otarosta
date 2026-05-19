@@ -126,6 +126,30 @@ export function RecapCardModal({ isOpen, onClose, userId }: RecapCardModalProps)
     }
   };
 
+  const [isDownloading, setIsDownloading] = useState(false);
+
+  const handleDownload = async () => {
+    if (isDownloading) return;
+    setIsDownloading(true);
+    try {
+      const res = await fetch(`${imageUrl}?download=1`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const blob = await res.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = objectUrl;
+      a.download = `Recap-${effectiveKey}-${format === 'card' ? 'Card' : 'Stories'}.png`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(objectUrl);
+    } catch (err) {
+      console.error('[RecapCardModal] download failed', err);
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
   return (
     <AnimatePresence>
       {isOpen && (
@@ -278,9 +302,10 @@ export function RecapCardModal({ isOpen, onClose, userId }: RecapCardModalProps)
               </p>
 
               <div className="flex flex-col gap-3 mt-auto">
-                <a
-                  href={`${imageUrl}?download=1`}
-                  className="flex items-center justify-center gap-3 rounded-[var(--radius-pill)] font-[700] transition-all active:scale-95"
+                <button
+                  onClick={handleDownload}
+                  disabled={isDownloading || imgState !== 'ok'}
+                  className="flex items-center justify-center gap-3 rounded-[var(--radius-pill)] font-[700] transition-all active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
                   style={{
                     background: 'var(--accent)',
                     color: 'var(--accent-fg)',
@@ -288,9 +313,11 @@ export function RecapCardModal({ isOpen, onClose, userId }: RecapCardModalProps)
                     padding: '16px 24px',
                   }}
                 >
-                  <Download size={20} strokeWidth={2.5} />
-                  Download PNG
-                </a>
+                  {isDownloading
+                    ? <><div className="w-5 h-5 rounded-full border-2 border-white/40 border-t-white animate-spin" /> Downloading…</>
+                    : <><Download size={20} strokeWidth={2.5} /> Download PNG</>
+                  }
+                </button>
 
                 <button
                   onClick={handleCopy}

@@ -42,8 +42,11 @@ export default function NewListingPage() {
       </Link>
 
       <div>
-        <h1 className="text-[24px] font-bold text-text tracking-tight">New Listing</h1>
-        <p className="text-[13px] text-text-muted mt-1">Your listing will be active for 30 days.</p>
+        <p className="text-[10px] font-black uppercase tracking-[0.4em] text-text-subtle font-mono mb-2">
+          {"// NEW LISTING"}
+        </p>
+        <h1 className="text-3xl font-black tracking-tighter text-text">Post gear for sale</h1>
+        <p className="text-[13px] text-text-muted font-bold mt-1.5">Your listing will be active for 30 days.</p>
       </div>
 
       {error && (

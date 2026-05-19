@@ -27,6 +27,7 @@
     "react-dropzone": "^15.0.0",
     "react-leaflet": "^5.0.0",
     "react-simple-maps": "^3.0.0",
+    "resend": "^6.12.3",
     "unpdf": "^1.6.2"
   },
   "devDependencies": {

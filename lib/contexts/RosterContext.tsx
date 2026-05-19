@@ -4,7 +4,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { RosterData } from '@/lib/types';
 import type { RosterSummary } from '@/lib/types/roster';
 import { extractDestinations } from '@/lib/utils/destinations';
-import { calculateKilometers, formatBlockHours } from '@/lib/utils/geo/haversine';
+import { calculateKilometers, calcTotalBlockMinutes, formatMinutes } from '@/lib/utils/geo/haversine';
 import { useAuth } from '@/lib/contexts/AuthContext';
 import { getUserRosters, getRoster, deleteRoster as deleteRosterAction, updateRosterEvents } from '@/lib/actions/rosters';
 import type { DutyEvent } from '@/lib/types';
@@ -37,7 +37,7 @@ function enrichRoster(raw: RosterData): RosterData {
     }
     return acc;
   }, 0);
-  const totalBlockTime = formatBlockHours(raw.events);
+  const totalBlockTime = formatMinutes(calcTotalBlockMinutes(raw.events));
   return {
     ...raw,
     destinations,
@@ -108,21 +108,21 @@ export function RosterProvider({ children }: { children: React.ReactNode }) {
     setIsLoadingState(false);
     setErrorState(null);
     // Prepend to rosters list (optimistic)
+    const flights = roster.events.filter((e) => e.type === 'FLIGHT');
     const summary: RosterSummary = {
       id: rosterId,
       month: roster.month,
       year: roster.year,
       crewName: roster.crewName ?? null,
-      airline: 'MH',
+      airline: roster.airline ?? 'MH',
       uploadedAt: new Date().toISOString(),
       eventCount: roster.events.length,
-      totalSectors: roster.events.filter((e) => e.type === 'FLIGHT').length,
-      totalKm: roster.events.reduce((acc, e) => {
-        if (e.type === 'FLIGHT' && e.depPort && e.arrPort) {
-          return acc + calculateKilometers(e.depPort, e.arrPort);
-        }
+      totalSectors: flights.length,
+      totalKm: flights.reduce((acc, e) => {
+        if (e.depPort && e.arrPort) return acc + calculateKilometers(e.depPort, e.arrPort);
         return acc;
       }, 0),
+      totalBlockMinutes: roster.totalBlockMinutes ?? calcTotalBlockMinutes(flights),
       uniqueDestinations: extractDestinations(roster.events).length,
     };
     setRosters((prev) => [summary, ...prev.filter((r) => r.id !== rosterId)]);

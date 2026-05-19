@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plane, Clock, MapPin, Hotel, Download, Upload, ChevronDown, Calendar, Trash2, AlertTriangle, Pencil, Check, X } from 'lucide-react';
+import { Plane, Clock, MapPin, Hotel, Download, Upload, ChevronDown, Calendar, Trash2, AlertTriangle, Check, X, Pencil, Send, ChevronUp } from 'lucide-react';
 import { useRoster } from '@/lib/contexts/RosterContext';
 import { useAuth } from '@/lib/contexts/AuthContext';
 import { DutyEvent } from '@/lib/types';
@@ -10,6 +10,9 @@ import { generateICS, downloadICS } from '@/lib/utils/calendar';
 import { DutyCalendar } from './DutyCalendar';
 import { DestinationPatch } from './DestinationPatch';
 import { FileUploader } from './FileUploader';
+import { RosterTile, dayEventsToDuty } from './RosterTile';
+
+// ── Constants ─────────────────────────────────────────────────────────────────
 
 const GREETINGS = [
   'Hello',      // English
@@ -24,6 +27,8 @@ const GREETINGS = [
   'Salut',      // Romanian / informal French
 ];
 
+// ── Edit form helpers ─────────────────────────────────────────────────────────
+
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex flex-col gap-1">
@@ -35,36 +40,32 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 const inputCls = "bg-surface-2 border border-border rounded-xl px-4 py-2.5 text-[14px] font-mono font-bold text-text focus:outline-none focus:border-accent transition-colors w-full";
 
-export const EventCard = ({ event, index }: { event: DutyEvent; index: number }) => {
+// ── Event edit modal ──────────────────────────────────────────────────────────
+
+function EventEditModal({
+  event,
+  onClose,
+}: {
+  event: DutyEvent;
+  onClose: () => void;
+}) {
   const { updateEvent } = useRoster();
-  const isFlight = event.type === 'FLIGHT';
+  const isFlight  = event.type === 'FLIGHT';
   const isStandby = event.type === 'STANDBY';
 
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState<DutyEvent>(event);
-  const [saving, setSaving] = useState(false);
+  const [draft, setDraft]       = useState<DutyEvent>(event);
+  const [saving, setSaving]     = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
   const set = (key: keyof DutyEvent, val: string) =>
     setDraft((prev) => ({ ...prev, [key]: val }));
-
-  const handleEdit = () => {
-    setDraft(event);
-    setSaveError(null);
-    setEditing(true);
-  };
-
-  const handleCancel = () => {
-    setEditing(false);
-    setSaveError(null);
-  };
 
   const handleSave = async () => {
     setSaving(true);
     setSaveError(null);
     try {
       await updateEvent(event.id, draft);
-      setEditing(false);
+      onClose();
     } catch {
       setSaveError('Failed to save. Please try again.');
     } finally {
@@ -72,39 +73,47 @@ export const EventCard = ({ event, index }: { event: DutyEvent; index: number })
     }
   };
 
+  // Close on Escape
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [onClose]);
+
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.05 }}
-      className="bg-white rounded-[2.5rem] p-8 md:p-10 shadow-sm border border-border mb-8 group hover:shadow-2xl hover:shadow-black/5 transition-all relative overflow-hidden"
-    >
-      {isFlight && !editing && (
-        <div className="absolute top-0 right-0 w-32 h-32 bg-accent/3 blur-[40px] -mr-16 -mt-16 rounded-full" />
-      )}
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      {/* Backdrop */}
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
 
-      {/* ── Edit button (top-right) ── */}
-      {!editing && (
-        <button
-          onClick={handleEdit}
-          aria-label="Edit event"
-          className="absolute top-6 right-6 w-9 h-9 flex items-center justify-center rounded-full text-text-subtle hover:text-accent hover:bg-accent/5 border border-border opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all z-10"
-        >
-          <Pencil size={14} strokeWidth={2.5} />
-        </button>
-      )}
-
-      {editing ? (
-        /* ── EDIT MODE ── */
-        <div className="relative z-10 space-y-6">
-          <div className="flex items-center gap-3 mb-2">
-            <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${isFlight ? 'bg-accent/5 text-accent border border-accent/10' : 'bg-orange-50 text-orange-600 border border-orange-100'}`}>
+      {/* Sheet */}
+      <motion.div
+        initial={{ opacity: 0, scale: 0.96, y: 16 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.96, y: 16 }}
+        className="relative bg-white rounded-[2rem] shadow-2xl shadow-black/20 w-full max-w-xl max-h-[90vh] overflow-y-auto"
+      >
+        {/* Modal header */}
+        <div className="flex items-center justify-between px-8 pt-8 pb-6 border-b border-border">
+          <div className="flex items-center gap-3">
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isFlight ? 'bg-accent/5 text-accent border border-accent/10' : 'bg-amber-50 text-amber-600 border border-amber-100'}`}>
               {isFlight ? <Plane className="w-5 h-5" /> : <Clock className="w-5 h-5" />}
             </div>
-            <span className="text-[11px] font-black text-text-subtle uppercase tracking-widest font-mono">Editing duty</span>
+            <div>
+              <p className="text-[10px] font-black text-text-subtle uppercase tracking-[0.2em] font-mono">Edit Duty</p>
+              <p className="font-bold text-text text-sm">{event.date}</p>
+            </div>
           </div>
+          <button
+            onClick={onClose}
+            className="w-9 h-9 flex items-center justify-center rounded-full text-text-subtle hover:text-text hover:bg-surface-2 border border-border transition-all"
+          >
+            <X size={16} />
+          </button>
+        </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+        {/* Form */}
+        <div className="px-8 py-6 space-y-6">
+          <div className="grid grid-cols-2 gap-4">
             <Field label="Date">
               <input className={inputCls} value={draft.date} onChange={(e) => set('date', e.target.value)} placeholder="YYYY-MM-DD" />
             </Field>
@@ -137,135 +146,272 @@ export const EventCard = ({ event, index }: { event: DutyEvent; index: number })
             </Field>
 
             {isFlight && (
-              <Field label="Hotel / Layover">
-                <input className={`${inputCls} col-span-2`} value={draft.hotel ?? ''} onChange={(e) => set('hotel', e.target.value)} placeholder="Hilton London Heathrow" />
-              </Field>
+              <div className="col-span-2">
+                <Field label="Hotel / Layover">
+                  <input className={inputCls} value={draft.hotel ?? ''} onChange={(e) => set('hotel', e.target.value)} placeholder="Hilton London Heathrow" />
+                </Field>
+              </div>
             )}
 
             {!isFlight && (
-              <Field label="Description">
-                <input className={inputCls} value={draft.description ?? ''} onChange={(e) => set('description', e.target.value)} placeholder="Standby duty description" />
-              </Field>
+              <div className="col-span-2">
+                <Field label="Description">
+                  <input className={inputCls} value={draft.description ?? ''} onChange={(e) => set('description', e.target.value)} placeholder="Duty description" />
+                </Field>
+              </div>
             )}
           </div>
 
           {saveError && (
             <p className="text-[12px] text-red-500 font-bold">{saveError}</p>
           )}
-
-          <div className="flex items-center gap-3 pt-2 border-t border-border">
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              className="flex items-center gap-2 bg-accent text-accent-fg px-6 py-2.5 rounded-full text-[12px] font-black uppercase tracking-widest transition-all active:scale-95 disabled:opacity-60"
-            >
-              <Check size={14} strokeWidth={3} />
-              {saving ? 'Saving…' : 'Save changes'}
-            </button>
-            <button
-              onClick={handleCancel}
-              disabled={saving}
-              className="flex items-center gap-2 text-text-muted hover:text-text border border-border px-6 py-2.5 rounded-full text-[12px] font-black uppercase tracking-widest transition-all"
-            >
-              <X size={14} strokeWidth={2.5} />
-              Cancel
-            </button>
-          </div>
         </div>
-      ) : (
-        /* ── READ MODE ── */
-        <div className="relative z-10">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-10">
-            <div className="flex items-start gap-8">
-              <div className={`w-16 h-16 rounded-2xl flex items-center justify-center shrink-0 shadow-sm ${isFlight ? 'bg-accent/5 text-accent border border-accent/10' : 'bg-orange-50 text-orange-600 border border-orange-100'}`}>
-                {isFlight ? <Plane className="w-8 h-8" /> : <Clock className="w-8 h-8" />}
-              </div>
-              <div>
-                <div className="flex items-center gap-3 mb-3">
-                  <span className="text-[10px] font-black text-text-subtle uppercase tracking-[0.2em] font-mono bg-surface-2 px-3 py-1 rounded-full border border-border">
-                    {event.date}
-                  </span>
-                  {isStandby && (
-                    <span className="bg-orange-100 text-orange-700 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-tighter shadow-sm">
-                      Standby Duty
-                    </span>
-                  )}
-                </div>
-                <h3 className="text-3xl font-bold text-text tracking-tighter">
-                  {isFlight ? `Flight ${event.flightNumber}` : `Duty Code: ${event.id}`}
-                </h3>
-                {isFlight && (
-                  <div className="flex items-center gap-3 mt-3 text-text-muted font-bold text-xl tracking-tight">
-                    <span className="text-text">{event.depPort}</span>
-                    <div className="flex items-center gap-1">
-                      <div className="w-1.5 h-1.5 rounded-full bg-accent/30" />
-                      <div className="w-8 h-[2px] bg-accent/20" />
-                      <div className="w-1.5 h-1.5 rounded-full bg-accent" />
-                    </div>
-                    <span className="text-text">{event.arrPort}</span>
-                  </div>
-                )}
-              </div>
-            </div>
 
-            <div className="flex flex-wrap gap-6 md:text-right">
-              <div className="bg-surface-2 px-6 py-4 rounded-2xl border border-border shadow-sm min-w-[120px]">
-                <p className="text-[10px] font-black text-text-subtle uppercase tracking-[0.2em] mb-2 font-mono">Sign On</p>
-                <p className="text-2xl font-black text-text font-mono">{event.signOn || event.std || '--:--'}</p>
-              </div>
-              <div className="bg-surface-2 px-6 py-4 rounded-2xl border border-border shadow-sm min-w-[120px]">
-                <p className="text-[10px] font-black text-text-subtle uppercase tracking-[0.2em] mb-2 font-mono">Sign Off</p>
-                <p className="text-2xl font-black text-text font-mono">{event.signOff || event.sta || '--:--'}</p>
-              </div>
-            </div>
-          </div>
-
-          {isFlight && event.std && (
-            <div className="mt-8 flex flex-wrap items-center gap-10 text-[10px] text-text-subtle font-black uppercase tracking-[0.15em] font-mono">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-xl bg-surface-2 flex items-center justify-center border border-border">
-                  <Clock className="w-4 h-4 text-accent" />
-                </div>
-                <span>STD {event.std}</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-xl bg-surface-2 flex items-center justify-center border border-border">
-                  <Clock className="w-4 h-4 text-accent" />
-                </div>
-                <span>STA {event.sta || '--:--'}</span>
-              </div>
-            </div>
-          )}
-
-          {event.hotel && (
-            <div className="mt-10 pt-10 border-t border-border flex flex-col sm:flex-row sm:items-center gap-6">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-2xl bg-accent text-white flex items-center justify-center shadow-lg shadow-accent/20">
-                  <Hotel className="w-6 h-6" strokeWidth={2.5} />
-                </div>
-                <span className="font-black text-text uppercase text-xs tracking-widest font-mono">Layover Operations:</span>
-              </div>
-              <span className="bg-accent/5 border border-accent/10 px-5 py-2.5 rounded-full text-accent font-black text-sm tracking-tight shadow-sm">{event.hotel}</span>
-            </div>
-          )}
+        {/* Footer */}
+        <div className="flex items-center gap-3 px-8 pb-8 pt-2 border-t border-border">
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="flex items-center gap-2 bg-accent text-accent-fg px-6 py-2.5 rounded-full text-[12px] font-black uppercase tracking-widest transition-all active:scale-95 disabled:opacity-60"
+          >
+            <Check size={14} strokeWidth={3} />
+            {saving ? 'Saving…' : 'Save changes'}
+          </button>
+          <button
+            onClick={onClose}
+            disabled={saving}
+            className="flex items-center gap-2 text-text-muted hover:text-text border border-border px-6 py-2.5 rounded-full text-[12px] font-black uppercase tracking-widest transition-all"
+          >
+            Cancel
+          </button>
         </div>
-      )}
-    </motion.div>
+      </motion.div>
+    </div>
   );
-};
+}
+
+// ── Support / Bug-report widget ───────────────────────────────────────────────
+
+const BUG_CATEGORIES = ['Parsing error', 'Wrong flight data', 'Missing duty', 'App bug', 'Other'];
+
+function SupportWidget({
+  userId,
+  userEmail,
+  rosterMonth,
+  rosterYear,
+}: {
+  userId?: string;
+  userEmail?: string;
+  rosterMonth?: string;
+  rosterYear?: string;
+}) {
+  const [open, setOpen]           = useState(false);
+  const [category, setCategory]   = useState(BUG_CATEGORIES[0]);
+  const [description, setDescription] = useState('');
+  const [status, setStatus]       = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
+
+  const handleSubmit = async () => {
+    if (description.trim().length < 10) return;
+    setStatus('sending');
+    try {
+      const res = await fetch('/api/support', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, userEmail, category, description, rosterMonth, rosterYear }),
+      });
+      if (!res.ok) throw new Error('Server error');
+      setStatus('sent');
+      setDescription('');
+      setTimeout(() => { setStatus('idle'); setOpen(false); }, 3000);
+    } catch {
+      setStatus('error');
+      setTimeout(() => setStatus('idle'), 3000);
+    }
+  };
+
+  return (
+    <div className="mt-12 bg-surface-2 border border-border rounded-[2rem] overflow-hidden">
+      {/* Header — always visible */}
+      <button
+        onClick={() => setOpen(v => !v)}
+        className="w-full flex items-center justify-between px-8 py-6 text-left hover:bg-surface transition-colors"
+      >
+        <div>
+          <p className="text-[10px] font-black text-text-subtle uppercase tracking-[0.4em] font-mono mb-1">
+            {'// MISSION SUPPORT'}
+          </p>
+          <p className="text-sm font-bold text-text-muted leading-snug">
+            Found an error? Report it to our flight deck.
+          </p>
+        </div>
+        {open
+          ? <ChevronUp size={16} className="text-text-subtle shrink-0" />
+          : <ChevronDown size={16} className="text-text-subtle shrink-0" />}
+      </button>
+
+      {/* Expandable form */}
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="overflow-hidden"
+          >
+            <div className="px-8 pb-8 pt-2 space-y-4 border-t border-border">
+
+              {/* Category pills */}
+              <div>
+                <p className="text-[10px] font-black text-text-subtle uppercase tracking-[0.2em] font-mono mb-3">Category</p>
+                <div className="flex flex-wrap gap-2">
+                  {BUG_CATEGORIES.map(cat => (
+                    <button
+                      key={cat}
+                      onClick={() => setCategory(cat)}
+                      className="px-3 py-1.5 rounded-full text-[11px] font-bold border transition-all"
+                      style={{
+                        background: category === cat ? 'var(--accent)' : 'transparent',
+                        color: category === cat ? 'var(--accent-fg)' : 'var(--text-muted)',
+                        borderColor: category === cat ? 'var(--accent)' : 'var(--border)',
+                      }}
+                    >
+                      {cat}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Description textarea */}
+              <div>
+                <p className="text-[10px] font-black text-text-subtle uppercase tracking-[0.2em] font-mono mb-3">Description</p>
+                <textarea
+                  value={description}
+                  onChange={e => setDescription(e.target.value)}
+                  rows={4}
+                  placeholder="Describe what went wrong — e.g. flight MH4 on 6 May showed wrong arrival time..."
+                  className="w-full bg-white border border-border rounded-xl px-4 py-3 text-[13px] font-mono text-text placeholder:text-text-subtle/50 focus:outline-none focus:border-accent resize-none transition-colors"
+                  disabled={status === 'sending' || status === 'sent'}
+                />
+                <p className="mt-1 text-[10px] text-text-subtle font-mono">
+                  {description.trim().length}/10 min chars
+                </p>
+              </div>
+
+              {/* Submit */}
+              <button
+                onClick={handleSubmit}
+                disabled={description.trim().length < 10 || status === 'sending' || status === 'sent'}
+                className="flex items-center gap-2 px-6 py-3 rounded-full font-black text-[11px] uppercase tracking-widest transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{ background: 'var(--accent)', color: 'var(--accent-fg)' }}
+              >
+                {status === 'sending' && <><div className="w-4 h-4 rounded-full border-2 border-white/40 border-t-white animate-spin" /> Sending…</>}
+                {status === 'sent'    && <><Check size={14} strokeWidth={3} /> Report sent!</>}
+                {status === 'error'   && <><X size={14} /> Failed — try again</>}
+                {status === 'idle'    && <><Send size={13} /> Send Report</>}
+              </button>
+
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+// ── Duty grid (the new "Timeline") ────────────────────────────────────────────
+
+function DutyGrid({ events }: { events: DutyEvent[] }) {
+  const [editingEvent, setEditingEvent] = useState<DutyEvent | null>(null);
+
+  if (events.length === 0) return null;
+
+  // Derive month / year from events
+  const [firstEvent] = events;
+  const seedDate = new Date(firstEvent.date);
+  const year  = seedDate.getFullYear();
+  const month = seedDate.getMonth();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+  // Group events by date — multiple flights on one day become multi-leg duty
+  const byDate = new Map<string, DutyEvent[]>();
+  for (const e of events) {
+    const bucket = byDate.get(e.date) ?? [];
+    bucket.push(e);
+    byDate.set(e.date, bucket);
+  }
+
+  // Primary event per date (for edit modal — we edit the first event of the day)
+  const primaryByDate = new Map<string, DutyEvent>();
+  for (const [date, evts] of byDate) {
+    const flight = evts.find((e) => e.type === 'FLIGHT');
+    primaryByDate.set(date, flight ?? evts[0]);
+  }
+
+  const today = new Date();
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+  // Only render days that have events (off days with no events are skipped —
+  // the DutyCalendar on the right already shows the full month view)
+  const dutyDays = Array.from({ length: daysInMonth }, (_, i) => {
+    const dom  = i + 1;
+    const mm   = String(month + 1).padStart(2, '0');
+    const dd   = String(dom).padStart(2, '0');
+    const date = `${year}-${mm}-${dd}`;
+    return { date, dom, evts: byDate.get(date) ?? [] };
+  }).filter((d) => d.evts.length > 0);
+
+  return (
+    <>
+      {/* 2-column tile grid — each tile ~350px+, well above container-query collapse thresholds */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {dutyDays.map(({ date, dom, evts }) => {
+          const isToday = date === todayStr;
+          const primary = primaryByDate.get(date);
+          const duty    = dayEventsToDuty(date, dom, evts);
+
+          return (
+            <div
+              key={date}
+              className={isToday ? 'ring-2 ring-accent/30 ring-offset-2 rounded-[var(--radius-tile)]' : ''}
+            >
+              <RosterTile
+                duty={duty}
+                onClick={primary ? () => setEditingEvent(primary) : undefined}
+              />
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Edit modal */}
+      <AnimatePresence>
+        {editingEvent && (
+          <EventEditModal
+            event={editingEvent}
+            onClose={() => setEditingEvent(null)}
+          />
+        )}
+      </AnimatePresence>
+    </>
+  );
+}
+
+// ── Main Dashboard ────────────────────────────────────────────────────────────
 
 export const Dashboard = () => {
   const { activeRoster, rosters, activeRosterId, selectRoster, deleteRoster, isLoading } = useRoster();
-  const { profile } = useAuth();
-  const [showUpload, setShowUpload] = useState(false);
+  const { profile, user } = useAuth();
+  const [showUpload, setShowUpload]           = useState(false);
   const [showRosterPicker, setShowRosterPicker] = useState(false);
-  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId]   = useState<string | null>(null);
 
-  // Typewriter greeting: cycles through GREETINGS, typing then erasing each one
+  // Typewriter greeting
   const [displayedGreeting, setDisplayedGreeting] = useState('');
   const [greetingIndex, setGreetingIndex] = useState(() =>
     Math.floor(Math.random() * GREETINGS.length)
   );
+
   useEffect(() => {
     const target = GREETINGS[greetingIndex];
     let frame: ReturnType<typeof setTimeout>;
@@ -274,23 +420,19 @@ export const Dashboard = () => {
 
     function tick() {
       if (!erasing) {
-        // Typing forward
         charIndex++;
         setDisplayedGreeting(target.slice(0, charIndex));
         if (charIndex < target.length) {
           frame = setTimeout(tick, 65);
         } else {
-          // Fully typed — pause before erasing
           frame = setTimeout(() => { erasing = true; tick(); }, 1400);
         }
       } else {
-        // Erasing backward
         charIndex--;
         setDisplayedGreeting(target.slice(0, charIndex));
         if (charIndex > 0) {
           frame = setTimeout(tick, 35);
         } else {
-          // Fully erased — move to next greeting after brief pause
           frame = setTimeout(() => {
             setGreetingIndex((i) => (i + 1) % GREETINGS.length);
           }, 300);
@@ -330,7 +472,8 @@ export const Dashboard = () => {
 
   return (
     <div className="max-w-7xl mx-auto px-4 pb-32 pt-6">
-      {/* Header */}
+
+      {/* ── Page header ─────────────────────────────────────────────────────── */}
       <div className="flex flex-col md:flex-row md:items-start justify-between mb-16 gap-8">
         <div>
           <div className="flex items-center gap-2 mb-4 text-[10px] font-black uppercase tracking-[0.4em] text-text-subtle font-mono">
@@ -346,10 +489,9 @@ export const Dashboard = () => {
             {firstName}.
           </h2>
 
-          {/* Roster Selector */}
+          {/* Roster selector */}
           <div className="relative mt-4">
             <div className="flex items-center gap-2">
-              {/* Roster label — clickable to switch when multiple exist */}
               <button
                 onClick={() => rosters.length > 1 && setShowRosterPicker((v) => !v)}
                 className={`flex items-center gap-3 font-bold text-lg tracking-tight transition-colors ${rosters.length > 1 ? 'text-text-muted hover:text-text cursor-pointer' : 'text-text-muted cursor-default'}`}
@@ -363,7 +505,6 @@ export const Dashboard = () => {
                 )}
               </button>
 
-              {/* Trash — always visible for the active roster */}
               {confirmDeleteId === activeRosterId ? (
                 <div className="flex items-center gap-2 ml-2 bg-red-50 border border-red-200 rounded-full px-4 py-1.5">
                   <AlertTriangle size={12} className="text-red-500 shrink-0" />
@@ -392,7 +533,6 @@ export const Dashboard = () => {
               )}
             </div>
 
-            {/* Multi-roster dropdown (switch only — no delete here anymore) */}
             <AnimatePresence>
               {showRosterPicker && rosters.length > 1 && (
                 <motion.div
@@ -464,7 +604,7 @@ export const Dashboard = () => {
         </div>
       </div>
 
-      {/* Inline Upload Zone */}
+      {/* ── Inline upload zone ───────────────────────────────────────────────── */}
       <AnimatePresence>
         {showUpload && (
           <motion.div
@@ -475,7 +615,7 @@ export const Dashboard = () => {
           >
             <div className="bg-white border border-border rounded-[2rem] p-10">
               <p className="text-[10px] font-black text-text-subtle uppercase tracking-[0.4em] font-mono mb-8">
-                {"// ADD ANOTHER MONTH"}
+                {'// ADD ANOTHER MONTH'}
               </p>
               <FileUploader onSuccess={() => setShowUpload(false)} />
             </div>
@@ -483,14 +623,14 @@ export const Dashboard = () => {
         )}
       </AnimatePresence>
 
-      {/* Loading state when switching rosters */}
+      {/* ── Loading state ────────────────────────────────────────────────────── */}
       {isLoading ? (
         <div className="flex items-center justify-center py-32">
           <div className="w-10 h-10 rounded-full border-2 border-accent border-t-transparent animate-spin" />
         </div>
       ) : (
         <>
-          {/* Destinations Section */}
+          {/* ── Destination stamps ──────────────────────────────────────────── */}
           {activeRoster.destinations && activeRoster.destinations.length > 0 && (
             <section className="mb-24">
               <div className="flex items-center justify-between mb-10 border-b border-border pb-8">
@@ -507,19 +647,26 @@ export const Dashboard = () => {
             </section>
           )}
 
+          {/* ── Main content grid ────────────────────────────────────────────── */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-16">
-            <div className="order-2 lg:order-1 lg:col-span-8 relative">
-              <div className="flex items-center gap-4 mb-12">
-                <h3 className="text-3xl font-bold text-text tracking-tighter uppercase italic">Timeline.</h3>
+
+            {/* ── Duty tiles (formerly Timeline) ───────────────────────────── */}
+            <div className="order-2 lg:order-1 lg:col-span-8">
+              <div className="flex items-center gap-4 mb-6">
+                <h3 className="text-3xl font-bold text-text tracking-tighter uppercase italic">Roster.</h3>
                 <div className="h-px flex-1 bg-border/50" />
+                <p className="text-[10px] font-black text-text-subtle uppercase tracking-widest font-mono">
+                  Tap to edit
+                </p>
+                <Pencil size={11} className="text-text-subtle" />
               </div>
 
-              <div className="absolute left-8 top-32 bottom-0 w-px bg-surface-2 -z-10" />
-              {activeRoster.events.map((event, index) => (
-                <EventCard key={event.id + index} event={event} index={index} />
-              ))}
+              <div className="bg-white rounded-[2rem] border border-border p-5">
+                <DutyGrid events={activeRoster.events} />
+              </div>
             </div>
 
+            {/* ── Calendar (unchanged) ─────────────────────────────────────── */}
             <div className="order-1 lg:order-2 lg:col-span-4">
               <div className="sticky top-32">
                 <div className="flex items-center gap-4 mb-12">
@@ -528,18 +675,12 @@ export const Dashboard = () => {
                 </div>
                 <DutyCalendar />
 
-                <div className="mt-12 p-8 bg-surface-2 border border-border rounded-[2rem] text-center">
-                  <p className="text-[10px] font-black text-text-subtle uppercase tracking-[0.4em] font-mono mb-6">
-                    {"// MISSION SUPPORT"}
-                  </p>
-                  <p className="text-sm font-bold text-text-muted leading-snug">
-                    Found an error in your roster parsing? <br />
-                    Report it to our flight deck.
-                  </p>
-                  <button className="mt-6 text-accent font-black text-[10px] uppercase tracking-widest hover:underline">
-                    Open Support Ticket
-                  </button>
-                </div>
+                <SupportWidget
+                  userId={user?.uid}
+                  userEmail={user?.email ?? undefined}
+                  rosterMonth={activeRoster.month}
+                  rosterYear={activeRoster.year}
+                />
               </div>
             </div>
           </div>
@@ -548,3 +689,6 @@ export const Dashboard = () => {
     </div>
   );
 };
+
+// Keep EventCard exported so any other file that imports it doesn't break
+export { EventEditModal as EventCard };

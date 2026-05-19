@@ -32,7 +32,7 @@
   --color-info: var(--info);
   --color-info-soft: var(--info-soft);
 
-  /* RosterCard — Airbnb-inspired palette (additive; hof=#222/foggy=#717 already covered by --color-text/--color-text-muted) */
+  /* RosterCard — Airbnb-inspired palette */
   --color-rausch:      #FF385C;
   --color-rausch-deep: #E61E4D;
   --color-babu:        #00A699;
@@ -49,22 +49,49 @@
   --color-patch-ams: var(--patch-ams);
   --color-patch-saf: var(--patch-saf);
 
+  /* ── RosterTile design tokens ──────────────────────────────────────────── */
+
+  /* Brand coral — holiday dates, next-day marker, standby accent */
+  --color-brand-50:  #FFF1F3;
+  --color-brand-100: #FFE4E8;
+  --color-brand-200: #FFCBD3;
+  --color-brand-500: #E0556A;
+  --color-brand-600: #C8425A;
+  --color-brand-700: #A6313F;
+
+  /* Ink — neutral typographic scale (fine-grained, distinct from --text-*) */
+  --color-ink-900: #1A1A1A;
+  --color-ink-800: #2D2D2D;
+  --color-ink-700: #484848;
+  --color-ink-500: #717171;
+  --color-ink-400: #959595;
+  --color-ink-300: #B0B0B0;
+  --color-ink-200: #DDDDDD;
+  --color-ink-100: #EEEEEE;
+
+  /* Mint — training / positive status */
+  --color-mint-50:  #E8F4EF;
+  --color-mint-500: #10A573;
+  --color-mint-700: #0A6A4D;
+
   /* Radii */
   --radius-sm: 6px;
   --radius-md: 10px;
   --radius-lg: 16px;
   --radius-xl: 24px;
   --radius-pill: 9999px;
-  /* RosterCard — story card radius */
   --radius-story: 36px;
+  --radius-tile: 14px;
 
   /* Shadows */
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.05);
   --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.06);
   --shadow-xl: 0 16px 40px rgba(0, 0, 0, 0.08);
-  /* RosterCard — story card shadow */
   --shadow-story: 0 30px 80px -20px rgba(0, 0, 0, 0.25), 0 8px 24px -12px rgba(0, 0, 0, 0.15);
+  /* RosterTile card shadows */
+  --shadow-card:       0 1px 2px rgba(0, 0, 0, 0.03);
+  --shadow-card-hover: 0 6px 18px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.03);
 
   /* Type scale */
   --text-h1: 3.5rem;
@@ -151,4 +178,36 @@ body {
     letter-spacing: -0.01em;
     font-weight: 600;
   }
+}
+
+/* ── RosterTile container queries ──────────────────────────────────────────────
+ * Applied via .tile-cq on the root <article> element.
+ * Helper classes tag individual sub-elements for selective narrowing.
+ * No selectors leak outside .tile-cq — safe to ship globally.
+ * ─────────────────────────────────────────────────────────────────────────── */
+
+.tile-cq { container-type: inline-size; }
+
+/* Below 175px — airport codes and pairing-activity hide;
+ * fonts shrink; status label hides. Flight number alone carries the route. */
+@container (max-width: 175px) {
+  .tile-cq .tile-pad         { padding-left: .5rem;   padding-right: .5rem;   }
+  .tile-cq .tile-pad-y       { padding-top: .375rem;  padding-bottom: .375rem; }
+  .tile-cq .tile-date        { font-size: 20px; }
+  .tile-cq .tile-airport     { display: none; }
+  .tile-cq .tile-flight-no   { font-size: 13.5px; }
+  .tile-cq .tile-route-label { font-size: 12px; }
+  .tile-cq .tile-time        { font-size: 13px; }
+  .tile-cq .tile-arrow       { display: none; }
+  .tile-cq .tile-pairing     { display: none; }
+  .tile-cq .tile-status      { font-size: 11px; letter-spacing: 0.06em; }
+  .tile-cq .tile-workchip    { font-size: 10.5px; padding: 1px 6px; }
+  .tile-cq .tile-statuslabel { display: none; }
+}
+
+/* Below 135px — even the route row collapses.
+ * Tile shows just date, status band, times, and footer chip. */
+@container (max-width: 135px) {
+  .tile-cq .tile-route-row         { display: none; }
+  .tile-cq .tile-route-row-divider { display: none; }
 }

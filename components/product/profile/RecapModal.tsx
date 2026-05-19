@@ -3,18 +3,19 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Download, Share2, Copy, Check } from 'lucide-react';
+import { toPng } from 'html-to-image';
 import { useRoster } from '@/lib/contexts/RosterContext';
+import { useAuth } from '@/lib/contexts/AuthContext';
 import { recentPeriodKeys } from '@/lib/recap/period';
 import type { EarnedDestination } from '@/lib/actions/destinations';
 import type { RosterSummary } from '@/lib/types/roster';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// RecapModal — replaces the OG-image-based RecapCardModal with an interactive
-// 9:16 RosterCard preview. Real data from useRoster() + earnedDestinations.
-// Download still hits the existing OG image API routes.
+// RecapModal — v3 card design · Instagram Stories 9:16 layout
+// Real data from useRoster() + earnedDestinations.
 // ─────────────────────────────────────────────────────────────────────────────
 
-// ── IATA metadata (city name + ISO country code) ────────────────────────────
+// ── IATA metadata ────────────────────────────────────────────────────────────
 
 const IATA_META: Record<string, { city: string; cc: string }> = {
   KUL: { city: 'Kuala Lumpur', cc: 'MY' }, SIN: { city: 'Singapore',    cc: 'SG' },
@@ -43,35 +44,43 @@ const IATA_META: Record<string, { city: string; cc: string }> = {
   ZQN: { city: 'Queenstown',   cc: 'NZ' }, JFK: { city: 'New York',     cc: 'US' },
   LAX: { city: 'Los Angeles',  cc: 'US' }, ORD: { city: 'Chicago',      cc: 'US' },
   YYZ: { city: 'Toronto',      cc: 'CA' }, GRU: { city: 'São Paulo',    cc: 'BR' },
-  EZE: { city: 'Buenos Aires', cc: 'AR' },
+  // New MAS destinations
+  KNO: { city: 'Medan',        cc: 'ID' }, UPG: { city: 'Makassar',     cc: 'ID' },
+  BPN: { city: 'Balikpapan',   cc: 'ID' }, PKU: { city: 'Pekanbaru',    cc: 'ID' },
+  JOG: { city: 'Yogyakarta',   cc: 'ID' }, CNX: { city: 'Chiang Mai',   cc: 'TH' },
+  HKT: { city: 'Phuket',       cc: 'TH' }, AMD: { city: 'Ahmedabad',    cc: 'IN' },
+  CCU: { city: 'Kolkata',      cc: 'IN' }, CSX: { city: 'Changsha',     cc: 'CN' },
+  CTU: { city: 'Chengdu',      cc: 'CN' }, TFU: { city: 'Chengdu',      cc: 'CN' },
+  ADL: { city: 'Adelaide',     cc: 'AU' }, PNH: { city: 'Phnom Penh',   cc: 'KH' },
+  AOR: { city: 'Alor Setar',   cc: 'MY' }, KUA: { city: 'Kuantan',      cc: 'MY' },
 };
 
-/** Convert ISO 3166-1 alpha-2 country code to flag emoji */
+/** ISO 3166-1 alpha-2 → flag emoji */
 function flag(cc: string): string {
   return [...cc.toUpperCase()].map(
     (c) => String.fromCodePoint(0x1f1e6 + c.charCodeAt(0) - 65),
   ).join('');
 }
 
-// ── Airport SVG coordinates (viewBox 0 0 1000 500) ──────────────────────────
+// ── Distance from KUL (km) for longestRoute highlight ────────────────────────
 
-const AIRPORT_SVG: Record<string, [number, number]> = {
-  KUL: [745, 282], SIN: [752, 298], BKK: [738, 265], HKG: [782, 235],
-  ICN: [825, 195], NRT: [820, 183], HND: [820, 184], PEK: [783, 196],
-  PVG: [795, 213], TPE: [800, 225], MNL: [795, 268], CGK: [758, 322],
-  DPS: [780, 330], DEL: [668, 228], BOM: [662, 238], MAA: [672, 258],
-  CMB: [680, 270], DXB: [622, 220], DOH: [618, 222], AUH: [625, 225],
-  MCT: [638, 232], IST: [560, 182], CAI: [568, 212], JNB: [572, 372],
-  CPT: [528, 390], ADD: [600, 280], NBO: [600, 310], LHR: [500, 145],
-  LGW: [502, 147], CDG: [508, 150], AMS: [504, 143], FRA: [518, 152],
-  MAD: [490, 168], FCO: [530, 170], ZRH: [515, 152], VIE: [530, 155],
-  MUC: [524, 150], SYD: [868, 402], MEL: [862, 418], BNE: [878, 390],
-  PER: [798, 398], AKL: [932, 418], CHC: [928, 428], ZQN: [922, 425],
-  JFK: [272, 186], LAX: [174, 217], ORD: [240, 190], YYZ: [258, 183],
-  GRU: [288, 358], EZE: [278, 388],
+const KUL_DISTANCE_KM: Record<string, number> = {
+  SIN: 316,   BKK: 1180,  CGK: 1160,  DPS: 2140,  KNO: 664,
+  UPG: 2050,  BPN: 1545,  PKU: 600,   JOG: 1550,  PNH: 1002,
+  HKT: 900,   CNX: 1600,  MNL: 2640,  HKG: 2680,  TPE: 3596,
+  PVG: 4080,  PEK: 4355,  ICN: 4670,  NRT: 5330,  HND: 5340,
+  MAA: 2847,  CMB: 2425,  BOM: 3865,  DEL: 4140,  KHI: 5040,
+  AMD: 4200,  CCU: 3150,  CSX: 3800,  CTU: 3500,  TFU: 3500,
+  DXB: 6340,  DOH: 6190,  AUH: 6395,  MCT: 5783,  JED: 7178,
+  RUH: 6576,  IST: 8145,  CAI: 7663,  ADD: 6023,  NBO: 6566,
+  JNB: 9050,  CPT: 10096, LHR: 10580, LGW: 10568, CDG: 10446,
+  AMS: 10726, FRA: 9990,  MAD: 11077, FCO: 9700,  ZRH: 10197,
+  VIE: 9638,  MUC: 9696,  SYD: 6641,  MEL: 6966,  BNE: 7006,
+  PER: 3889,  AKL: 8158,  ZQN: 8500,  ADL: 6278,
+  JFK: 15310, LAX: 13940, ORD: 14250, YYZ: 14980, GRU: 15980,
 };
 
-// ── Month label helper ───────────────────────────────────────────────────────
+// ── Month label helper ────────────────────────────────────────────────────────
 
 const MONTH_ABBR_TO_IDX: Record<string, number> = {
   JAN: 0, FEB: 1, MAR: 2, APR: 3, MAY: 4, JUN: 5,
@@ -85,20 +94,24 @@ function rosterShortLabel(r: RosterSummary): string {
   return `${SHORT_MONTH[idx] ?? r.month} ${r.year}`;
 }
 
-// ── Card data shape ──────────────────────────────────────────────────────────
+// ── Card data shape ───────────────────────────────────────────────────────────
 
 interface CardData {
-  periodLabel: string;
-  rangeLabel: string;
-  hours: number;
-  prevHours: number;
-  flights: number;
-  countries: number;
-  blockHrs: number;
-  totalKm: number;
-  topRoute: { from: string; to: string; count: number } | null;
-  topDests: { city: string; code: string; flag: string; visits: number; blockHrs: number }[];
-  pins: { x: number; y: number; code: string }[];
+  periodLabel:   string;
+  rangeLabel:    string;
+  hours:         number;
+  prevHours:     number;
+  flights:       number;
+  countries:     number;
+  standbyDays:   number;
+  offDays:       number;
+  blockHrs:      number;
+  totalKm:       number;
+  topRoute:      { from: string; to: string; count: number } | null;
+  longestRoute:  { from: string; to: string; km: number } | null;
+  mostVisited:   { city: string; code: string; count: number } | null;
+  topDests:      { city: string; code: string; flag: string; visits: number; blockHrs: number }[];
+  moreStamps:    number;
 }
 
 function buildCardData(
@@ -106,7 +119,7 @@ function buildCardData(
   rosters: RosterSummary[],
   earnedDests: EarnedDestination[],
 ): CardData {
-  const n = periodType === 'month' ? 1 : periodType === '6m' ? 6 : 12;
+  const n       = periodType === 'month' ? 1 : periodType === '6m' ? 6 : 12;
   const current = rosters.slice(0, n);
   const prev    = rosters.slice(n, n * 2);
 
@@ -114,8 +127,14 @@ function buildCardData(
   const prevKm       = prev.reduce((s, r) => s + r.totalKm, 0);
   const totalSectors = current.reduce((s, r) => s + r.totalSectors, 0);
   const uniqueDests  = current.reduce((s, r) => s + r.uniqueDestinations, 0);
+  const totalEvents  = current.reduce((s, r) => s + r.eventCount, 0);
   const blockHrs     = Math.round(totalKm / 850);
   const prevHours    = prevKm > 0 ? Math.round(prevKm / 850) : Math.max(1, Math.round(blockHrs * 0.92));
+
+  // Non-flight events split into rough standby / off estimates
+  const nonFlightEvents = Math.max(0, totalEvents - totalSectors);
+  const standbyDays     = Math.round(nonFlightEvents * 0.25);
+  const offDays         = Math.round(nonFlightEvents * 0.45);
 
   // Period label + range
   let periodLabel = '—';
@@ -139,39 +158,57 @@ function buildCardData(
   const nonHome = earnedDests.filter((d) => !d.isHome);
   const topDest = nonHome[0] ?? null;
 
-  const topDests = nonHome.slice(0, 3).map((d) => ({
+  // Show max 2 stamp patches — larger and more beautiful
+  const topDests = nonHome.slice(0, 2).map((d) => ({
     city:     IATA_META[d.iata]?.city ?? d.iata,
     code:     d.iata,
     flag:     flag(IATA_META[d.iata]?.cc ?? 'XX'),
     visits:   d.visits,
-    blockHrs: Math.round(d.visits * 7), // rough block-hours per visit
+    blockHrs: Math.round(d.visits * 7),
   }));
 
-  // Map pins: home + top 5 non-home destinations
-  const pins = [
-    { x: AIRPORT_SVG.KUL[0], y: AIRPORT_SVG.KUL[1], code: 'KUL' },
-    ...nonHome.slice(0, 5).map((d) => {
-      const [x, y] = AIRPORT_SVG[d.iata] ?? [500, 250];
-      return { x, y, code: d.iata };
-    }),
-  ];
+  // Longest route from KUL among earned destinations
+  let longestRoute: CardData['longestRoute'] = null;
+  if (nonHome.length > 0) {
+    const farthest = nonHome.reduce((best, d) => {
+      const km = KUL_DISTANCE_KM[d.iata] ?? 0;
+      return km > (KUL_DISTANCE_KM[best.iata] ?? 0) ? d : best;
+    }, nonHome[0]);
+    const km = KUL_DISTANCE_KM[farthest.iata];
+    if (km) longestRoute = { from: 'KUL', to: farthest.iata, km };
+  }
+
+  // Most visited
+  const mostVisited: CardData['mostVisited'] = topDest
+    ? { city: IATA_META[topDest.iata]?.city ?? topDest.iata, code: topDest.iata, count: topDest.visits }
+    : null;
+
+  // Top route
+  const topRoute = topDest ? { from: 'KUL', to: topDest.iata, count: topDest.visits } : null;
+
+  // More stamps (beyond the 2 shown)
+  const moreStamps = Math.max(0, nonHome.length - 2);
 
   return {
     periodLabel,
     rangeLabel,
-    hours: blockHrs,
+    hours:        blockHrs,
     prevHours,
-    flights: totalSectors,
-    countries: uniqueDests,
+    flights:      totalSectors,
+    countries:    uniqueDests,
+    standbyDays,
+    offDays,
     blockHrs,
     totalKm,
-    topRoute: topDest ? { from: 'KUL', to: topDest.iata, count: topDest.visits } : null,
+    topRoute,
+    longestRoute,
+    mostVisited,
     topDests,
-    pins,
+    moreStamps,
   };
 }
 
-// ── Download URL builder (maps to existing OG image API) ────────────────────
+// ── Download URL builder ──────────────────────────────────────────────────────
 
 type PeriodType = 'month' | '6m' | '1y';
 
@@ -189,7 +226,7 @@ function buildDownloadUrl(userId: string, periodType: PeriodType): string {
   return `/api/recap/${userId}/${key}/1y/stories?download=1`;
 }
 
-// ── Tiny inline SVG icon ─────────────────────────────────────────────────────
+// ── Tiny inline SVG icon ──────────────────────────────────────────────────────
 
 const Ico = ({ d, size = 16 }: { d: string; size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
@@ -199,16 +236,19 @@ const Ico = ({ d, size = 16 }: { d: string; size?: number }) => (
 );
 
 const ICON = {
-  plane:  'M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-3 3-2-.5c-.4-.1-.8 0-1 .3l-.3.3c-.3.4-.3 1 .1 1.3L6 18l1.8 2.8c.3.4.9.4 1.3.1l.3-.3c.3-.2.4-.6.3-1l-.5-2 3-3 4.3 4.8c.3.4.8.5 1.3.3l.5-.3c.4-.2.6-.6.5-1.1Z',
-  globe:  'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Zm0 0c2.5-2.5 4-6 4-9s-1.5-6.5-4-9m0 18c-2.5-2.5-4-6-4-9s1.5-6.5 4-9M3.5 9h17M3.5 15h17',
-  clock:  'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20Zm0-14v4l3 3',
-  route:  'M3 17l6-6 4 4 8-8M14 7h7v7',
-  share:  'M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7M16 6l-4-4-4 4M12 2v14',
-  right:  'M5 12h14M13 6l6 6-6 6',
-  trend:  'M3 17l6-6 4 4 8-8M14 7h7v7',
+  plane:   'M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-3 3-2-.5c-.4-.1-.8 0-1 .3l-.3.3c-.3.4-.3 1 .1 1.3L6 18l1.8 2.8c.3.4.9.4 1.3.1l.3-.3c.3-.2.4-.6.3-1l-.5-2 3-3 4.3 4.8c.3.4.8.5 1.3.3l.5-.3c.4-.2.6-.6.5-1.1Z',
+  globe:   'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Zm0 0c2.5-2.5 4-6 4-9s-1.5-6.5-4-9m0 18c-2.5-2.5-4-6-4-9s1.5-6.5 4-9M3.5 9h17M3.5 15h17',
+  clock:   'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20Zm0-14v4l3 3',
+  standby: 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20ZM12 8v4l4 2',
+  beach:   'M12 21V11M5 11h14M5 11a7 7 0 0 1 14 0M3 19c2-1 3-1 4.5 0s2.5 1 4.5 0 3-1 4.5 0 2.5 1 4.5 0',
+  trend:   'M3 17l6-6 4 4 8-8M14 7h7v7',
+  route:   'M5 21V7a3 3 0 0 1 6 0v10a3 3 0 0 0 6 0V3M9 7l-3-3-3 3M15 17l3 3 3-3',
+  pin:     'M12 21s-7-7.5-7-12a7 7 0 0 1 14 0c0 4.5-7 12-7 12ZM12 9a2 2 0 1 0 .001 4.001A2 2 0 0 0 12 9Z',
+  right:   'M5 12h14M13 6l6 6-6 6',
+  share:   'M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7M16 6l-4-4-4 4M12 2v14',
 };
 
-// ── Focus-trap helper ────────────────────────────────────────────────────────
+// ── Focus-trap helper ─────────────────────────────────────────────────────────
 
 const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])';
 function trapFocus(el: HTMLElement, e: KeyboardEvent) {
@@ -240,12 +280,13 @@ const PERIOD_TABS: { id: PeriodType; label: string }[] = [
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Main component
+// Main modal
 // ─────────────────────────────────────────────────────────────────────────────
 
 export function RecapModal({ isOpen, onClose, userId, earnedDestinations }: RecapModalProps) {
   const { rosters } = useRoster();
-  const [period, setPeriod]   = useState<PeriodType>('month');
+  const { profile }  = useAuth();
+  const [period, setPeriod]     = useState<PeriodType>('month');
   const [isCopied, setIsCopied] = useState(false);
 
   const panelRef   = useRef<HTMLDivElement>(null);
@@ -272,13 +313,40 @@ export function RecapModal({ isOpen, onClose, userId, earnedDestinations }: Reca
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, handleKeyDown]);
 
-  // Build card data whenever period or rosters change
   const data = useMemo(
     () => buildCardData(period, rosters, earnedDestinations),
     [period, rosters, earnedDestinations],
   );
 
+  // Profile for the card header
+  const cardProfile = useMemo(() => {
+    const name     = profile?.full_name || 'Crew Member';
+    const rankLine = [profile?.rank, profile?.fleet].filter(Boolean).join(' · ') || 'Malaysia Airlines';
+    const initials = name.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase();
+    return { name, rankLine, initials };
+  }, [profile]);
+
   const downloadUrl = buildDownloadUrl(userId, period);
+  const cardRef     = useRef<HTMLDivElement>(null);
+  const [isDownloading, setIsDownloading] = useState(false);
+
+  const handleDownload = async () => {
+    if (!cardRef.current || isDownloading) return;
+    setIsDownloading(true);
+    try {
+      const dataUrl = await toPng(cardRef.current, { pixelRatio: 3, cacheBust: true });
+      const a       = document.createElement('a');
+      a.href        = dataUrl;
+      a.download    = `Mission-Recap-${data.periodLabel.replace(/\s/g, '-')}.png`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    } catch (err) {
+      console.error('[RecapModal] download failed', err);
+    } finally {
+      setIsDownloading(false);
+    }
+  };
 
   const handleCopy = async () => {
     try {
@@ -322,7 +390,7 @@ export function RecapModal({ isOpen, onClose, userId, earnedDestinations }: Reca
                        rounded-[2rem] bg-bg border border-border max-h-[92vh] md:max-h-[88vh]"
             style={{ boxShadow: '0 32px 80px -16px rgba(0,0,0,0.35)' }}
           >
-            {/* ── Left: 9:16 card preview ─────────────────────────────── */}
+            {/* ── Left: 9:16 card preview ───────────────────────────── */}
             <div className="flex-1 flex flex-col items-center gap-5 p-6 md:p-8
                             border-b md:border-b-0 md:border-r border-border
                             bg-surface-2 overflow-y-auto">
@@ -337,7 +405,7 @@ export function RecapModal({ isOpen, onClose, userId, earnedDestinations }: Reca
                       className="flex-1 px-4 py-2 rounded-full text-[11px] font-black uppercase tracking-widest transition-all"
                       style={{
                         background: active ? 'var(--accent)' : 'transparent',
-                        color: active ? 'var(--accent-fg)' : 'var(--text-muted)',
+                        color:      active ? 'var(--accent-fg)' : 'var(--text-muted)',
                       }}
                     >
                       {tab.label}
@@ -346,13 +414,15 @@ export function RecapModal({ isOpen, onClose, userId, earnedDestinations }: Reca
                 })}
               </div>
 
-              {/* The 9:16 card */}
-              <LiveRosterCard data={data} />
+              {/* The 9:16 card — ref used for html-to-image capture */}
+              <div ref={cardRef} className="inline-block">
+                <LiveRosterCard data={data} profile={cardProfile} />
+              </div>
             </div>
 
-            {/* ── Right: actions ──────────────────────────────────────── */}
+            {/* ── Right: actions ────────────────────────────────────── */}
             <div className="w-full md:w-[360px] shrink-0 flex flex-col bg-bg p-8 md:p-10">
-              {/* Close button */}
+              {/* Close */}
               <div className="flex justify-end mb-6">
                 <button
                   onClick={onClose}
@@ -370,35 +440,38 @@ export function RecapModal({ isOpen, onClose, userId, earnedDestinations }: Reca
                 <div style={{ width: 40, height: 20, background: 'var(--accent)' }} />
               </div>
 
-              <h2 className="text-[28px] font-bold text-text leading-tight mb-2">
+              <h2 className="text-[28px] font-black text-text leading-tight tracking-tighter mb-2">
                 Share your mission.
               </h2>
-              <p className="text-[14px] text-text-muted font-medium leading-snug mb-8">
+              <p className="text-[14px] text-text-muted font-bold leading-snug mb-8">
                 Your {data.periodLabel} summary is ready — download or share with your crew.
               </p>
 
               {/* Stats snapshot */}
               <div className="grid grid-cols-2 gap-2 mb-8">
-                <MiniStat label="km in the sky"    value={data.totalKm.toLocaleString()} />
-                <MiniStat label="sectors flown"    value={data.flights.toString()} />
+                <MiniStat label="km in the sky"   value={data.totalKm.toLocaleString()} />
+                <MiniStat label="sectors flown"   value={data.flights.toString()} />
                 <MiniStat label="block hours"      value={data.blockHrs.toString()} />
                 <MiniStat label="destinations"     value={data.countries.toString()} />
               </div>
 
               {/* Actions */}
               <div className="flex flex-col gap-3 mt-auto">
-                <a
-                  href={downloadUrl}
-                  className="flex items-center justify-center gap-3 rounded-full font-bold transition-all active:scale-95 text-[15px] py-4"
+                <button
+                  onClick={handleDownload}
+                  disabled={isDownloading}
+                  className="flex items-center justify-center gap-3 rounded-full font-bold transition-all active:scale-95 text-[15px] py-4 w-full disabled:opacity-60 disabled:cursor-not-allowed"
                   style={{ background: 'var(--accent)', color: 'var(--accent-fg)' }}
                 >
-                  <Download size={18} strokeWidth={2.5} />
-                  Download PNG
-                </a>
+                  {isDownloading
+                    ? <><div className="w-4 h-4 rounded-full border-2 border-white/40 border-t-white animate-spin" /> Downloading…</>
+                    : <><Download size={18} strokeWidth={2.5} /> Download PNG</>
+                  }
+                </button>
 
                 <button
                   onClick={handleCopy}
-                  className="flex items-center justify-center gap-3 rounded-full font-semibold border border-border transition-all active:scale-95 hover:bg-surface-2 text-[14px] py-3.5"
+                  className="flex items-center justify-center gap-3 rounded-full font-bold border border-border transition-all active:scale-95 hover:bg-surface-2 text-[14px] py-3.5"
                   style={{ color: 'var(--text)' }}
                 >
                   {isCopied
@@ -409,7 +482,7 @@ export function RecapModal({ isOpen, onClose, userId, earnedDestinations }: Reca
                 {typeof navigator !== 'undefined' && !!navigator.share && (
                   <button
                     onClick={handleShare}
-                    className="flex items-center justify-center gap-3 rounded-full font-semibold border border-border transition-all active:scale-95 hover:bg-surface-2 text-[14px] py-3.5"
+                    className="flex items-center justify-center gap-3 rounded-full font-bold border border-border transition-all active:scale-95 hover:bg-surface-2 text-[14px] py-3.5"
                     style={{ color: 'var(--text)' }}
                   >
                     <Share2 size={16} />
@@ -430,219 +503,241 @@ export function RecapModal({ isOpen, onClose, userId, earnedDestinations }: Reca
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// LiveRosterCard — the 9:16 card, styled with real data
+// LiveRosterCard — v3 9:16 card with real data
 // ─────────────────────────────────────────────────────────────────────────────
 
-function LiveRosterCard({ data }: { data: CardData }) {
-  const delta    = data.prevHours > 0
+interface CardProfile { name: string; rankLine: string; initials: string }
+
+function LiveRosterCard({ data, profile }: { data: CardData; profile: CardProfile }) {
+  const delta      = data.prevHours > 0
     ? Math.round(((data.hours - data.prevHours) / data.prevHours) * 100)
     : 0;
-  const positive = delta >= 0;
-  const fmt      = (n: number) => n.toLocaleString();
+  const positive   = delta >= 0;
+  const fmt        = (n: number) => n.toLocaleString();
+  const stampCount = data.topDests.length + data.moreStamps;
 
   return (
     <div
-      className="relative w-full max-w-[300px] aspect-[9/16] overflow-hidden flex-shrink-0
-                 bg-[#FFFCF8] text-[#222222] ring-1 ring-black/8"
+      className="relative w-full max-w-[300px] aspect-[9/16] overflow-hidden flex-shrink-0"
       style={{
         borderRadius: 28,
-        boxShadow: '0 24px 60px -12px rgba(0,0,0,0.22), 0 6px 20px -8px rgba(0,0,0,0.14)',
+        background: '#FFFCF8',
+        color: '#222222',
         fontFamily: "Inter, ui-sans-serif, system-ui, -apple-system, sans-serif",
+        boxShadow: '0 30px 80px -20px rgba(0,0,0,0.25), 0 8px 24px -12px rgba(0,0,0,0.15)',
+        outline: '1px solid rgba(0,0,0,0.05)',
       }}
     >
       {/* Background glow blobs */}
-      <div className="pointer-events-none absolute -top-20 -right-20 h-60 w-60 rounded-full opacity-10 blur-3xl"
-           style={{ background: 'var(--accent)' }} />
-      <div className="pointer-events-none absolute -bottom-24 -left-16 h-60 w-60 rounded-full bg-[#00A699]/10 blur-3xl" />
+      <div className="pointer-events-none absolute -top-16 -right-16 h-48 w-48 rounded-full blur-3xl"
+           style={{ background: '#FF385C', opacity: 0.08 }} />
+      <div className="pointer-events-none absolute -bottom-20 -left-12 h-48 w-48 rounded-full blur-3xl"
+           style={{ background: '#00A699', opacity: 0.08 }} />
 
-      <div className="relative flex h-full flex-col p-5">
-        {/* Header: period label + top route pill */}
-        <header className="flex items-start justify-between">
-          <div>
-            <p className="text-[9px] font-black uppercase tracking-[0.18em] mb-0.5"
-               style={{ color: 'var(--accent)' }}>
-              // Mission Recap
-            </p>
-            <p className="text-[11px] font-semibold text-[#717171]">{data.rangeLabel || data.periodLabel}</p>
+      <div className="relative flex h-full flex-col p-4">
+
+        {/* ── Header ── */}
+        <header className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2.5 min-w-0">
+            {/* Avatar */}
+            <div
+              className="grid h-9 w-9 place-items-center rounded-full text-[11px] font-bold text-white shadow-md shrink-0"
+              style={{ background: 'linear-gradient(135deg, #FF385C, #E61E4D)' }}
+            >
+              {profile.initials}
+            </div>
+            <div className="leading-tight min-w-0">
+              <div className="flex items-center gap-1">
+                <p className="text-[12px] font-bold tracking-tight truncate">{profile.name}</p>
+                <span className="rounded-full px-1.5 py-[1px] text-[8px] font-bold tracking-wide text-white shrink-0"
+                      style={{ background: '#222' }}>
+                  MH
+                </span>
+              </div>
+              <p className="text-[9px] truncate" style={{ color: '#717171' }}>{profile.rankLine}</p>
+            </div>
           </div>
-          {data.topRoute && (
-            <span className="rounded-full bg-[#222]/8 px-2 py-[3px] text-[9px] font-bold text-[#222] ring-1 ring-black/5">
-              {data.topRoute.from} → {data.topRoute.to}
-            </span>
-          )}
+          {/* Period pill */}
+          <span
+            className="shrink-0 rounded-full px-2.5 py-1 text-[8px] font-black uppercase tracking-widest"
+            style={{ background: 'rgba(255,56,92,0.1)', color: '#FF385C' }}
+          >
+            {data.periodLabel}
+          </span>
         </header>
 
-        {/* Period tabs strip */}
-        <div className="mt-3 flex rounded-full bg-[#F1EFE8] p-[3px] text-[9px] font-semibold">
-          {PERIOD_TABS.map((t) => (
-            <div key={t.id} className="flex-1 text-center rounded-full py-1.5 text-[#717171]">
-              {t.label}
-            </div>
-          ))}
-        </div>
-
-        {/* Hero stat */}
-        <section className="mt-4">
-          <p className="text-[9px] font-semibold uppercase tracking-[0.14em]"
-             style={{ color: 'var(--accent)' }}>
-            {data.periodLabel}
-          </p>
-          <div className="flex items-end gap-1.5 mt-0.5">
-            <span className="text-[44px] font-bold leading-none tracking-tighter">{fmt(data.hours)}</span>
-            <span className="mb-1 text-[11px] font-medium text-[#717171]">hrs in the air</span>
+        {/* ── Passport stamps hero — 2 large patches ── */}
+        <section className="mt-3 flex-1 flex flex-col">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-[9px] font-bold uppercase tracking-[0.14em]" style={{ color: '#FF385C' }}>
+              Stamps collected
+            </p>
+            {stampCount > 0 && (
+              <p className="text-[8px] font-bold" style={{ color: '#717171' }}>
+                {stampCount} total
+              </p>
+            )}
           </div>
-          <div className="mt-1.5 flex items-center gap-1.5">
+
+          {data.topDests.length > 0 ? (
+            <div className="flex-1 flex flex-col">
+              {/* 2-column grid — large, beautiful patches */}
+              <div className="grid grid-cols-2 gap-2 flex-1">
+                {data.topDests.slice(0, 2).map((d) => (
+                  <div
+                    key={d.code}
+                    className="relative overflow-hidden rounded-2xl ring-1 ring-black/8 flex flex-col items-center justify-center"
+                    style={{ background: 'white', minHeight: 100 }}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={`/city-patches/${d.code}.png`}
+                      alt={`${d.city} stamp`}
+                      className="h-full w-full object-contain p-2"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = 'none';
+                        (e.target as HTMLImageElement).nextElementSibling?.removeAttribute('hidden');
+                      }}
+                    />
+                    <div hidden className="absolute inset-0 flex flex-col items-center justify-center gap-1">
+                      <span className="text-[28px]">{d.flag}</span>
+                      <span className="text-[11px] font-bold" style={{ color: '#222' }}>{d.code}</span>
+                      <span className="text-[8px]" style={{ color: '#717171' }}>{d.city}</span>
+                    </div>
+                    {/* City label overlay at the bottom */}
+                    <div className="absolute bottom-0 left-0 right-0 px-2 py-1.5"
+                         style={{ background: 'linear-gradient(to top, rgba(255,255,255,0.95) 60%, transparent)' }}>
+                      <p className="text-[8px] font-bold text-center leading-tight" style={{ color: '#222' }}>
+                        {d.city}
+                      </p>
+                      <p className="text-[7px] text-center" style={{ color: '#717171' }}>
+                        {d.visits} visit{d.visits !== 1 ? 's' : ''}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {data.moreStamps > 0 && (
+                <p className="mt-1.5 text-center text-[8px] font-bold" style={{ color: '#717171' }}>
+                  +{data.moreStamps} more stamp{data.moreStamps !== 1 ? 's' : ''} this {data.periodLabel.toLowerCase().includes('month') ? 'month' : 'period'}
+                </p>
+              )}
+            </div>
+          ) : (
+            <div className="flex-1 rounded-2xl ring-1 ring-black/5 flex flex-col items-center justify-center gap-2"
+                 style={{ background: '#F7F5F0', minHeight: 100 }}>
+              <span className="text-[24px]">✈️</span>
+              <p className="text-[9px]" style={{ color: '#717171' }}>No destinations yet</p>
+            </div>
+          )}
+        </section>
+
+        {/* ── Stats grid: hours (featured) + 4 smaller ── */}
+        <section className="mt-3 grid grid-cols-4 grid-rows-2 gap-1.5">
+          {/* Hours — spans 2 cols × 2 rows */}
+          <div className="col-span-2 row-span-2 flex flex-col justify-between rounded-2xl bg-white px-3 py-2.5 ring-1 ring-black/5">
+            <div>
+              <div className="flex items-center gap-1" style={{ color: '#FF385C' }}>
+                <Ico d={ICON.clock} size={11} />
+                <span className="text-[8px] font-bold uppercase tracking-wider">Hours</span>
+              </div>
+              <p className="mt-1 flex items-baseline gap-1 text-[32px] font-bold leading-none tracking-tight">
+                {fmt(data.hours)}
+                <span className="text-[10px] font-medium" style={{ color: '#717171' }}>h</span>
+              </p>
+              <p className="mt-0.5 text-[8px]" style={{ color: '#717171' }}>{data.rangeLabel}</p>
+            </div>
             <span
-              className="inline-flex items-center gap-1 rounded-full px-2 py-[2px] text-[9px] font-bold"
+              className="inline-flex w-fit items-center gap-1 rounded-full px-2 py-[2px] text-[8px] font-bold"
               style={{
                 background: positive ? '#E8F5EF' : '#FBEAF0',
                 color:      positive ? '#0F6E56' : '#993556',
               }}
             >
-              <Ico d={positive ? ICON.trend : ICON.right} size={9} />
+              <Ico d={positive ? ICON.trend : ICON.right} size={8} />
               {positive ? '+' : ''}{delta}% vs prev
             </span>
-            {data.topRoute && (
-              <span className="text-[9px] text-[#717171]">· top route {data.topRoute.from}→{data.topRoute.to}</span>
+          </div>
+
+          {/* 4 small stats */}
+          <SmallStat icon={ICON.plane}   value={fmt(data.flights)}      label="Flights"  />
+          <SmallStat icon={ICON.globe}   value={fmt(data.countries)}    label="Countries"/>
+          <SmallStat icon={ICON.standby} value={`${data.standbyDays}d`} label="Standby"  />
+          <SmallStat icon={ICON.beach}   value={`${data.offDays}d`}     label="Off days" />
+        </section>
+
+        {/* ── Highlights ── */}
+        <section className="mt-3 grid grid-cols-2 gap-1.5">
+          {/* Longest distance */}
+          <div className="rounded-xl p-2 ring-1 ring-black/5" style={{ background: '#FFE9EE' }}>
+            <div className="flex items-center gap-1 text-[8px] font-bold uppercase tracking-wider"
+                 style={{ color: '#FF385C' }}>
+              <Ico d={ICON.route} size={9} />Longest
+            </div>
+            {data.longestRoute ? (
+              <>
+                <p className="mt-1 text-[11px] font-bold leading-tight" style={{ color: '#222' }}>
+                  {data.longestRoute.from} → {data.longestRoute.to}
+                </p>
+                <p className="text-[9px] font-medium" style={{ color: '#FF385C' }}>
+                  {data.longestRoute.km.toLocaleString()} km
+                </p>
+              </>
+            ) : (
+              <p className="mt-1 text-[9px]" style={{ color: '#717171' }}>—</p>
+            )}
+          </div>
+          {/* Most visited */}
+          <div className="rounded-xl p-2 ring-1 ring-black/5" style={{ background: '#E1F5EE' }}>
+            <div className="flex items-center gap-1 text-[8px] font-bold uppercase tracking-wider"
+                 style={{ color: '#00A699' }}>
+              <Ico d={ICON.pin} size={9} />Most visited
+            </div>
+            {data.mostVisited ? (
+              <>
+                <p className="mt-1 text-[11px] font-bold leading-tight" style={{ color: '#222' }}>
+                  {data.mostVisited.city}
+                </p>
+                <p className="text-[9px] font-medium" style={{ color: '#00A699' }}>
+                  {data.mostVisited.count} visits · {data.mostVisited.code}
+                </p>
+              </>
+            ) : (
+              <p className="mt-1 text-[9px]" style={{ color: '#717171' }}>—</p>
             )}
           </div>
         </section>
 
-        {/* 4-up stat boxes */}
-        <section className="mt-3 grid grid-cols-4 gap-1.5">
-          <MiniStatBox icon={ICON.plane} value={fmt(data.flights)} label="Flights" />
-          <MiniStatBox icon={ICON.globe} value={fmt(data.countries)} label="Dests" />
-          <MiniStatBox icon={ICON.clock} value={fmt(data.blockHrs)} label="Hrs" />
-          <MiniStatBox icon={ICON.route} value={`${(data.totalKm/1000).toFixed(0)}k`} label="km" />
-        </section>
-
-        {/* World map */}
-        <section className="mt-3 overflow-hidden rounded-xl bg-[#F7F5F0] ring-1 ring-black/5">
-          <div className="flex items-center justify-between px-2.5 pt-2.5">
-            <p className="text-[9px] font-bold uppercase tracking-wider text-[#222]">Where you flew</p>
-          </div>
-          <CardWorldMap pins={data.pins} topRoute={data.topRoute} />
-        </section>
-
-        {/* Top destinations */}
-        {data.topDests.length > 0 && (
-          <section className="mt-2.5">
-            <p className="mb-1 text-[9px] font-bold uppercase tracking-wider text-[#717171]">Top destinations</p>
-            <ul className="space-y-1">
-              {data.topDests.map((d, i) => (
-                <li key={d.code}
-                    className="flex items-center justify-between rounded-lg bg-white px-2 py-1.5 ring-1 ring-black/5">
-                  <div className="flex items-center gap-2">
-                    <span className="grid h-6 w-6 place-items-center rounded-md text-[10px]"
-                          style={{ background: 'var(--accent)' }}>
-                      <span className="text-white font-bold text-[8px]">{d.flag}</span>
-                    </span>
-                    <div className="leading-tight">
-                      <p className="text-[10px] font-semibold">
-                        {d.city} <span className="text-[#717171] font-normal">· {d.code}</span>
-                      </p>
-                      <p className="text-[8px] text-[#717171]">{d.visits} visits · {d.blockHrs}h</p>
-                    </div>
-                  </div>
-                  <span className="text-[8px] font-bold text-[#717171]">#{i + 1}</span>
-                </li>
-              ))}
-            </ul>
-          </section>
-        )}
-
-        {/* Footer */}
-        <footer className="mt-auto flex items-center justify-between pt-3">
-          <div className="flex items-center gap-1 text-[9px] text-[#717171]">
+        {/* ── Footer ── */}
+        <footer className="mt-2 flex items-center justify-center pt-1">
+          <div className="flex items-center gap-1.5 text-[8px]" style={{ color: '#717171' }}>
             <span className="inline-grid h-4 w-4 place-items-center rounded-full text-white"
-                  style={{ background: 'var(--accent)' }}>
+                  style={{ background: '#FF385C' }}>
               <Ico d={ICON.plane} size={8} />
             </span>
-            <span className="font-bold tracking-tight text-[#222]">
-              cemrosta
+            <span className="font-bold tracking-tight" style={{ color: '#717171' }}>
+              cemrosta<span style={{ color: '#FF385C' }}>.io</span>
             </span>
           </div>
-          <button className="inline-flex items-center gap-1 rounded-full bg-[#222] px-2.5 py-1 text-[9px] font-bold text-white">
-            Share story <Ico d={ICON.right} size={8} />
-          </button>
         </footer>
       </div>
     </div>
   );
 }
 
-// ── Sub-components for the 9:16 card ────────────────────────────────────────
+// ── Small stat box for the stats grid ────────────────────────────────────────
 
-function MiniStatBox({ icon, value, label }: { icon: string; value: string; label: string }) {
+function SmallStat({ icon, value, label }: { icon: string; value: string; label: string }) {
   return (
-    <div className="flex flex-col items-start rounded-lg bg-white px-1.5 py-1.5 ring-1 ring-black/5">
-      <span style={{ color: 'var(--accent)' }}><Ico d={icon} size={11} /></span>
-      <p className="mt-0.5 text-[14px] font-bold leading-none tracking-tight">{value}</p>
-      <p className="mt-0.5 text-[8px] text-[#717171]">{label}</p>
+    <div className="flex flex-col items-start rounded-xl bg-white px-2 py-1.5 ring-1 ring-black/5">
+      <span style={{ color: '#FF385C' }}><Ico d={icon} size={10} /></span>
+      <p className="mt-0.5 text-[13px] font-bold leading-none tracking-tight">{value}</p>
+      <p className="mt-0.5 text-[7px]" style={{ color: '#717171' }}>{label}</p>
     </div>
   );
 }
 
-interface CardPin { x: number; y: number; code: string }
-
-function CardWorldMap({ pins, topRoute }: {
-  pins: CardPin[];
-  topRoute: { from: string; to: string; count: number } | null;
-}) {
-  const continents = [
-    { cx: 190, cy: 180, rx: 90,  ry: 55 },
-    { cx: 270, cy: 320, rx: 42,  ry: 78 },
-    { cx: 505, cy: 165, rx: 60,  ry: 42 },
-    { cx: 525, cy: 305, rx: 60,  ry: 85 },
-    { cx: 720, cy: 210, rx: 120, ry: 65 },
-    { cx: 855, cy: 405, rx: 55,  ry: 32 },
-  ];
-
-  const from = topRoute ? pins.find((p) => p.code === topRoute.from) : null;
-  const to   = topRoute ? pins.find((p) => p.code === topRoute.to)   : null;
-  let arcPath = '';
-  if (from && to) {
-    const mx = (from.x + to.x) / 2;
-    const my = Math.min(from.y, to.y) - 60;
-    arcPath = `M ${from.x} ${from.y} Q ${mx} ${my} ${to.x} ${to.y}`;
-  }
-
-  return (
-    <div className="px-2.5 pb-2.5 pt-1.5">
-      <svg viewBox="0 0 1000 500" className="w-full">
-        <defs>
-          <pattern id="rm-dots" width="14" height="14" patternUnits="userSpaceOnUse">
-            <circle cx="1" cy="1" r="1" fill="#222" opacity="0.06" />
-          </pattern>
-        </defs>
-        <rect width="1000" height="500" fill="url(#rm-dots)" />
-        <g fill="#222" opacity="0.08">
-          {continents.map((c, i) => (
-            <ellipse key={i} cx={c.cx} cy={c.cy} rx={c.rx} ry={c.ry} />
-          ))}
-        </g>
-        <line x1="0" y1="250" x2="1000" y2="250"
-              stroke="#222" strokeOpacity="0.06" strokeWidth="1" strokeDasharray="4 6" />
-        {arcPath && (
-          <path d={arcPath} fill="none" stroke="var(--accent)"
-                strokeWidth="3" strokeLinecap="round" strokeDasharray="2 8" opacity="0.85" />
-        )}
-        {pins.map((p) => (
-          <g key={p.code}>
-            <circle cx={p.x} cy={p.y} r="14" fill="var(--accent)" opacity="0.18" />
-            <circle cx={p.x} cy={p.y} r="6.5" fill="var(--accent)" stroke="white" strokeWidth="2.5" />
-          </g>
-        ))}
-        {to && (
-          <circle cx={to.x} cy={to.y} r="22" fill="none"
-                  stroke="var(--accent)" strokeWidth="1.5" opacity="0.35" />
-        )}
-      </svg>
-    </div>
-  );
-}
-
-// ── Right-panel mini stat ────────────────────────────────────────────────────
+// ── Right-panel mini stat ─────────────────────────────────────────────────────
 
 function MiniStat({ label, value }: { label: string; value: string }) {
   return (

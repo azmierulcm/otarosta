@@ -46,7 +46,7 @@ export function ListingFilters({
           <button
             key={c.value}
             onClick={() => onCategory(c.value as ListingCategory | '')}
-            className={`px-3 py-1.5 rounded-[var(--radius-pill)] text-[12px] font-semibold border transition-colors ${
+            className={`px-3 py-1.5 rounded-[var(--radius-pill)] text-[12px] font-bold border transition-colors ${
               category === c.value
                 ? 'bg-accent text-accent-fg border-accent'
                 : 'bg-bg text-text-muted border-border hover:border-accent/40 hover:text-text'
@@ -64,7 +64,7 @@ export function ListingFilters({
             <button
               key={s.value}
               onClick={() => onSort(s.value)}
-              className={`px-3 py-1.5 text-[12px] font-semibold transition-colors ${
+              className={`px-3 py-1.5 text-[12px] font-bold transition-colors ${
                 sort === s.value
                   ? 'bg-accent text-accent-fg'
                   : 'bg-bg text-text-muted hover:text-text'
@@ -77,7 +77,7 @@ export function ListingFilters({
 
         <button
           onClick={() => onVerifiedOnly(!verifiedOnly)}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-pill)] text-[12px] font-semibold border transition-colors ${
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-pill)] text-[12px] font-bold border transition-colors ${
             verifiedOnly
               ? 'bg-accent-soft text-accent border-accent/30'
               : 'bg-bg text-text-muted border-border hover:border-accent/40 hover:text-text'

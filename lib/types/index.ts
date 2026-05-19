@@ -1,4 +1,4 @@
-export type DutyType = 'FLIGHT' | 'STANDBY' | 'LAYOVER' | 'OFF' | 'OTHER';
+export type DutyType = 'FLIGHT' | 'STANDBY' | 'LAYOVER' | 'OFF' | 'TRAINING' | 'GROUND' | 'OTHER';
 
 export interface DutyEvent {
   id: string;
@@ -38,8 +38,12 @@ export interface RosterData {
   month: string;
   year: string;
   crewName?: string;
+  /** IATA airline code, e.g. "MH". Parsed from the roster; stored in Firestore. */
+  airline?: string;
   destinations?: Destination[];
   stats?: RosterStats;
+  /** Aggregate block time in minutes — computed by enrichment module. */
+  totalBlockMinutes?: number;
   /** Structured parse report — present only when returned from parseRosterPreview */
   parseReport?: import('@/lib/parser/report').ParseReport;
 }

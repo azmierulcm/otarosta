@@ -42,7 +42,7 @@ export const Navbar = () => {
               <div className="w-5 h-2 bg-accent/50 rounded-sm" />
               <div className="w-5 h-4 bg-accent rounded-sm" />
             </div>
-            <span className="text-[22px] font-semibold text-text tracking-tight">Cemrosta</span>
+            <span className="text-[22px] font-bold text-text tracking-tight">Cemrosta</span>
           </Link>
 
           {/* Desktop right */}
@@ -80,7 +80,7 @@ export const Navbar = () => {
                 </button>
                 <button
                   onClick={() => openAuthModal('signup')}
-                  className="flex items-center gap-2 px-5 py-2 rounded-[var(--radius-pill)] bg-accent text-accent-fg text-[14px] font-medium hover:bg-accent-hover transition-colors shadow-[var(--shadow-sm)]"
+                  className="flex items-center gap-2 px-5 py-2 rounded-[var(--radius-pill)] bg-accent text-accent-fg text-[14px] font-bold hover:bg-accent-hover transition-colors shadow-[var(--shadow-sm)]"
                 >
                   Register
                 </button>

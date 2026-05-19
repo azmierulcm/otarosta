@@ -39,15 +39,18 @@ export default function MarketplaceClient() {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
       {/* Header */}
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex items-end justify-between gap-4 pt-4">
         <div>
-          <h1 className="text-[28px] font-bold text-text tracking-tight">Marketplace</h1>
-          <p className="text-[14px] text-text-muted mt-1">Crew gear, verified sellers.</p>
+          <p className="text-[10px] font-black uppercase tracking-[0.4em] text-text-subtle font-mono mb-2">
+            {"// CREW MARKETPLACE"}
+          </p>
+          <h1 className="text-4xl md:text-5xl font-black tracking-tighter text-text leading-none">Marketplace</h1>
+          <p className="text-[14px] text-text-muted font-bold mt-2">Crew gear, verified sellers only.</p>
         </div>
         {user && (
           <Link
             href="/marketplace/new"
-            className="flex items-center gap-2 px-4 py-2.5 rounded-[var(--radius-pill)] bg-accent text-accent-fg text-[13px] font-semibold hover:bg-accent-hover transition-colors shadow-[var(--shadow-sm)] shrink-0"
+            className="flex items-center gap-2 px-5 py-3 rounded-[var(--radius-pill)] bg-accent text-accent-fg text-[13px] font-bold hover:bg-accent-hover transition-colors shadow-[var(--shadow-sm)] shrink-0"
           >
             <Plus size={16} />
             New Listing
@@ -72,12 +75,12 @@ export default function MarketplaceClient() {
         </div>
       ) : listings.length === 0 ? (
         <div className="text-center py-24 space-y-3">
-          <p className="text-[15px] font-semibold text-text">No listings found</p>
-          <p className="text-[13px] text-text-muted">Try adjusting your filters or be the first to post!</p>
+          <p className="text-[15px] font-bold text-text">No listings found</p>
+          <p className="text-[13px] text-text-muted font-medium">Try adjusting your filters or be the first to post!</p>
           {user && (
             <Link
               href="/marketplace/new"
-              className="inline-flex items-center gap-2 mt-2 px-5 py-2.5 rounded-[var(--radius-pill)] bg-accent text-accent-fg text-[13px] font-semibold hover:bg-accent-hover transition-colors"
+              className="inline-flex items-center gap-2 mt-2 px-5 py-2.5 rounded-[var(--radius-pill)] bg-accent text-accent-fg text-[13px] font-bold hover:bg-accent-hover transition-colors"
             >
               <Plus size={15} />
               Post a listing

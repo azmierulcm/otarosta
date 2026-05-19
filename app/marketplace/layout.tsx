@@ -25,16 +25,19 @@ function AuthGate({ children }: { children: React.ReactNode }) {
             <ShoppingBag size={28} className="text-accent" />
           </div>
           <div className="space-y-2">
-            <h1 className="text-[22px] font-bold text-text tracking-tight">
-              Crew-only Marketplace
+            <p className="text-[10px] font-black uppercase tracking-[0.4em] text-text-subtle font-mono mb-3">
+              {"// CREW MARKETPLACE"}
+            </p>
+            <h1 className="text-3xl font-black tracking-tighter text-text leading-none">
+              Crew-only<br />Marketplace
             </h1>
-            <p className="text-[14px] text-text-muted leading-relaxed">
-              Sign in to browse and list gear. Only verified crew can access the marketplace.
+            <p className="text-[14px] text-text-muted font-bold leading-snug pt-1">
+              Sign in to browse and list gear. Verified crew only.
             </p>
           </div>
           <button
             onClick={() => openAuthModal('login')}
-            className="inline-flex items-center gap-2 px-6 py-3 rounded-[var(--radius-pill)] bg-accent text-accent-fg text-[14px] font-semibold hover:bg-accent-hover transition-colors shadow-[var(--shadow-sm)]"
+            className="inline-flex items-center gap-2 px-6 py-3 rounded-[var(--radius-pill)] bg-accent text-accent-fg text-[14px] font-bold hover:bg-accent-hover transition-colors shadow-[var(--shadow-sm)]"
           >
             <LogIn size={16} />
             Sign in to continue
