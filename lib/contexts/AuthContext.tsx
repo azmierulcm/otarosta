@@ -74,7 +74,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsAuthModalOpen(true)
   }
   const closeAuthModal = () => setIsAuthModalOpen(false)
-  const signOutUser = () => signOut(auth)
+  const signOutUser = () => signOut(auth).then(() => {
+    window.location.href = '/demo';
+  })
 
   return (
     <AuthContext.Provider
