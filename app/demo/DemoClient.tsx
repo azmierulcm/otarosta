@@ -331,18 +331,17 @@ export default function DemoClient() {
     <div className="max-w-7xl mx-auto px-4 pt-8 pb-32">
 
       {/* Hero banner */}
-      <div className="mb-12 rounded-[2.5rem] overflow-hidden relative"
-        style={{ background: 'linear-gradient(135deg, #1C1C1E 0%, #2d1a2e 100%)' }}>
+      <div className="mb-12 rounded-[2.5rem] overflow-hidden relative bg-surface-2 border border-border">
         <div className="px-10 py-12 relative z-10">
-          <div className="flex items-center gap-2 mb-4">
-            <Sparkles size={14} className="text-accent" />
-            <span className="text-[10px] font-[800] uppercase tracking-[0.35em] font-mono text-accent">Preview Mode</span>
+          <div className="flex items-center gap-2 mb-5">
+            <Sparkles size={13} className="text-accent" />
+            <span className="text-[10px] font-black uppercase tracking-[0.35em] font-mono text-accent">Preview Mode</span>
           </div>
-          <h1 className="text-4xl md:text-6xl font-[900] text-white tracking-tighter leading-none mb-4">
+          <h1 className="text-4xl md:text-6xl font-black text-text tracking-tighter leading-none mb-4">
             This is what<br />
-            <span style={{ color: 'var(--accent)' }}>you unlock.</span>
+            <span className="text-accent italic">you unlock.</span>
           </h1>
-          <p className="text-[16px] text-white/60 font-[500] max-w-lg leading-snug mb-8">
+          <p className="text-[16px] text-text-muted font-bold max-w-lg leading-snug mb-8">
             Every flight you take earns a city patch. Every month becomes a shareable recap card. Upload your roster and watch your passport fill up.
           </p>
 
@@ -354,23 +353,23 @@ export default function DemoClient() {
               { icon: Share2, label: 'Shareable recap', value: 'Monthly · 6M · 1Y' },
             ].map(({ icon: Icon, label, value }) => (
               <div key={label} className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: 'rgba(255,255,255,0.08)' }}>
-                  <Icon size={16} className="text-white/60" />
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-white border border-border">
+                  <Icon size={16} className="text-accent" />
                 </div>
                 <div>
-                  <p className="text-white font-[700] text-[15px] leading-none">{value}</p>
-                  <p className="text-white/40 text-[11px] mt-0.5">{label}</p>
+                  <p className="font-black text-text text-[15px] leading-none">{value}</p>
+                  <p className="text-text-muted text-[11px] mt-0.5">{label}</p>
                 </div>
               </div>
             ))}
           </div>
         </div>
 
-        {/* Decorative patch preview top-right */}
-        <div className="absolute right-10 top-1/2 -translate-y-1/2 hidden lg:flex gap-3 opacity-20">
+        {/* Decorative patch preview — right side */}
+        <div className="absolute right-10 top-1/2 -translate-y-1/2 hidden lg:flex gap-4">
           {['kuala_lumpur_patch.png', 'london_patch.png', 'sydney_patch.png'].map(f => (
             // eslint-disable-next-line @next/next/no-img-element
-            <img key={f} src={`/images/city_patches/${f}`} alt="" className="w-24 h-24 object-contain" />
+            <img key={f} src={`/images/city_patches/${f}`} alt="" className="w-24 h-24 object-contain drop-shadow-md" />
           ))}
         </div>
       </div>

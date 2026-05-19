@@ -3,6 +3,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { CalendarDays, MapPinned, Share2, Download, Check } from 'lucide-react';
+import { getPatchImageUrl } from '@/lib/patches/patch-images';
 
 /* ── Calendar week data ────────────────────────────────────────────────────── */
 type DutyType = 'flight' | 'layover' | 'standby';
@@ -21,19 +22,8 @@ const EV_STYLE: Record<DutyType, string> = {
   standby: 'bg-slate-100 border border-slate-200 text-slate-500',
 };
 
-/* ── Passport stamp data ───────────────────────────────────────────────────── */
-type StampSize = 'lg' | 'md' | 'sm';
-const STAMPS: { code: string; size: StampSize }[] = [
-  { code: 'KUL', size: 'lg' }, { code: 'LHR', size: 'md' }, { code: 'SIN', size: 'md' },
-  { code: 'SYD', size: 'md' }, { code: 'CDG', size: 'sm' }, { code: 'DOH', size: 'sm' },
-  { code: 'NRT', size: 'sm' }, { code: 'DXB', size: 'sm' }, { code: 'MEL', size: 'sm' },
-  { code: 'HKG', size: 'sm' }, { code: 'BKK', size: 'sm' }, { code: 'FRA', size: 'sm' },
-];
-const STAMP_SIZE: Record<StampSize, string> = {
-  lg: 'w-16 h-16 text-[11px]',
-  md: 'w-12 h-12 text-[10px]',
-  sm: 'w-10 h-10 text-[9px]',
-};
+/* ── City patches for passport card ───────────────────────────────────────── */
+const PASSPORT_PATCHES = ['KUL', 'LHR', 'SIN', 'HKG', 'BKK', 'SYD', 'CDG', 'NRT', 'PEN', 'DEL', 'DPS', 'ICN'];
 
 /* ── Sub-components ────────────────────────────────────────────────────────── */
 function CalendarCard() {
@@ -109,18 +99,28 @@ function PassportCard() {
         </div>
       </div>
 
-      {/* Stamp grid */}
-      <div className="flex-1 flex flex-wrap gap-2 content-start">
-        {STAMPS.map(({ code, size }) => (
-          <div
-            key={code}
-            className={`${STAMP_SIZE[size]} rounded-full border-2 border-accent/25 flex items-center justify-center font-black font-mono text-accent bg-accent/5 shrink-0`}
-          >
-            {code}
+      {/* Patch grid — real artwork */}
+      <div className="flex-1 grid grid-cols-4 gap-2 content-start">
+        {PASSPORT_PATCHES.map((code) => {
+          const url = getPatchImageUrl(code);
+          return (
+            <div key={code} className="flex flex-col items-center gap-0.5">
+              {url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={url} alt={code} className="w-full aspect-square object-contain drop-shadow-sm" />
+              ) : (
+                <div className="w-full aspect-square rounded-lg bg-accent/5 border border-accent/15 flex items-center justify-center text-[8px] font-black font-mono text-accent">
+                  {code}
+                </div>
+              )}
+              <span className="text-[7px] font-black font-mono text-text-subtle">{code}</span>
+            </div>
+          );
+        })}
+        <div className="flex flex-col items-center gap-0.5">
+          <div className="w-full aspect-square rounded-lg border border-dashed border-border flex items-center justify-center text-[8px] font-black text-text-subtle font-mono">
+            +35
           </div>
-        ))}
-        <div className="w-10 h-10 rounded-full border-2 border-dashed border-border flex items-center justify-center text-[9px] font-black text-text-subtle font-mono shrink-0">
-          +35
         </div>
       </div>
 

@@ -9,10 +9,9 @@ import { StatsStrip } from '@/components/product/profile/StatsStrip';
 import { SAMPLE_PROFILE } from '@/lib/fixtures/sample-profile';
 import {
   DESTINATION_CATALOG,
-  REGION_COLORS,
   type CatalogEntry,
 } from '@/lib/data/destination-catalog';
-import { ILLUSTRATIONS } from '@/lib/patches/illustrations';
+import { getPatchImageUrl } from '@/lib/patches/patch-images';
 import { getRarityTier, RARITY_CSS } from '@/lib/patches/rules';
 import type { EarnedDestination } from '@/lib/actions/destinations';
 
@@ -32,58 +31,36 @@ function MiniPatch({ entry, earned, index }: { entry: CatalogEntry; earned?: Ear
   const isUnlocked = !!earned;
   const rarity = isUnlocked ? getRarityTier(earned.visits) : null;
   const rarityBorder = rarity ? RARITY_CSS[rarity] : null;
-  const regionColor = REGION_COLORS[entry.region];
-  const Illustration = ILLUSTRATIONS[entry.iata] ?? ILLUSTRATIONS['Generic'];
+  const patchUrl = getPatchImageUrl(entry.iata);
 
-  // Cards beyond index 11 are blurred/locked to tease locked content
   const isHidden = index >= 12;
 
   return (
     <div
-      className={`rounded-[var(--radius-lg)] overflow-hidden flex flex-col transition-all ${isHidden ? 'opacity-30 blur-[1px]' : ''}`}
+      className={`rounded-xl overflow-hidden flex flex-col transition-all ${isHidden ? 'opacity-25 blur-[1.5px]' : ''}`}
       style={{
         border: '0.5px solid var(--border)',
-        boxShadow: rarityBorder ? `0 0 0 1px ${rarityBorder}` : undefined,
+        boxShadow: rarityBorder ? `0 0 0 1.5px ${rarityBorder}` : undefined,
       }}
     >
-      {/* Illustration area */}
+      {/* Artwork area */}
       <div
         className="relative flex items-center justify-center"
         style={{
           background: isUnlocked ? 'var(--surface)' : 'var(--surface-2)',
           borderBottom: '0.5px solid var(--border)',
-          paddingBlock: '24px',
-          minHeight: '120px',
+          paddingBlock: '20px',
+          minHeight: '110px',
         }}
       >
-        {entry.localName && (
-          <span
-            className="absolute top-2 left-2 text-[9px] font-[500] leading-none select-none"
-            style={{ color: `${regionColor}99` }}
-          >
-            {entry.localName}
-          </span>
+        {isUnlocked && patchUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={patchUrl} alt={entry.city} className="w-16 h-16 object-contain drop-shadow-sm" />
+        ) : (
+          <Lock size={20} className="text-text-subtle opacity-30" />
         )}
-
-        <div
-          className="transition-all"
-          style={{
-            opacity: isUnlocked ? 1 : 0.22,
-            filter: isUnlocked ? 'none' : 'grayscale(1)',
-            transform: 'scale(0.72)',
-          }}
-        >
-          <Illustration size={100} />
-        </div>
-
-        {!isUnlocked && (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <Lock size={18} className="text-text-subtle opacity-40" />
-          </div>
-        )}
-
         {earned?.isNew && (
-          <span className="absolute top-2 right-2 text-[9px] font-black uppercase tracking-widest text-accent font-mono">
+          <span className="absolute top-2 right-2 text-[8px] font-black uppercase tracking-widest text-accent font-mono">
             NEW
           </span>
         )}
@@ -91,23 +68,15 @@ function MiniPatch({ entry, earned, index }: { entry: CatalogEntry; earned?: Ear
 
       {/* Footer */}
       <div
-        className="px-3 py-2.5 flex items-center justify-between gap-2"
+        className="px-2.5 py-2"
         style={{ background: isUnlocked ? 'var(--bg)' : 'var(--surface-2)' }}
       >
-        <div className="min-w-0">
-          <p className={`text-[12px] font-[500] leading-tight truncate ${isUnlocked ? 'text-text' : 'text-text-subtle'}`}>
-            {entry.city}
-          </p>
-          <p className="text-[10px] text-text-subtle font-mono truncate">{entry.iata}</p>
-        </div>
-        {isUnlocked && earned && (
-          <span
-            className="text-[9px] font-black uppercase tracking-widest shrink-0 px-1.5 py-0.5 rounded-full"
-            style={{ background: `${regionColor}18`, color: regionColor }}
-          >
-            ×{earned.visits}
-          </span>
-        )}
+        <p className="font-mono font-semibold text-[11px] leading-none truncate" style={{ color: isUnlocked ? 'var(--text)' : 'var(--text-subtle)' }}>
+          {entry.iata}
+        </p>
+        <p className="text-[10px] truncate mt-0.5" style={{ color: isUnlocked ? 'var(--text-muted)' : 'var(--text-subtle)' }}>
+          {entry.city}
+        </p>
       </div>
     </div>
   );
