@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { randomUUID } from 'crypto';
 import { adminAuth, adminDb, adminBucket } from '@/lib/firebase/admin';
 
 const MAX_SIZE = 5 * 1024 * 1024; // 5 MB
@@ -33,21 +34,30 @@ export async function POST(req: NextRequest) {
     const filePath = `avatars/${uid}/profile.${ext}`;
     const fileRef  = adminBucket.file(filePath);
 
+    // Generate a stable download token so the URL works regardless of bucket ACL settings
+    const downloadToken = randomUUID();
+
     await fileRef.save(buffer, {
-      metadata: { contentType: file.type, cacheControl: 'public, max-age=31536000' },
+      metadata: {
+        contentType: file.type,
+        cacheControl: 'public, max-age=31536000',
+        // Embed the token in custom metadata — Firebase Storage honours this
+        metadata: { firebaseStorageDownloadTokens: downloadToken },
+      },
     });
 
-    // Make the file publicly readable
-    await fileRef.makePublic();
-    const publicUrl = fileRef.publicUrl();
+    // Build the standard Firebase Storage download URL (token-based, no ACL required)
+    const bucket     = adminBucket.name;
+    const encodedPath = encodeURIComponent(filePath);
+    const downloadUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket}/o/${encodedPath}?alt=media&token=${downloadToken}`;
 
     // ── Persist URL to Firestore profile ───────────────────────────────────
     await adminDb.collection('profiles').doc(uid).set(
-      { avatar_url: publicUrl },
+      { avatar_url: downloadUrl },
       { merge: true },
     );
 
-    return NextResponse.json({ url: publicUrl });
+    return NextResponse.json({ url: downloadUrl });
   } catch (err) {
     console.error('[POST /api/profile/avatar]', err);
     return NextResponse.json(

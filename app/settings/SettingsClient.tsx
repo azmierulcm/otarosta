@@ -86,6 +86,7 @@ export default function SettingsClient() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [photoError, setPhotoError] = useState<string | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -117,7 +118,7 @@ export default function SettingsClient() {
     const file = e.target.files?.[0];
     if (!file || !user) return;
     setUploadingPhoto(true);
-    setError(null);
+    setPhotoError(null);
     try {
       const idToken = await user.getIdToken();
       const formData = new FormData();
@@ -134,7 +135,7 @@ export default function SettingsClient() {
       setAvatarUrl(json.url);
       setProfile({ ...(profile ?? { id: user.uid }), avatar_url: json.url });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Photo upload failed.');
+      setPhotoError(err instanceof Error ? err.message : 'Photo upload failed.');
     } finally {
       setUploadingPhoto(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -281,6 +282,11 @@ export default function SettingsClient() {
               onChange={handlePhotoUpload}
             />
           </div>
+
+          {/* Photo upload error */}
+          {photoError && (
+            <p className="text-[12px] text-danger font-bold">{photoError}</p>
+          )}
 
           <Field label="Full Name" icon={User2}>
             <input
