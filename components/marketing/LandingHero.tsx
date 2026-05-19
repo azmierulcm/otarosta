@@ -207,24 +207,34 @@ export const LandingHero = () => {
     : { initial: { opacity: 0, y: 20 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.6, delay } };
 
   return (
-    <section className="relative pt-32 pb-20 px-4 overflow-hidden bg-white">
+    <section className="relative pt-16 md:pt-32 pb-16 md:pb-20 px-4 overflow-hidden bg-white">
       {/* Background gradient */}
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-accent/3 via-transparent to-transparent" />
 
       <div className="max-w-7xl mx-auto">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 lg:gap-20 items-center">
+        <div className="flex flex-col lg:grid lg:grid-cols-2 gap-10 lg:gap-20 items-center">
 
-          {/* ── Left: copy ── */}
-          <div className="flex flex-col gap-8">
+          {/* ── Product preview — first on mobile (top), right on desktop ── */}
+          <motion.div
+            initial={shouldReduceMotion ? undefined : { opacity: 0, x: 30 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.7, delay: 0.1 }}
+            className="relative pb-10 lg:pb-0 w-full order-first lg:order-last"
+          >
+            <ProductPreview />
+          </motion.div>
+
+          {/* ── Copy — second on mobile (bottom), left on desktop ── */}
+          <div className="flex flex-col gap-6 lg:gap-8 order-last lg:order-first">
             <motion.div {...fade(0)}>
-              <div className="inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.4em] text-text-subtle font-mono mb-6">
-                {"// BUILT FOR CREW"}
+              <div className="inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.4em] text-text-subtle font-mono mb-4 md:mb-6">
+                {'// BUILT FOR CREW'}
               </div>
-              <h1 className="text-5xl md:text-6xl xl:text-7xl font-black tracking-tighter text-text leading-[0.92] mb-6">
+              <h1 className="text-4xl md:text-6xl xl:text-7xl font-black tracking-tighter text-text leading-[0.92] mb-4 md:mb-6">
                 Roster screenshots?{' '}
                 <span className="text-accent italic">Sudah-lah.</span>
               </h1>
-              <p className="text-lg md:text-xl text-text-muted font-bold leading-snug tracking-tight max-w-lg">
+              <p className="text-base md:text-xl text-text-muted font-bold leading-snug tracking-tight max-w-lg">
                 Drop your PDF roster. See your duties, sync your calendar, and build your lifetime digital passport — one city at a time.
               </p>
             </motion.div>
@@ -232,14 +242,14 @@ export const LandingHero = () => {
             <motion.div {...fade(0.15)} className="flex flex-col sm:flex-row gap-3">
               <button
                 onClick={() => openAuthModal('signup')}
-                className="flex items-center justify-center gap-3 bg-accent text-accent-fg px-8 py-4 rounded-full text-[15px] font-black shadow-xl shadow-accent/20 hover:scale-[1.03] hover:bg-accent-hover transition-all active:scale-95"
+                className="w-full sm:w-auto flex items-center justify-center gap-3 bg-accent text-accent-fg px-8 py-4 rounded-full text-[15px] font-black shadow-xl shadow-accent/20 hover:scale-[1.03] hover:bg-accent-hover transition-all active:scale-95"
               >
                 Get started free
                 <ArrowRight size={18} strokeWidth={3} />
               </button>
               <button
                 onClick={() => openAuthModal('login')}
-                className="flex items-center justify-center gap-3 border border-border px-8 py-4 rounded-full text-[15px] font-black text-text-muted hover:text-text hover:border-text-subtle transition-all"
+                className="w-full sm:w-auto flex items-center justify-center gap-3 border border-border px-8 py-4 rounded-full text-[15px] font-black text-text-muted hover:text-text hover:border-text-subtle transition-all"
               >
                 Sign in
               </button>
@@ -282,16 +292,6 @@ export const LandingHero = () => {
               ))}
             </motion.div>
           </div>
-
-          {/* ── Right: product preview ── */}
-          <motion.div
-            initial={shouldReduceMotion ? undefined : { opacity: 0, x: 30 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.7, delay: 0.1 }}
-            className="relative pb-8 lg:pb-0"
-          >
-            <ProductPreview />
-          </motion.div>
         </div>
       </div>
 

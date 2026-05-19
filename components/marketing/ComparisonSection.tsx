@@ -1,69 +1,130 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { CalendarDays, MapPinned, Share2, Download, Check } from 'lucide-react';
+import { MapPinned, Share2, Download, Check } from 'lucide-react';
 import { getPatchImageUrl } from '@/lib/patches/patch-images';
-
-/* ── Calendar week data ────────────────────────────────────────────────────── */
-type DutyType = 'flight' | 'layover' | 'standby';
-const WEEK: { d: string; dt: string; ev: { label: string; sub: string; type: DutyType } | null }[] = [
-  { d: 'Mon', dt: '13', ev: null },
-  { d: 'Tue', dt: '14', ev: { label: 'MH001', sub: 'KUL → LHR', type: 'flight' } },
-  { d: 'Wed', dt: '15', ev: { label: 'Layover', sub: 'London', type: 'layover' } },
-  { d: 'Thu', dt: '16', ev: { label: 'Layover', sub: 'London', type: 'layover' } },
-  { d: 'Fri', dt: '17', ev: { label: 'MH002', sub: 'LHR → KUL', type: 'flight' } },
-  { d: 'Sat', dt: '18', ev: null },
-  { d: 'Sun', dt: '19', ev: { label: 'Standby', sub: 'KUL Base', type: 'standby' } },
-];
-const EV_STYLE: Record<DutyType, string> = {
-  flight:  'bg-accent/10 border border-accent/20 text-accent',
-  layover: 'bg-amber-50 border border-amber-200 text-amber-700',
-  standby: 'bg-slate-100 border border-slate-200 text-slate-500',
-};
 
 /* ── City patches for passport card ───────────────────────────────────────── */
 const PASSPORT_PATCHES = ['KUL', 'LHR', 'SIN', 'HKG', 'BKK', 'SYD', 'CDG', 'NRT', 'PEN', 'DEL', 'DPS', 'ICN'];
 
+/* ── Calendar month data — May 2026 (May 1 = Friday, Mon-Sun week) ────────── */
+type DutyKind = 'flight' | 'layover' | 'standby';
+const DUTY_STYLE: Record<DutyKind, { bg: string; text: string; dot: string }> = {
+  flight:  { bg: 'bg-sky-50',    text: 'text-sky-700',    dot: 'bg-sky-400' },
+  layover: { bg: 'bg-amber-50',  text: 'text-amber-700',  dot: 'bg-amber-400' },
+  standby: { bg: 'bg-yellow-50', text: 'text-yellow-800', dot: 'bg-yellow-400' },
+};
+const MAY_DUTIES: Record<number, { kind: DutyKind; detail: string[] }> = {
+  4:  { kind: 'flight',  detail: ['KUL → SIN', 'MH610 · 08:00–10:20'] },
+  5:  { kind: 'flight',  detail: ['SIN → KUL', 'MH611 · 11:30–13:50'] },
+  7:  { kind: 'flight',  detail: ['KUL → HKG', 'MH070 · 07:55–11:55'] },
+  8:  { kind: 'layover', detail: ['Layover · Hong Kong'] },
+  9:  { kind: 'flight',  detail: ['HKG → KUL', 'MH071 · 12:45–17:10'] },
+  12: { kind: 'standby', detail: ['Standby · KUL Base'] },
+  14: { kind: 'flight',  detail: ['KUL → LHR', 'MH001 · 23:50–06:10+'] },
+  15: { kind: 'layover', detail: ['Layover · London'] },
+  16: { kind: 'layover', detail: ['Layover · London'] },
+  17: { kind: 'flight',  detail: ['LHR → KUL', 'MH002 · 13:30–08:20+'] },
+  21: { kind: 'flight',  detail: ['KUL → SYD', 'MH121 · 22:55–10:50+'] },
+  22: { kind: 'layover', detail: ['Layover · Sydney'] },
+  23: { kind: 'flight',  detail: ['SYD → KUL', 'MH120 · 12:30–18:50'] },
+  27: { kind: 'standby', detail: ['Standby · KUL Base'] },
+  28: { kind: 'flight',  detail: ['KUL → CDG', 'MH098 · 01:00–07:30'] },
+  29: { kind: 'layover', detail: ['Layover · Paris'] },
+  30: { kind: 'flight',  detail: ['CDG → KUL', 'MH099 · 10:30–06:30+'] },
+};
+// 4 leading nulls (Mon–Thu), then days 1–31
+const CALENDAR_CELLS: Array<number | null> = [
+  null, null, null, null, 1, 2, 3,
+  4, 5, 6, 7, 8, 9, 10,
+  11, 12, 13, 14, 15, 16, 17,
+  18, 19, 20, 21, 22, 23, 24,
+  25, 26, 27, 28, 29, 30, 31,
+];
+const DAY_HEADERS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+
 /* ── Sub-components ────────────────────────────────────────────────────────── */
 function CalendarCard() {
+  const [hovered, setHovered] = useState<number | null>(null);
+  const duty = hovered ? MAY_DUTIES[hovered] ?? null : null;
+
   return (
-    <div className="bg-white border border-border rounded-[2rem] p-6 flex flex-col gap-5 shadow-sm hover:shadow-xl hover:shadow-black/5 transition-all duration-500 h-full">
+    <div className="bg-white border border-border rounded-[2rem] p-6 flex flex-col gap-4 shadow-sm hover:shadow-xl hover:shadow-black/5 transition-all duration-500 h-full">
       {/* Header */}
-      <div className="flex items-start justify-between">
-        <div>
-          <div className="text-[9px] font-black uppercase tracking-[0.35em] text-accent font-mono mb-1.5">01 · Calendar Sync</div>
-          <div className="text-xl font-black text-text tracking-tight leading-none">Your roster, live<br/>in any calendar.</div>
-        </div>
-        <div className="w-10 h-10 rounded-2xl bg-accent/5 border border-accent/10 flex items-center justify-center shrink-0">
-          <CalendarDays size={18} className="text-accent" />
+      <div>
+        <div className="text-[9px] font-black uppercase tracking-[0.35em] text-accent font-mono mb-1.5">01 · Calendar Sync</div>
+        <div className="text-xl font-black text-text tracking-tight leading-none">Your roster, live<br />in any calendar.</div>
+      </div>
+
+      {/* Month label */}
+      <div className="flex items-center justify-between">
+        <span className="text-[10px] font-black text-text font-mono uppercase tracking-widest">May 2026</span>
+        <div className="flex items-center gap-1 text-[10px] font-bold text-success">
+          <Check size={10} strokeWidth={3} className="text-success" />
+          Synced
         </div>
       </div>
 
-      {/* Week view mock */}
-      <div className="rounded-2xl overflow-hidden border border-border flex-1">
-        <div className="bg-surface-2 px-4 py-2.5 flex items-center justify-between border-b border-border">
-          <span className="text-[10px] font-black text-text-muted font-mono uppercase tracking-widest">May 2026</span>
-          <span className="text-[10px] text-text-subtle font-bold">Week view</span>
-        </div>
-        <div className="divide-y divide-border/60">
-          {WEEK.map((day) => (
-            <div key={day.d} className="flex items-center gap-3 px-3 py-2">
-              <div className="w-8 text-center shrink-0">
-                <div className="text-[8px] font-bold text-text-subtle uppercase tracking-wide">{day.d}</div>
-                <div className="text-[13px] font-black text-text leading-none">{day.dt}</div>
-              </div>
-              {day.ev ? (
-                <div className={`flex-1 px-2.5 py-1.5 rounded-lg ${EV_STYLE[day.ev.type]}`}>
-                  <div className="text-[10px] font-black leading-none">{day.ev.label}</div>
-                  <div className="text-[9px] font-bold opacity-70 mt-0.5">{day.ev.sub}</div>
-                </div>
-              ) : (
-                <div className="flex-1 text-[10px] text-text-subtle font-bold opacity-40 px-2.5">Rest</div>
-              )}
-            </div>
+      {/* Calendar grid */}
+      <div className="flex-1">
+        {/* Day headers */}
+        <div className="grid grid-cols-7 mb-1">
+          {DAY_HEADERS.map((d, i) => (
+            <div key={i} className="text-center text-[9px] font-black text-text-subtle">{d}</div>
           ))}
         </div>
+        {/* Day cells */}
+        <div className="grid grid-cols-7 gap-[3px]">
+          {CALENDAR_CELLS.map((day, i) => {
+            if (!day) return <div key={i} />;
+            const d = MAY_DUTIES[day];
+            const style = d ? DUTY_STYLE[d.kind] : null;
+            const isHov = hovered === day;
+            return (
+              <div
+                key={i}
+                onMouseEnter={() => setHovered(day)}
+                onMouseLeave={() => setHovered(null)}
+                className={`aspect-square rounded-md flex flex-col items-center justify-center cursor-pointer transition-all relative ${
+                  style
+                    ? `${style.bg} ${isHov ? 'ring-2 ring-accent/40 scale-110 z-10 shadow-sm' : ''}`
+                    : 'hover:bg-surface-2'
+                }`}
+              >
+                <span className={`text-[9px] font-black leading-none ${style ? style.text : 'text-text-subtle'}`}>
+                  {day}
+                </span>
+                {style && (
+                  <div className={`w-[3px] h-[3px] rounded-full mt-[2px] ${style.dot}`} />
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Hover detail panel */}
+      <div className="rounded-xl border border-border px-3 py-2 min-h-[52px] flex items-center">
+        {duty && hovered ? (
+          <div className="flex items-start gap-2">
+            <div className={`w-1.5 h-1.5 rounded-full mt-1 shrink-0 ${DUTY_STYLE[duty.kind].dot}`} />
+            <div>
+              <p className="text-[9px] font-black uppercase tracking-wide text-text-muted mb-0.5">
+                May {hovered}
+              </p>
+              {duty.detail.map((line, i) => (
+                <p key={i} className={`leading-snug ${
+                  i === 0 ? 'text-[11px] font-black text-text' : 'text-[10px] text-text-muted font-bold font-mono'
+                }`}>
+                  {line}
+                </p>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <p className="text-[10px] text-text-subtle font-bold italic">Hover a day to see duty details</p>
+        )}
       </div>
 
       {/* Export strip */}
@@ -72,12 +133,12 @@ function CalendarCard() {
           <Download size={12} strokeWidth={3} />
           Export .ics
         </button>
-        <div className="flex items-center gap-1 text-[10px] text-text-muted font-bold px-1">
-          <Check size={11} className="text-success shrink-0" strokeWidth={3} />
+        <div className="flex items-center gap-1 text-[10px] text-text-muted font-bold">
+          <Check size={11} className="text-success" strokeWidth={3} />
           Google
         </div>
-        <div className="flex items-center gap-1 text-[10px] text-text-muted font-bold px-1">
-          <Check size={11} className="text-success shrink-0" strokeWidth={3} />
+        <div className="flex items-center gap-1 text-[10px] text-text-muted font-bold">
+          <Check size={11} className="text-success" strokeWidth={3} />
           Apple
         </div>
       </div>
@@ -92,7 +153,7 @@ function PassportCard() {
       <div className="flex items-start justify-between">
         <div>
           <div className="text-[9px] font-black uppercase tracking-[0.35em] text-accent font-mono mb-1.5">02 · Destination Passport</div>
-          <div className="text-xl font-black text-text tracking-tight leading-none">Every city<br/>you&apos;ve ever landed.</div>
+          <div className="text-xl font-black text-text tracking-tight leading-none">Every city<br />you&apos;ve ever landed.</div>
         </div>
         <div className="w-10 h-10 rounded-2xl bg-accent/5 border border-accent/10 flex items-center justify-center shrink-0">
           <MapPinned size={18} className="text-accent" />
@@ -142,65 +203,101 @@ function PassportCard() {
 }
 
 function RecapCard() {
+  const LHR = getPatchImageUrl('LHR');
+  const CDG = getPatchImageUrl('CDG');
+
   return (
     <div className="bg-white border border-border rounded-[2rem] p-6 flex flex-col gap-5 shadow-sm hover:shadow-xl hover:shadow-black/5 transition-all duration-500 h-full">
       {/* Header */}
-      <div className="flex items-start justify-between">
-        <div>
-          <div className="text-[9px] font-black uppercase tracking-[0.35em] text-accent font-mono mb-1.5">03 · Recap Card</div>
-          <div className="text-xl font-black text-text tracking-tight leading-none">Share the mission.<br/>Look great doing it.</div>
-        </div>
-        <div className="w-10 h-10 rounded-2xl bg-accent/5 border border-accent/10 flex items-center justify-center shrink-0">
-          <Share2 size={18} className="text-accent" />
-        </div>
+      <div>
+        <div className="text-[9px] font-black uppercase tracking-[0.35em] text-accent font-mono mb-1.5">03 · Recap Card</div>
+        <div className="text-xl font-black text-text tracking-tight leading-none">Share the mission.<br />Look great doing it.</div>
       </div>
 
-      {/* Card preview */}
-      <div className="flex-1 rounded-2xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-5 text-white relative overflow-hidden">
-        {/* Glow blobs */}
-        <div className="absolute -top-6 -right-6 w-28 h-28 rounded-full bg-accent opacity-20 blur-2xl pointer-events-none" />
-        <div className="absolute -bottom-6 -left-6 w-24 h-24 rounded-full bg-blue-500 opacity-15 blur-2xl pointer-events-none" />
-
-        <div className="relative z-10 flex flex-col h-full gap-4">
-          {/* Logo */}
-          <div className="flex items-center gap-1.5">
-            <div className="flex flex-col gap-[2px]">
-              <div className="w-3 h-[2px] bg-accent/40 rounded-sm" />
-              <div className="w-3 h-[3px] bg-accent/65 rounded-sm" />
-              <div className="w-3 h-[5px] bg-accent rounded-sm" />
-            </div>
-            <span className="text-[9px] font-bold text-white/50 tracking-widest uppercase font-mono">Cemrosta</span>
-          </div>
-
-          {/* Route */}
-          <div>
+      {/* Mini LiveRosterCard preview */}
+      <div className="flex-1 relative rounded-2xl overflow-hidden"
+           style={{ background: '#FFFCF8', outline: '1px solid rgba(0,0,0,0.06)' }}>
+        <div className="absolute -top-8 -right-8 w-24 h-24 rounded-full blur-2xl pointer-events-none"
+             style={{ background: '#FF385C', opacity: 0.09 }} />
+        <div className="relative p-4 flex flex-col gap-3">
+          {/* Header row */}
+          <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <span className="text-4xl font-black tracking-tighter">KUL</span>
-              <div className="flex-1 flex items-center gap-1 px-1">
-                <div className="flex-1 h-px bg-white/15" />
-                <span className="text-white/35 text-base">✈</span>
-                <div className="flex-1 h-px bg-white/15" />
+              <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[9px] font-bold shrink-0"
+                   style={{ background: 'linear-gradient(135deg, #FF385C, #E61E4D)' }}>
+                AC
               </div>
-              <span className="text-4xl font-black tracking-tighter">LHR</span>
+              <div>
+                <div className="flex items-center gap-1">
+                  <p className="text-[11px] font-bold" style={{ color: '#222' }}>Ahmad Crew</p>
+                  <span className="rounded-full px-1 py-[1px] text-[7px] font-bold text-white"
+                        style={{ background: '#222' }}>MH</span>
+                </div>
+                <p className="text-[8px]" style={{ color: '#717171' }}>Captain · A350</p>
+              </div>
             </div>
-            <div className="text-[9px] text-white/35 font-bold uppercase tracking-widest mt-1">
-              Kuala Lumpur · London Heathrow
-            </div>
+            <span className="rounded-full px-2 py-0.5 text-[7px] font-black uppercase tracking-widest"
+                  style={{ background: 'rgba(255,56,92,0.10)', color: '#FF385C' }}>
+              May 2026
+            </span>
           </div>
 
-          {/* Meta */}
-          <div className="flex gap-5 mt-auto">
+          {/* Stamps */}
+          <div>
+            <p className="text-[7px] font-black uppercase tracking-widest mb-2"
+               style={{ color: '#FF385C' }}>
+              Stamps collected
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              {[{ patch: LHR, city: 'London', visits: 4 }, { patch: CDG, city: 'Paris', visits: 2 }].map((d) => (
+                <div key={d.city} className="flex flex-col items-center">
+                  {d.patch && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={d.patch} alt={d.city} className="w-full h-16 object-contain" />
+                  )}
+                  <p className="text-[8px] font-bold text-center mt-0.5" style={{ color: '#222' }}>{d.city}</p>
+                  <p className="text-[7px]" style={{ color: '#717171' }}>{d.visits} visits</p>
+                </div>
+              ))}
+            </div>
+            <p className="text-center text-[7px] font-bold mt-1" style={{ color: '#717171' }}>+7 more stamps this month</p>
+          </div>
+
+          {/* Stats grid */}
+          <div className="grid grid-cols-4 grid-rows-2 gap-1">
+            <div className="col-span-2 row-span-2 rounded-xl px-2.5 py-2 flex flex-col justify-between"
+                 style={{ background: '#fff', outline: '1px solid rgba(0,0,0,0.07)' }}>
+              <div>
+                <p className="text-[7px] font-bold uppercase tracking-wider"
+                   style={{ color: '#FF385C' }}>Hours</p>
+                <p className="text-[22px] font-bold leading-none tracking-tight mt-0.5"
+                   style={{ color: '#222' }}>
+                  147<span className="text-[9px] font-medium" style={{ color: '#717171' }}>h</span>
+                </p>
+              </div>
+              <span className="text-[7px] font-bold rounded-full px-1.5 py-[1px] w-fit"
+                    style={{ background: '#E8F5EF', color: '#0F6E56' }}>
+                +12% vs prev
+              </span>
+            </div>
             {[
-              { lbl: 'Flight',    val: 'MH001'    },
-              { lbl: 'Duration',  val: '13h 05m'  },
-              { lbl: 'Date',      val: '14 May 26' },
-            ].map(({ lbl, val }) => (
-              <div key={lbl}>
-                <div className="text-[8px] text-white/35 uppercase tracking-widest font-bold mb-0.5">{lbl}</div>
-                <div className="text-[11px] text-white font-black">{val}</div>
+              { label: 'Flights', value: '18' },
+              { label: 'Cities',  value: '9'  },
+              { label: 'Standby', value: '3d' },
+              { label: 'Off',     value: '12d' },
+            ].map((s) => (
+              <div key={s.label} className="rounded-lg px-1.5 py-1.5 flex flex-col gap-0.5"
+                   style={{ background: '#F7F5F0' }}>
+                <p className="text-[11px] font-bold leading-none" style={{ color: '#222' }}>{s.value}</p>
+                <p className="text-[7px]" style={{ color: '#717171' }}>{s.label}</p>
               </div>
             ))}
           </div>
+
+          <p className="text-center text-[7px] font-black uppercase tracking-widest font-mono"
+             style={{ color: '#B0ABA5' }}>
+            cemrosta.io
+          </p>
         </div>
       </div>
 
@@ -226,7 +323,7 @@ export const ComparisonSection = () => {
         {/* Heading */}
         <div className="text-center mb-20">
           <div className="flex items-center justify-center gap-2 mb-6 text-[10px] font-black uppercase tracking-[0.4em] text-text-subtle font-mono">
-            {"// WHAT YOU GET"}
+            {'// WHAT YOU GET'}
           </div>
           <h2 className="text-5xl md:text-8xl font-black tracking-tighter text-text mb-8 leading-none">
             Stop fighting <br /> your roster PDF.
