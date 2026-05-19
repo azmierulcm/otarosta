@@ -5,7 +5,7 @@ import { useAuth } from '@/lib/contexts/AuthContext';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   User2, Plane, Building2, MapPin, FileText,
-  Loader2, Check, ChevronDown, ArrowRight, Sparkles, Camera,
+  Loader2, Check, ChevronDown, ArrowRight, Sparkles, Camera, Trash2,
 } from 'lucide-react';
 
 /* ── Options ──────────────────────────────────────────────────────────────── */
@@ -89,6 +89,7 @@ export default function SettingsClient() {
   const [photoError, setPhotoError] = useState<string | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [deletingPhoto, setDeletingPhoto] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Pre-fill from existing profile
@@ -139,6 +140,27 @@ export default function SettingsClient() {
     } finally {
       setUploadingPhoto(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const handlePhotoDelete = async () => {
+    if (!user) return;
+    setDeletingPhoto(true);
+    setPhotoError(null);
+    try {
+      const idToken = await user.getIdToken();
+      const res = await fetch('/api/profile/avatar', {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${idToken}` },
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? `Delete failed (${res.status})`);
+      setAvatarUrl(null);
+      setProfile({ ...(profile ?? { id: user.uid }), avatar_url: undefined });
+    } catch (err) {
+      setPhotoError(err instanceof Error ? err.message : 'Could not remove photo.');
+    } finally {
+      setDeletingPhoto(false);
     }
   };
 
@@ -233,12 +255,12 @@ export default function SettingsClient() {
           <div className="flex items-center gap-5">
             {/* Avatar preview */}
             <div className="relative shrink-0">
-              <div className="w-20 h-20 rounded-full overflow-hidden border-2 border-border bg-surface-2 flex items-center justify-center">
+              <div className="w-20 h-20 rounded-full overflow-hidden border-2 border-border bg-accent/10 flex items-center justify-center">
                 {avatarUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={avatarUrl} alt="Profile photo" className="w-full h-full object-cover" />
                 ) : (
-                  <span className="text-[22px] font-black text-text-muted select-none">
+                  <span className="text-[26px] font-black text-accent select-none leading-none">
                     {(form.full_name || user?.email || '?').slice(0, 1).toUpperCase()}
                   </span>
                 )}
@@ -247,7 +269,7 @@ export default function SettingsClient() {
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                disabled={uploadingPhoto}
+                disabled={uploadingPhoto || deletingPhoto}
                 className="absolute bottom-0 right-0 w-7 h-7 rounded-full bg-accent text-accent-fg flex items-center justify-center shadow-md hover:bg-accent-hover transition-colors disabled:opacity-60"
                 aria-label="Upload profile photo"
               >
@@ -257,20 +279,36 @@ export default function SettingsClient() {
               </button>
             </div>
 
-            {/* Info + trigger */}
+            {/* Info + actions */}
             <div className="flex flex-col gap-1.5">
               <p className="text-[13px] font-black text-text">Profile photo</p>
               <p className="text-[12px] text-text-muted font-bold leading-snug">
                 JPG, PNG or WebP · max 5 MB
               </p>
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={uploadingPhoto}
-                className="self-start text-[12px] font-bold text-accent hover:underline underline-offset-4 transition-colors disabled:opacity-60"
-              >
-                {uploadingPhoto ? 'Uploading…' : avatarUrl ? 'Change photo' : 'Upload photo'}
-              </button>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploadingPhoto || deletingPhoto}
+                  className="text-[12px] font-bold text-accent hover:underline underline-offset-4 transition-colors disabled:opacity-60"
+                >
+                  {uploadingPhoto ? 'Uploading…' : avatarUrl ? 'Change photo' : 'Upload photo'}
+                </button>
+                {avatarUrl && (
+                  <button
+                    type="button"
+                    onClick={handlePhotoDelete}
+                    disabled={uploadingPhoto || deletingPhoto}
+                    className="flex items-center gap-1 text-[12px] font-bold text-danger hover:underline underline-offset-4 transition-colors disabled:opacity-60"
+                    aria-label="Remove profile photo"
+                  >
+                    {deletingPhoto
+                      ? <Loader2 size={11} className="animate-spin" />
+                      : <Trash2 size={11} />}
+                    {deletingPhoto ? 'Removing…' : 'Remove'}
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* Hidden file input */}

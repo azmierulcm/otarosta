@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { randomUUID } from 'crypto';
+import { FieldValue } from 'firebase-admin/firestore';
 import { adminAuth, adminDb, adminBucket } from '@/lib/firebase/admin';
 
 const MAX_SIZE = 5 * 1024 * 1024; // 5 MB
@@ -61,6 +62,41 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ url: downloadUrl });
   } catch (err) {
     console.error('[POST /api/profile/avatar]', err);
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : String(err) },
+      { status: 500 },
+    );
+  }
+}
+
+// ── DELETE — remove avatar ─────────────────────────────────────────────────
+
+export async function DELETE(req: NextRequest) {
+  try {
+    // ── Auth ───────────────────────────────────────────────────────────────
+    const idToken = (req.headers.get('Authorization') ?? '').replace('Bearer ', '');
+    if (!idToken) return NextResponse.json({ error: 'Missing auth token' }, { status: 401 });
+
+    let uid: string;
+    try {
+      const decoded = await adminAuth.verifyIdToken(idToken);
+      uid = decoded.uid;
+    } catch {
+      return NextResponse.json({ error: 'Invalid auth token' }, { status: 401 });
+    }
+
+    // ── Delete all avatar files for this user ──────────────────────────────
+    const [files] = await adminBucket.getFiles({ prefix: `avatars/${uid}/profile.` });
+    await Promise.all(files.map((f) => f.delete().catch(() => null)));
+
+    // ── Remove URL from Firestore ──────────────────────────────────────────
+    await adminDb.collection('profiles').doc(uid).update({
+      avatar_url: FieldValue.delete(),
+    });
+
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    console.error('[DELETE /api/profile/avatar]', err);
     return NextResponse.json(
       { error: err instanceof Error ? err.message : String(err) },
       { status: 500 },
