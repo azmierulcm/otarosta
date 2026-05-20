@@ -2,438 +2,568 @@ import { ParsedRoster, ParsedDuty, ParsedFlight, ParsedMonthlyStats } from '../t
 import type { ParseLogger } from '../logger';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Malaysia Airlines — AIMS Roster Parser
+// Malaysia Airlines — AIMS Roster Parser  (v3)
 //
-// Data extracted per duty row:
-//   date       — ISO YYYY-MM-DD
-//   day        — "MON" | "TUE" … (computed from date, not extracted from PDF)
-//   item       — flight number ("MH001") or duty code ("OFF", "SBY", "SIM")
-//   depPort    — IATA departure port
-//   arrPort    — IATA arrival port
-//   std / sta  — scheduled times (HH:MM)
-//   blockHrs   — "HH:MM" from PDF block-hours column (best-effort, times[2])
-//   dutyHrs    — "HH:MM" from PDF duty-hours column (best-effort, times[3])
-//   signOn     — pre-flight sign-on time
-//   signOff    — post-flight sign-off time
-//   notes      — hotel / layover info if present
+// Rewritten from scratch based on a real iFlight Crew Portal PDF.
 //
-// Monthly stats extracted from the PDF summary section:
-//   actualBlockHours — "HH:MM"
-//   dutyHours        — "HH:MM"
-//   offDaysAtBase    — integer
+// AIMS table columns (as printed):
+//   Date | Day | Duty Start | Item | Overd Rank | Dep/Start | Arr/End |
+//   Duty End | Work Type | Actual Block Hrs | Duty Hrs | DutyCode | Ac Type
 //
-// Fault-tolerance: every individual duty is wrapped in its own try-catch.
+// Key behaviours observed in real PDFs
+// ─────────────────────────────────────────────────────────────────────────────
+//  • Long-haul flights (e.g. MH1 LHR→KUL) span two calendar rows:
+//      Row 1 (departure date): has Duty Start, Item, DepPort, DepTime, WorkType,
+//                              Block Hrs, Duty Hrs, DutyCode, AcType.
+//                              No ArrPort/ArrTime in this row.
+//      Row 2 (arrival date):   has ONLY ArrPort, ArrTime, DutyEnd. No Item.
+//    → detected as "continuation" rows and merged into the preceding flight.
+//
+//  • Short-haul turnarounds (e.g. MH376+MH377 on same day) appear as two
+//    consecutive flight lines within the same date block.
+//
+//  • Standby rows (S4-353, S2-353): the last two HH:MM values in the chunk
+//    are Block Hrs (always 00:00) and Duty Hrs, NOT clock times for sign-off.
+//
+//  • Off codes in this roster: D (Day Off), DO (Earned Day Off), MC1/MC2/MC3
+//    (Medical Leave). These do NOT appear in the old OFF_REGEX.
+//
+//  • Monthly stats: PDF prints "Actual Block\nHours 61:07" so regex must
+//    match "Block Hours", not just "BLK HRS".
+//
+//  • All times in the PDF are LOCAL to each port (KUL times = MYT UTC+8,
+//    LHR times = BST UTC+1, etc.). Stored as-is from the PDF.
 // ─────────────────────────────────────────────────────────────────────────────
 
-// ── Exclusion list for port-code extraction ────────────────────────────────────
-const AIMS_NON_PORT = new Set([
-  'ACT', 'STD', 'STA', 'SGN', 'SFI', 'OBS', 'POS', 'REL', 'DEB', 'ETA', 'ETD',
-  'ARR', 'DEP', 'CAB', 'CCR', 'CRT', 'OPT', 'DAY', 'OFF', 'MNT', 'TRN',
-  'SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT',
-  'JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC',
-  'SIM', 'GND', 'CRM', 'LPC', 'OPC', 'CBT', 'TRG',
-  'ASB', 'SBY',
+// ── 3-letter token exclusion list (not IATA port codes) ──────────────────────
+const NON_PORT = new Set([
+  'ACT','STD','STA','SGN','SFI','OBS','POS','REL','DEB','ETA','ETD',
+  'ARR','DEP','CAB','CCR','CRT','OPT','DAY','OFF','MNT','TRN','MAS',
+  'IBS','AOP','OPC','TRG','CBT','GND','CRM','LPC','SIM',
+  'SUN','MON','TUE','WED','THU','FRI','SAT',
+  'JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC',
+  'ASB','SBY',
 ]);
 
-// ── Duty-type detection patterns ───────────────────────────────────────────────
-const OFF_REGEX      = /\b(OFF|REST|AL|SL|ML|HL|PH|EL|CMP|COMP)\b/i;
-const TRAINING_REGEX = /\b(SIM\/TRN|SIM|TRN|GND|LPC|OPC|CRM|TRAINING|CBT|RECURRENT|TRG)\b/i;
-const STANDBY_REGEX  = /\b(SB|SA|SH|ASB|SBY|STBY|S\d+-\d+)\b/gi;
-
-// ── Human-readable labels ──────────────────────────────────────────────────────
-const OFF_LABEL: Record<string, string> = {
-  OFF:  'Day Off',     REST: 'Rest Day',         AL:   'Annual Leave',
-  SL:   'Sick Leave',  ML:   'Maternity Leave',   HL:   'Home Leave',
-  PH:   'Public Holiday', EL: 'Emergency Leave',  CMP:  'Compensatory Off',
+// ── Off / leave day codes (from AIMS code legend) ────────────────────────────
+const OFF_CODES: Record<string, string> = {
+  D:    'Day Off',
+  DO:   'Earned Day Off',
+  OFF:  'Day Off',
+  REST: 'Rest Day',
+  AL:   'Annual Leave',
+  SL:   'Sick Leave',
+  ML:   'Maternity Leave',
+  HL:   'Home Leave',
+  PH:   'Public Holiday',
+  EL:   'Emergency Leave',
+  CMP:  'Compensatory Off',
   COMP: 'Compensatory Off',
+  MC1:  'Medical Leave (1–2 days)',
+  MC2:  'Medical Leave (1–2 days)',
+  MC3:  'Medical Leave (3+ days)',
+  MC4:  'Medical Leave (extended)',
 };
 
-const TRAINING_LABEL: Record<string, string> = {
-  'SIM/TRN': 'Simulator Training', SIM: 'Simulator',        TRN: 'Training',
-  GND:       'Ground Training',    LPC: 'Line Proficiency Check',
-  OPC:       'Operator Proficiency Check', CRM: 'Crew Resource Management',
-  TRAINING:  'Training',           CBT: 'Computer-Based Training',
-  RECURRENT: 'Recurrent Training', TRG: 'Training',
+// ── Training / simulator codes ────────────────────────────────────────────────
+const TRAINING_CODES: Record<string, string> = {
+  'SIM/TRN': 'Simulator Training',
+  SIM:       'Simulator',
+  TRN:       'Training',
+  GND:       'Ground Training',
+  LPC:       'Line Proficiency Check',
+  OPC:       'Operator Proficiency Check',
+  CRM:       'Crew Resource Management',
+  TRAINING:  'Training',
+  CBT:       'Computer-Based Training',
+  RECURRENT: 'Recurrent Training',
+  TRG:       'Training',
 };
 
-// ── Day-of-week lookup ─────────────────────────────────────────────────────────
-const DOW = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'] as const;
+const MONTH_MAP: Record<string, string> = {
+  JAN:'01',FEB:'02',MAR:'03',APR:'04',MAY:'05',JUN:'06',
+  JUL:'07',AUG:'08',SEP:'09',OCT:'10',NOV:'11',DEC:'12',
+};
 
-function getDayOfWeek(dateISO: string): string {
-  // Use noon UTC to avoid any DST/timezone boundary issues
-  const d = new Date(`${dateISO}T12:00:00Z`);
-  return DOW[d.getUTCDay()];
+const DOW = ['SUN','MON','TUE','WED','THU','FRI','SAT'] as const;
+function getDayOfWeek(iso: string): string {
+  return DOW[new Date(`${iso}T12:00:00Z`).getUTCDay()];
 }
 
-// ── HH:MM duration validator ───────────────────────────────────────────────────
-// Block/duty hours are durations — hours can exceed 23. Clock times are 00-23.
-// A value whose hours part is > 23 is definitely a duration, not a clock time.
-// Values 00-23 are ambiguous; we accept them as potential durations here.
-function isHHMM(s: string): boolean {
-  return /^\d{1,3}:\d{2}$/.test(s);
-}
-
-// ── Monthly stats extraction ───────────────────────────────────────────────────
-// AIMS PDFs print a summary section with total block hours, duty hours, and
-// off-day counts. The exact label varies between AIMS versions and airlines;
-// we try several patterns for each field.
-
+// ─────────────────────────────────────────────────────────────────────────────
+// Monthly stats extraction
+// ─────────────────────────────────────────────────────────────────────────────
 function extractMonthlyStats(text: string, logger?: ParseLogger): ParsedMonthlyStats {
   const stats: ParsedMonthlyStats = {};
 
-  // Actual block hours — matches "ACT BLK HRS 74:25", "ACTUAL BLOCK 74:25",
-  // "BLK HRS : 74:25", "TOTAL BLOCK HRS 74:25"
+  // "Actual Block\nHours 61:07"  → pdf.js merges to "Actual Block Hours 61:07"
+  // Also handles "ACT BLK HRS 74:25", "TOTAL BLOCK HRS", etc.
   const blkPatterns = [
-    /ACT(?:UAL)?\s+BLK(?:OCK)?\s+HRS?\s*[:\-]?\s*(\d{1,4}:\d{2})/i,
-    /BLK(?:OCK)?\s+HRS?\s*[:\-]?\s*(\d{1,4}:\d{2})/i,
-    /TOTAL\s+BLOCK(?:\s+HRS?)?\s*[:\-]?\s*(\d{1,4}:\d{2})/i,
-    /BLOCK\s+HRS?\s*[:\-]?\s*(\d{1,4}:\d{2})/i,
+    /ACT(?:UAL)?\s+BLK(?:OCK)?\s+(?:HRS?|HOURS?)\s*[:\-]?\s*(\d{1,4}:\d{2})/i,
+    /(?:ACTUAL\s+)?BLOCK\s+(?:HRS?|HOURS?)\s*[:\-]?\s*(\d{1,4}:\d{2})/i,
+    /TOTAL\s+BLOCK(?:\s+(?:HRS?|HOURS?))?\s*[:\-]?\s*(\d{1,4}:\d{2})/i,
+    /BLK\s+(?:HRS?|HOURS?)\s*[:\-]?\s*(\d{1,4}:\d{2})/i,
   ];
   for (const pat of blkPatterns) {
     const m = text.match(pat);
     if (m) { stats.actualBlockHours = m[1]; break; }
   }
 
-  // Duty hours — matches "DUTY HRS 89:10", "DHR : 89:10", "TOTAL DUTY 89:10"
+  // "Duty Hours 148:08" or "DUTY HRS 89:10"
   const dhrPatterns = [
-    /DUTY\s+HRS?\s*[:\-]?\s*(\d{1,4}:\d{2})/i,
+    /DUTY\s+(?:HRS?|HOURS?)\s*[:\-]?\s*(\d{1,4}:\d{2})/i,
+    /TOTAL\s+DUTY(?:\s+(?:HRS?|HOURS?))?\s*[:\-]?\s*(\d{1,4}:\d{2})/i,
     /DHR\s*[:\-]?\s*(\d{1,4}:\d{2})/i,
-    /TOTAL\s+DUTY(?:\s+HRS?)?\s*[:\-]?\s*(\d{1,4}:\d{2})/i,
   ];
   for (const pat of dhrPatterns) {
     const m = text.match(pat);
     if (m) { stats.dutyHours = m[1]; break; }
   }
 
-  // Off days — matches "OFF DAYS 8", "OFF DAYS AT BASE 8", "NO OF OFF DAYS 8",
-  // "DAYS OFF : 8"
-  const offPatterns = [
-    /(?:NO\s+OF\s+)?OFF\s+DAYS?\s+(?:AT\s+BASE\s+)?[:\-]?\s*(\d{1,2})/i,
+  // "OFF Days At Base 14"
+  const offAtBasePatterns = [
+    /OFF\s+DAYS?\s+AT\s+BASE\s+[:\-]?\s*(\d{1,2})/i,
+    /(?:NO\s+OF\s+)?OFF\s+DAYS?\s*[:\-]?\s*(\d{1,2})/i,
     /DAYS?\s+OFF\s*[:\-]?\s*(\d{1,2})/i,
   ];
-  for (const pat of offPatterns) {
+  for (const pat of offAtBasePatterns) {
     const m = text.match(pat);
     if (m) { stats.offDaysAtBase = parseInt(m[1], 10); break; }
   }
 
-  logger?.info('mas-aims:monthly-stats', 'Monthly stats extraction result', {
-    actualBlockHours: stats.actualBlockHours ?? null,
-    dutyHours:        stats.dutyHours ?? null,
-    offDaysAtBase:    stats.offDaysAtBase ?? null,
-  });
+  // "OFF Days Away From Base" (may be blank in the roster)
+  const awayM = text.match(/OFF\s+DAYS?\s+AWAY\s+(?:FROM\s+)?BASE\s*[:\-]?\s*(\d{1,2})/i);
+  if (awayM) stats.offDaysAwayFromBase = parseInt(awayM[1], 10);
 
+  logger?.info('mas-aims:monthly-stats', 'Monthly stats extracted', {
+    actualBlockHours:    stats.actualBlockHours ?? null,
+    dutyHours:           stats.dutyHours ?? null,
+    offDaysAtBase:       stats.offDaysAtBase ?? null,
+    offDaysAwayFromBase: stats.offDaysAwayFromBase ?? null,
+  });
   return stats;
 }
 
-// ── Port extraction ────────────────────────────────────────────────────────────
-function extractPorts(flightChunk: string): [string, string] {
-  const direct = flightChunk.match(/MH\s*\d+\s+([A-Z]{3})\s+([A-Z]{3})/);
-  if (direct) return [direct[1], direct[2]];
-  const filtered = (flightChunk.match(/\b[A-Z]{3}\b/g) ?? []).filter(
-    (p) => !AIMS_NON_PORT.has(p),
-  );
-  return [filtered[0] ?? '', filtered[1] ?? ''];
+// ─────────────────────────────────────────────────────────────────────────────
+// Crew info extraction
+// ─────────────────────────────────────────────────────────────────────────────
+function extractCrewInfo(text: string): { name: string } {
+  // AIMS format: "Name :MUHAMMAD AZMIERUL\nBIN CHE MAT"
+  const m = text.match(/Name\s*[:\-]\s*([A-Z][A-Z\s]+?)(?=\s*(?:Staff\s*Number|Rank|Base|Direct|\d{6,}))/i);
+  const name = m ? m[1].replace(/\s+/g, ' ').trim() : 'Crew Member';
+  return { name };
 }
 
-// ── Month map ──────────────────────────────────────────────────────────────────
-const MONTH_MAP: Record<string, string> = {
-  JAN: '01', FEB: '02', MAR: '03', APR: '04', MAY: '05', JUN: '06',
-  JUL: '07', AUG: '08', SEP: '09', OCT: '10', NOV: '11', DEC: '12',
-};
-
-// ── Roster period via MODE of all date matches ─────────────────────────────────
-function inferRosterPeriod(dateMatches: RegExpMatchArray[]): { month: string; year: string } {
+// ─────────────────────────────────────────────────────────────────────────────
+// Roster period inference  (mode of all DD-MMM-YYYY matches)
+// ─────────────────────────────────────────────────────────────────────────────
+function inferRosterPeriod(matches: RegExpMatchArray[]): { month: string; year: string } {
   const counts = new Map<string, number>();
-  for (const m of dateMatches) {
+  for (const m of matches) {
     const key = `${m[2].toUpperCase()}-${m[3]}`;
     counts.set(key, (counts.get(key) ?? 0) + 1);
   }
-  let best = `${dateMatches[0][2].toUpperCase()}-${dateMatches[0][3]}`;
-  let bestCount = 0;
-  for (const [key, count] of counts) {
-    if (count > bestCount) { bestCount = count; best = key; }
-  }
+  let best = `${matches[0][2].toUpperCase()}-${matches[0][3]}`;
+  let bestN = 0;
+  for (const [k, n] of counts) { if (n > bestN) { bestN = n; best = k; } }
   const [month, year] = best.split('-') as [string, string];
   return { month, year };
 }
 
-// ── Hotel / layover note extraction ───────────────────────────────────────────
-// AIMS sometimes appends hotel or layover city text after flight times.
-// Look for a capitalised word sequence that follows the time block.
-function extractNotes(chunk: string): string | undefined {
-  // Match text like "LAYOVER LHR" or "HOTEL SHERATON" after the times
-  const m = chunk.match(/\b(LAYOVER|HOTEL|OVERNIGHT)\b[:\s]+([A-Z][A-Z0-9\s]{1,40})/i);
-  return m ? m[0].trim() : undefined;
+// ─────────────────────────────────────────────────────────────────────────────
+// Flight-row tokenizer
+//
+// Scans the text AFTER "MH \d+" and classifies each word:
+//   port     — 3-letter IATA (not in NON_PORT), only BEFORE the OP token
+//   time     — HH:MM  (clock or duration)
+//   op       — the literal "OP" work-type marker
+//   dutycode — 2-letter code after OP (e.g. "BA", "BB")
+//   actype   — 3-digit aircraft type (e.g. "359")
+// ─────────────────────────────────────────────────────────────────────────────
+type FlightToken =
+  | { t: 'port';     v: string }
+  | { t: 'time';     v: string }
+  | { t: 'op' }
+  | { t: 'dutycode'; v: string }
+  | { t: 'actype';   v: string };
+
+function tokenizeFlightChunk(raw: string): FlightToken[] {
+  const tokens: FlightToken[] = [];
+  let seenOP = false;
+  // Match: HH:MM | 3-letter words | 2-letter words | 3-digit numbers
+  const RE = /\b([A-Z]{2,4}|\d{2}:\d{2}|\d{3})\b/g;
+  for (const m of raw.matchAll(RE)) {
+    const w = m[1];
+    if (/^\d{2}:\d{2}$/.test(w)) {
+      tokens.push({ t: 'time', v: w });
+    } else if (w === 'OP') {
+      tokens.push({ t: 'op' });
+      seenOP = true;
+    } else if (!seenOP && /^[A-Z]{3}$/.test(w) && !NON_PORT.has(w)) {
+      tokens.push({ t: 'port', v: w });
+    } else if (seenOP && /^[A-Z]{2}$/.test(w) && !['OP','MC','FO','CA','DC','SG'].includes(w)) {
+      tokens.push({ t: 'dutycode', v: w });
+    } else if (/^\d{3}$/.test(w)) {
+      tokens.push({ t: 'actype', v: w });
+    }
+  }
+  return tokens;
 }
 
-// ── Main parser ────────────────────────────────────────────────────────────────
-export function parseMasAims(text: string, logger?: ParseLogger): ParsedRoster {
+// Parse the token stream into structured flight fields.
+// Expected order: depPort, depTime, [arrPort, arrTime], [dutyEnd], [OP],
+//                 [blockHrs], [dutyHrs], [dutyCode], [acType]
+interface FlightFields {
+  depPort:   string;
+  depTime:   string;
+  arrPort?:  string;
+  arrTime?:  string;
+  dutyEnd?:  string;
+  workType?: string;
+  blockHrs?: string;
+  dutyHrs?:  string;
+  dutyCode?: string;
+  acType?:   string;
+}
+
+function parseFlightTokens(tokens: FlightToken[]): FlightFields {
+  let i = 0;
+  const peek = (kind: FlightToken['t']) => i < tokens.length && tokens[i].t === kind;
+  const take = <T extends FlightToken['t']>(kind: T) =>
+    (peek(kind) ? (tokens[i++] as Extract<FlightToken, { t: T }>) : null);
+
+  const depPort = take('port')?.v ?? '';
+  const depTime = take('time')?.v ?? '00:00';
+
+  let arrPort: string | undefined;
+  let arrTime: string | undefined;
+  if (peek('port')) {
+    arrPort = take('port')!.v;
+    if (peek('time')) arrTime = take('time')!.v;
+  }
+
+  // A time that appears before the 'op' token is the duty end
+  let dutyEnd: string | undefined;
+  if (peek('time')) dutyEnd = take('time')!.v;
+
+  let workType: string | undefined;
+  if (peek('op')) { take('op'); workType = 'OP'; }
+
+  const blockHrs = take('time')?.v;
+  const dutyHrs  = take('time')?.v;
+  const dutyCode = take('dutycode')?.v;
+  const acType   = take('actype')?.v;
+
+  return { depPort, depTime, arrPort, arrTime, dutyEnd, workType, blockHrs, dutyHrs, dutyCode, acType };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Classify and parse one date block
+// ─────────────────────────────────────────────────────────────────────────────
+function parseDayChunk(
+  chunk: string,
+  dateISO: string,
+  day: string,
+  logger?: ParseLogger,
+): ParsedDuty[] {
   const duties: ParsedDuty[] = [];
-  let skippedDuties = 0;
 
-  // ── Monthly stats (from PDF summary section) ───────────────────────────────
-  const monthlyStats = extractMonthlyStats(text, logger);
+  // ── 1. Flight(s) ─────────────────────────────────────────────────────────
+  const mhRe      = /MH\s*(\d{1,4})/gi;
+  const mhMatches = [...chunk.matchAll(mhRe)];
 
-  // ── Date blocks ────────────────────────────────────────────────────────────
-  const dateRegex   = /(\d{2})-([A-Z]{3})-(\d{4})/gi;
-  const dateMatches = Array.from(text.matchAll(dateRegex));
+  if (mhMatches.length > 0) {
+    // Duty start = last HH:MM BEFORE the first MH in the chunk
+    const beforeFirst   = chunk.substring(0, mhMatches[0].index!);
+    const dutyStartTimes = beforeFirst.match(/(\d{2}:\d{2})/g);
+    const dutyStart     = dutyStartTimes?.at(-1);
 
-  if (dateMatches.length === 0) {
-    logger?.error('mas-aims:dates', 'No DD-MMM-YYYY date patterns found in text', {
-      textLength: text.length,
-      preview: text.slice(0, 200),
-    });
-    throw new Error(
-      'No dates found in the roster. Please ensure this is a text-based AIMS roster PDF.',
-    );
-  }
-
-  logger?.info('mas-aims:dates', `Found ${dateMatches.length} date block(s)`, {
-    firstDate: dateMatches[0][0],
-    lastDate:  dateMatches[dateMatches.length - 1][0],
-  });
-
-  // ── Crew name ──────────────────────────────────────────────────────────────
-  const crewNameMatch = text.match(/Name:\s*([A-Z][A-Z\s]+)/i);
-  const crewName      = crewNameMatch ? crewNameMatch[1].trim() : 'Crew Member';
-
-  if (!crewNameMatch) {
-    logger?.warn('mas-aims:crew', 'Could not find "Name:" field — defaulting to "Crew Member"', {
-      textPreview: text.slice(0, 300),
-    });
-  } else {
-    logger?.info('mas-aims:crew', `Crew name extracted: ${crewName}`);
-  }
-
-  // ── Roster period ──────────────────────────────────────────────────────────
-  const { month: rosterMonth, year: rosterYear } = inferRosterPeriod(dateMatches);
-  logger?.info('mas-aims:period', `Roster period: ${rosterMonth} ${rosterYear}`);
-
-  // ── Per-date-block parsing ─────────────────────────────────────────────────
-  for (let i = 0; i < dateMatches.length; i++) {
-    const match      = dateMatches[i];
-    const dayNum     = match[1];
-    const monthStr   = match[2].toUpperCase();
-    const year       = match[3];
-    const dateISO    = `${year}-${MONTH_MAP[monthStr] ?? '01'}-${dayNum}`;
-    const charOffset = match.index!;
-    const dayOfWeek  = getDayOfWeek(dateISO);
-
-    const chunkStart = charOffset + match[0].length;
-    const chunkEnd   = dateMatches[i + 1] ? dateMatches[i + 1].index! : text.length;
-    const chunk      = text.substring(chunkStart, chunkEnd);
-
-    const chunkTimes = chunk.match(/\d{2}:\d{2}/g) ?? [];
-
-    // ── Flight extraction ────────────────────────────────────────────────────
-    const flightRegex   = /MH\s*(\d+)/gi;
-    const flightMatches = Array.from(chunk.matchAll(flightRegex));
-
-    // Sign-on: last HH:MM before the first "MH XXXX" token
-    const firstFlightOffset = flightMatches[0]?.index ?? chunk.length;
-    const preFlightTimes    = chunk.substring(0, firstFlightOffset).match(/\d{2}:\d{2}/g) ?? [];
-    const daySignOn         = preFlightTimes.at(-1);
-
-    flightMatches.forEach((fMatch, fIdx) => {
+    mhMatches.forEach((mhM, idx) => {
       try {
-        const flightEnd   = fIdx + 1 < flightMatches.length
-          ? flightMatches[fIdx + 1].index!
-          : chunk.length;
-        const flightChunk = chunk.substring(fMatch.index!, flightEnd);
+        const flightNo    = `MH${mhM[1]}`;
+        const nextMHStart = mhMatches[idx + 1]?.index ?? chunk.length;
+        const flightChunk = chunk.substring(mhM.index! + mhM[0].length, nextMHStart);
 
-        const flightNo           = fMatch[1];
-        const times              = flightChunk.match(/\d{2}:\d{2}/g) ?? [];
-        const [depPort, arrPort] = extractPorts(flightChunk);
+        const tokens = tokenizeFlightChunk(flightChunk);
+        const f      = parseFlightTokens(tokens);
+        const isFirst = idx === 0;
 
-        const isFirst = fIdx === 0;
-        const isLast  = fIdx === flightMatches.length - 1;
-
-        // times[0]=STD  times[1]=STA  times[2]=blockHrs (best-effort)
-        // times[3]=dutyHrs (best-effort, only present when AIMS prints per-leg duty)
-        // For the last leg, times[2] may alternatively be the sign-off time.
-        // We capture both possibilities: use times[2] as blockHrs and also
-        // as signOff (they often have the same index in different AIMS versions).
-        const blockHrs = times[2] && isHHMM(times[2]) ? times[2] : undefined;
-        const dutyHrs  = times[3] && isHHMM(times[3]) ? times[3] : undefined;
-
-        const flight: ParsedFlight = {
-          flightNumber: `MH${flightNo}`,
-          depPort,
-          arrPort,
-          std:    times[0] ?? '00:00',
-          sta:    times[1] ?? '00:00',
-          ...(isFirst && daySignOn ? { signOn:  daySignOn } : {}),
-          ...(isLast  && times[2]  ? { signOff: times[2]  } : {}),
-        };
-
-        if (!depPort || !arrPort) {
-          logger?.warn('mas-aims:flight', `Missing port code(s) on MH${flightNo}`, {
-            date: dateISO, charOffset: charOffset + fMatch.index!,
-            depPort: depPort || null, arrPort: arrPort || null,
+        if (!f.depPort) {
+          logger?.warn('mas-aims:flight', `Missing dep port for ${flightNo} at ${dateISO}`, {
             rawChunk: flightChunk.slice(0, 120),
           });
         }
 
-        if (times.length < 2) {
-          logger?.warn('mas-aims:flight', `Insufficient time fields on MH${flightNo}`, {
-            date: dateISO, charOffset: charOffset + fMatch.index!,
-            timesFound: times.length, rawChunk: flightChunk.slice(0, 120),
-          });
-        }
-
         duties.push({
-          id:      `MH${flightNo}-${dateISO}-${fIdx}`,
-          type:    'FLIGHT',
-          date:    dateISO,
-          day:     dayOfWeek,
-          item:    `MH${flightNo}`,
-          flight,
-          blockHrs,
-          dutyHrs,
-          notes:   extractNotes(flightChunk),
-          ...(isFirst && daySignOn ? { signOn:  daySignOn } : {}),
-          ...(isLast  && times[2]  ? { signOff: times[2]  } : {}),
+          id:       `${flightNo}-${dateISO}-${idx}`,
+          type:     'FLIGHT',
+          date:     dateISO,
+          day,
+          item:     flightNo,
+          signOn:   isFirst ? dutyStart : undefined,
+          signOff:  f.dutyEnd,
+          blockHrs: f.blockHrs,
+          dutyHrs:  f.dutyHrs,
+          dutyCode: f.dutyCode,
+          acType:   f.acType,
+          flight: {
+            flightNumber: flightNo,
+            depPort: f.depPort,
+            arrPort: f.arrPort ?? '',  // filled later by linkContinuationArrivals if empty
+            std:     f.depTime,
+            sta:     f.arrTime ?? '',
+            signOn:  isFirst ? dutyStart : undefined,
+            signOff: f.dutyEnd,
+          },
         });
-
-      } catch (err: unknown) {
-        skippedDuties++;
-        logger?.error('mas-aims:flight', `Unexpected error parsing flight in date block ${dateISO}`, {
-          date: dateISO, charOffset, flightIndex: fIdx,
-          error: err instanceof Error ? err.message : String(err),
-          rawChunk: chunk.slice(0, 200),
+      } catch (err) {
+        logger?.error('mas-aims:flight', `Failed to parse flight at ${dateISO}`, {
+          error: String(err), chunk: chunk.slice(0, 200),
         });
       }
     });
+    return duties;
+  }
 
-    // ── Non-flight duties ────────────────────────────────────────────────────
-    if (flightMatches.length === 0) {
+  // ── 2. Standby ───────────────────────────────────────────────────────────
+  const standbyRe = /\b(S\d+-\d+|SBY|ASB|STBY|SB|SA|SH)\b/i;
+  const standbyM  = chunk.match(standbyRe);
+  if (standbyM) {
+    const code  = standbyM[1].toUpperCase();
+    const times = chunk.match(/\d{2}:\d{2}/g) ?? [];
+    // Standby chunk layout (6 times):
+    //   times[0] = duty start
+    //   times[1] = dep time (= duty start, duplicated)
+    //   times[2] = arr time
+    //   times[3] = duty end  (= arr time, duplicated)
+    //   times[4] = block hrs (always 00:00)
+    //   times[5] = duty hrs
+    const dutyStart = times[0];
+    const dutyEnd   = times.length >= 4 ? times[times.length - 3] : times[1];
+    const blockHrs  = times.length >= 2 ? times[times.length - 2] : undefined;
+    const dutyHrs   = times.at(-1);
 
-      const offMatch = chunk.match(OFF_REGEX);
-      if (offMatch) {
-        try {
-          const code = offMatch[1].toUpperCase();
-          duties.push({
-            id:          `${code}-${dateISO}`,
-            type:        'OFF',
-            date:        dateISO,
-            day:         dayOfWeek,
-            item:        code,
-            description: OFF_LABEL[code] ?? `Off — ${code}`,
-          });
-        } catch (err: unknown) {
-          skippedDuties++;
-          logger?.error('mas-aims:off', `Error parsing OFF duty at ${dateISO}`, {
-            date: dateISO, error: err instanceof Error ? err.message : String(err),
-          });
-        }
+    duties.push({
+      id:          `${code}-${dateISO}`,
+      type:        'STANDBY',
+      date:        dateISO,
+      day,
+      item:        code,
+      signOn:      dutyStart,
+      signOff:     dutyEnd,
+      blockHrs:    blockHrs === '00:00' ? blockHrs : undefined,
+      dutyHrs,
+      description: `Standby — ${code}`,
+    });
+    return duties;
+  }
+
+  // ── 3. Training / simulator ──────────────────────────────────────────────
+  // Short standard codes
+  const trnShortRe = /\b(SIM\/TRN|RECURRENT|TRAINING|SIM|TRN|GND|LPC|OPC|CRM|CBT|TRG)\b/i;
+  // Long AIMS alphanumeric training codes (e.g. "350AOP35", "A353UPRR", "A353ETPR", "353RRCYA")
+  const trnLongRe  = /\b([A-Z0-9]{5,}(?:OPC|SIM|TRN|UPR|ETP|REC|UPRR|ETPR|RRCYA)[A-Z0-9]*)\b/i;
+  const trnM = chunk.match(trnShortRe) ?? chunk.match(trnLongRe);
+  if (trnM) {
+    const code  = trnM[1].toUpperCase();
+    const times = chunk.match(/\d{2}:\d{2}/g) ?? [];
+    duties.push({
+      id:          `TRN-${dateISO}`,
+      type:        'TRAINING',
+      date:        dateISO,
+      day,
+      item:        code,
+      signOn:      times[0],
+      signOff:     times.at(-1),
+      description: TRAINING_CODES[code] ?? `Training — ${code}`,
+    });
+    return duties;
+  }
+
+  // ── 4. Off / leave / medical ─────────────────────────────────────────────
+  // Longer codes first so "DO" doesn't get partially matched before "D".
+  const offRe = /\b(DO|MC[1-4]|COMP|CMP|OFF|REST|AL|SL|ML|HL|PH|EL|D)\b/;
+  const offM  = chunk.match(offRe);
+  if (offM) {
+    const code = offM[1].toUpperCase();
+    duties.push({
+      id:          `${code}-${dateISO}`,
+      type:        'OFF',
+      date:        dateISO,
+      day,
+      item:        code,
+      description: OFF_CODES[code] ?? `Off — ${code}`,
+    });
+    return duties;
+  }
+
+  // ── 5. Continuation arrival (arrival day of a long-haul) ─────────────────
+  // Pattern: ArrPort ArrTime DutyEnd — no Item, no MH, no standby code.
+  // Example: "KUL 16:52 17:37" on the day after a LHR departure.
+  const contRe = /\b([A-Z]{3})\s+(\d{2}:\d{2})\s+(\d{2}:\d{2})/;
+  const contM  = chunk.match(contRe);
+  if (contM && !NON_PORT.has(contM[1])) {
+    const placeholder: ParsedDuty = {
+      id:              `CONT-${dateISO}`,
+      type:            'FLIGHT',
+      date:            dateISO,
+      day,
+      item:            '__continuation__',
+      signOff:         contM[3],
+      _isContinuation: true,
+      flight: {
+        flightNumber: '',
+        depPort:      '',
+        arrPort:      contM[1],
+        std:          '00:00',
+        sta:          contM[2],
+        signOff:      contM[3],
+      },
+    };
+    duties.push(placeholder);
+    return duties;
+  }
+
+  // ── 6. Blank / day-of-week-only rows ────────────────────────────────────
+  // Some rosters omit the "D" code on the first day of the month.
+  // The chunk may contain only a day-of-week abbreviation (e.g. " Fri\n").
+  // Strip weekday tokens and check if anything meaningful remains.
+  const strippedChunk = chunk.replace(/\b(Mon|Tue|Wed|Thu|Fri|Sat|Sun)\b/gi, '').trim();
+  if (strippedChunk.length === 0) {
+    duties.push({
+      id:          `D-${dateISO}`,
+      type:        'OFF',
+      date:        dateISO,
+      day,
+      item:        'D',
+      description: 'Day Off',
+    });
+    return duties;
+  }
+
+  // Unrecognised content — log and skip to avoid phantom duties
+  logger?.warn('mas-aims:day', `Unclassified chunk at ${dateISO}`, {
+    preview: chunk.slice(0, 80),
+  });
+  return [];
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Post-processing: link continuation arrival rows to preceding flights
+//
+// A continuation row has _isContinuation = true.  We find the most recent
+// FLIGHT duty with an empty arrPort and fill it in from the continuation,
+// then remove the placeholder.
+// ─────────────────────────────────────────────────────────────────────────────
+function linkContinuationArrivals(duties: ParsedDuty[], logger?: ParseLogger): void {
+  const contIndices: number[] = [];
+  duties.forEach((d, i) => { if (d._isContinuation) contIndices.push(i); });
+
+  // Work in reverse so splicing doesn't shift earlier indices
+  for (let ci = contIndices.length - 1; ci >= 0; ci--) {
+    const contIdx  = contIndices[ci];
+    const contDuty = duties[contIdx];
+
+    // Find the most recent FLIGHT that hasn't been filled with an arrPort yet
+    let targetIdx = -1;
+    for (let j = contIdx - 1; j >= 0; j--) {
+      const d = duties[j];
+      if (d.type === 'FLIGHT' && !d._isContinuation && !d.flight?.arrPort) {
+        targetIdx = j;
+        break;
       }
+    }
 
-      const trainingMatch = !offMatch ? chunk.match(TRAINING_REGEX) : null;
-      if (trainingMatch) {
-        try {
-          const code = trainingMatch[1].toUpperCase();
-          duties.push({
-            id:          `${code}-${dateISO}`,
-            type:        'TRAINING',
-            date:        dateISO,
-            day:         dayOfWeek,
-            item:        code,
-            signOn:      chunkTimes[0] ?? undefined,
-            signOff:     chunkTimes[chunkTimes.length - 1] ?? undefined,
-            description: TRAINING_LABEL[code] ?? `Training — ${code}`,
-          });
-        } catch (err: unknown) {
-          skippedDuties++;
-          logger?.error('mas-aims:training', `Error parsing TRAINING duty at ${dateISO}`, {
-            date: dateISO, error: err instanceof Error ? err.message : String(err),
-          });
-        }
+    if (targetIdx >= 0) {
+      const target = duties[targetIdx];
+      if (target.flight && contDuty.flight) {
+        target.flight.arrPort = contDuty.flight.arrPort;
+        target.flight.sta     = contDuty.flight.sta;
+        target.flight.signOff = contDuty.flight.signOff;
+        target.signOff        = contDuty.signOff;
+        logger?.info('mas-aims:link',
+          `Linked continuation ${contDuty.flight.arrPort} ${contDuty.flight.sta} → ${target.item} on ${target.date}`);
       }
-
-      if (!offMatch && !trainingMatch) {
-        const standbyMatches = Array.from(chunk.matchAll(STANDBY_REGEX));
-        standbyMatches.forEach((sMatch) => {
-          try {
-            const code   = sMatch[1].toUpperCase();
-            const sChunk = chunk.substring(sMatch.index!);
-            const sTimes = sChunk.match(/\d{2}:\d{2}/g) ?? chunkTimes;
-
-            if (sTimes.length === 0) {
-              logger?.warn('mas-aims:standby', `No times found for standby ${code}`, {
-                date: dateISO, charOffset: charOffset + sMatch.index!, rawChunk: sChunk.slice(0, 120),
-              });
-            }
-
-            duties.push({
-              id:          `${code}-${dateISO}`,
-              type:        'STANDBY',
-              date:        dateISO,
-              day:         dayOfWeek,
-              item:        code,
-              signOn:      sTimes[0] ?? undefined,
-              signOff:     sTimes.at(-1) ?? undefined,
-              description: `Standby — ${code}`,
-            });
-          } catch (err: unknown) {
-            skippedDuties++;
-            logger?.error('mas-aims:standby', `Error parsing standby at ${dateISO}`, {
-              date: dateISO, charOffset, error: err instanceof Error ? err.message : String(err),
-            });
-          }
-        });
-      }
-
     } else {
-      // Mixed-day standby alongside flights
-      const standbyMatches = Array.from(chunk.matchAll(STANDBY_REGEX));
-      standbyMatches.forEach((sMatch) => {
-        try {
-          const code   = sMatch[1].toUpperCase();
-          const sChunk = chunk.substring(sMatch.index!);
-          const sTimes = sChunk.match(/\d{2}:\d{2}/g) ?? chunkTimes;
+      logger?.warn('mas-aims:link', `No unmatched flight found for continuation at ${contDuty.date}`);
+    }
 
-          duties.push({
-            id:          `${code}-${dateISO}-SBY`,
-            type:        'STANDBY',
-            date:        dateISO,
-            day:         dayOfWeek,
-            item:        code,
-            signOn:      sTimes[0] ?? undefined,
-            signOff:     sTimes.at(-1) ?? undefined,
-            description: `Standby — ${code}`,
-          });
-        } catch (err: unknown) {
-          skippedDuties++;
-          logger?.error('mas-aims:standby', `Error parsing mixed-day standby at ${dateISO}`, {
-            date: dateISO, charOffset, error: err instanceof Error ? err.message : String(err),
-          });
-        }
+    duties.splice(contIdx, 1);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Main export
+// ─────────────────────────────────────────────────────────────────────────────
+export function parseMasAims(text: string, logger?: ParseLogger): ParsedRoster {
+  let skipped = 0;
+
+  // ── Monthly stats ──────────────────────────────────────────────────────────
+  const monthlyStats = extractMonthlyStats(text, logger);
+
+  // ── Crew info ──────────────────────────────────────────────────────────────
+  const { name: crewName } = extractCrewInfo(text);
+  if (crewName === 'Crew Member') {
+    logger?.warn('mas-aims:crew', 'Could not extract crew name', { preview: text.slice(0, 300) });
+  } else {
+    logger?.info('mas-aims:crew', `Crew name: ${crewName}`);
+  }
+
+  // ── Date blocks ────────────────────────────────────────────────────────────
+  const dateRe      = /(\d{2})-([A-Z]{3})-(\d{4})/gi;
+  const dateMatches = [...text.matchAll(dateRe)];
+
+  if (dateMatches.length === 0) {
+    logger?.error('mas-aims:dates', 'No DD-MMM-YYYY patterns found', { preview: text.slice(0, 200) });
+    throw new Error('No dates found in the roster. Please ensure this is a text-based AIMS roster PDF.');
+  }
+
+  logger?.info('mas-aims:dates', `Found ${dateMatches.length} date(s)`, {
+    first: dateMatches[0][0],
+    last:  dateMatches.at(-1)![0],
+  });
+
+  const { month, year } = inferRosterPeriod(dateMatches);
+  logger?.info('mas-aims:period', `Roster period: ${month} ${year}`);
+
+  // ── Parse each date block ──────────────────────────────────────────────────
+  const duties: ParsedDuty[] = [];
+
+  for (let i = 0; i < dateMatches.length; i++) {
+    const m       = dateMatches[i];
+    const dateISO = `${m[3]}-${MONTH_MAP[m[2].toUpperCase()] ?? '01'}-${m[1]}`;
+    const dayOfW  = getDayOfWeek(dateISO);
+
+    const chunkStart = m.index! + m[0].length;
+    const chunkEnd   = dateMatches[i + 1]?.index ?? text.length;
+    const chunk      = text.substring(chunkStart, chunkEnd);
+
+    try {
+      duties.push(...parseDayChunk(chunk, dateISO, dayOfW, logger));
+    } catch (err) {
+      skipped++;
+      logger?.error('mas-aims:day', `Error at ${dateISO}`, {
+        error: String(err), chunk: chunk.slice(0, 200),
       });
     }
   }
 
-  if (skippedDuties > 0) {
-    logger?.warn('mas-aims', `${skippedDuties} duty/duties skipped due to parse errors`, {
-      skippedDuties, totalExtracted: duties.length,
-    });
+  // ── Link long-haul continuation arrivals ───────────────────────────────────
+  linkContinuationArrivals(duties, logger);
+
+  if (skipped > 0) {
+    logger?.warn('mas-aims', `${skipped} date block(s) skipped due to errors`);
   }
 
   logger?.info('mas-aims', 'Parse complete', {
-    dutiesExtracted: duties.length,
-    flights:         duties.filter((d) => d.type === 'FLIGHT').length,
-    standbys:        duties.filter((d) => d.type === 'STANDBY').length,
-    offDays:         duties.filter((d) => d.type === 'OFF').length,
-    training:        duties.filter((d) => d.type === 'TRAINING').length,
-    skippedDuties,
+    duties:   duties.length,
+    flights:  duties.filter(d => d.type === 'FLIGHT').length,
+    standby:  duties.filter(d => d.type === 'STANDBY').length,
+    off:      duties.filter(d => d.type === 'OFF').length,
+    training: duties.filter(d => d.type === 'TRAINING').length,
+    skipped,
     monthlyStats,
   });
 
-  return {
-    crewName,
-    month:   rosterMonth,
-    year:    rosterYear,
-    airline: 'Malaysia Airlines',
-    duties,
-    monthlyStats,
-  };
+  return { crewName, month, year, airline: 'Malaysia Airlines', duties, monthlyStats };
 }

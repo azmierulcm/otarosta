@@ -3,28 +3,31 @@ export type DutyType = 'FLIGHT' | 'STANDBY' | 'LAYOVER' | 'OFF' | 'TRAINING' | '
 export interface DutyEvent {
   id: string;
   type: DutyType;
-  date: string;         // ISO format YYYY-MM-DD
-  day?: string;         // "MON" | "TUE" … day of week
-  item?: string;        // flight number ("MH001") or duty code ("OFF", "SBY")
+  date: string;          // ISO format YYYY-MM-DD
+  day?: string;          // "MON" | "TUE" … day of week
+  item?: string;         // flight number ("MH4") or duty code ("D", "DO", "S4-353")
   flightNumber?: string;
   depPort?: string;
   arrPort?: string;
-  std?: string;
-  sta?: string;
-  signOn?: string;
-  signOff?: string;
-  blockHrs?: string;    // "HH:MM" from PDF block-hours column
-  dutyHrs?: string;     // "HH:MM" from PDF duty-hours column
+  std?: string;          // scheduled departure time HH:MM (local)
+  sta?: string;          // scheduled arrival time HH:MM (local)
+  signOn?: string;       // duty start time HH:MM
+  signOff?: string;      // duty end time HH:MM
+  blockHrs?: string;     // "HH:MM" from PDF Actual Block Hours column
+  dutyHrs?: string;      // "HH:MM" from PDF Duty Hours column
+  dutyCode?: string;     // AIMS pairing code e.g. "BA", "BB"
+  acType?: string;       // aircraft type e.g. "359" (A350-900)
   duration?: string;
   hotel?: string;
   description?: string;
-  notes?: string;       // layover port, hotel, or other free-text from PDF
+  notes?: string;
 }
 
 export interface MonthlyStats {
-  actualBlockHours?: string;  // "HH:MM" — read directly from PDF summary
-  dutyHours?: string;         // "HH:MM" — read directly from PDF summary
+  actualBlockHours?: string;     // "HH:MM" — read directly from PDF summary
+  dutyHours?: string;            // "HH:MM" — read directly from PDF summary
   offDaysAtBase?: number;
+  offDaysAwayFromBase?: number;
 }
 
 export interface Destination {

@@ -230,6 +230,8 @@ export async function parseRosterPreview(formData: FormData): Promise<RosterData
       signOff:      d.signOff ?? d.flight?.signOff,
       blockHrs:     d.blockHrs,
       dutyHrs:      d.dutyHrs,
+      dutyCode:     d.dutyCode,
+      acType:       d.acType,
       hotel:        d.flight?.hotel,
       description:  d.description,
       notes:        d.notes,
