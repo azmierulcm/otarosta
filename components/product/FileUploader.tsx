@@ -18,10 +18,10 @@ export const FileUploader = ({ onSuccess }: FileUploaderProps) => {
   const shouldReduceMotion = useReducedMotion();
   const { error, setError, setRoster } = useRoster();
   const { user } = useAuth();
-  const userId = user?.uid;
 
   const [previewData, setPreviewData] = useState<RosterData | null>(null);
   const [savedRosterId, setSavedRosterId] = useState<string | null>(null);
+  const [calendarSecret, setCalendarSecret] = useState<string | null>(null);
   // Local states — never touch the shared RosterContext isLoading.
   // If we did, HomeClient's showLoading would flip true and AnimatePresence
   // would unmount this component mid-request, making setPreviewData a no-op.
@@ -103,11 +103,13 @@ export const FileUploader = ({ onSuccess }: FileUploaderProps) => {
   }, [setError]);
 
   const handleConfirm = async () => {
-    if (!previewData || !userId) return;
+    if (!previewData || !user) return;
     setIsSaving(true);
     try {
-      const { rosterId } = await saveConfirmedRoster(userId, previewData);
+      const token = await user.getIdToken();
+      const { rosterId, calendarSecret: secret } = await saveConfirmedRoster(token, previewData);
       setSavedRosterId(rosterId);
+      setCalendarSecret(secret);
     } catch (err) {
       setError(classifyError(err));
       setPreviewData(null);
@@ -122,12 +124,14 @@ export const FileUploader = ({ onSuccess }: FileUploaderProps) => {
     }
     setPreviewData(null);
     setSavedRosterId(null);
+    setCalendarSecret(null);
     onSuccess?.();
   };
 
   const handleReupload = () => {
     setPreviewData(null);
     setSavedRosterId(null);
+    setCalendarSecret(null);
     setError(null);
   };
 
@@ -211,6 +215,7 @@ export const FileUploader = ({ onSuccess }: FileUploaderProps) => {
         previewData={previewData}
         isSaving={isSaving}
         savedRosterId={savedRosterId}
+        calendarSecret={calendarSecret}
         onConfirm={handleConfirm}
         onReupload={handleReupload}
         onDone={handleDone}

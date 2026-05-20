@@ -1,7 +1,7 @@
 'use server';
 
 import { adminDb, adminAuth } from '@/lib/firebase/admin';
-import { Timestamp } from 'firebase-admin/firestore';
+import { assertAdmin } from '@/lib/firebase/auth-helpers';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -31,7 +31,9 @@ export interface AdminStats {
 
 // ── Stats ─────────────────────────────────────────────────────────────────────
 
-export async function getAdminStats(): Promise<AdminStats> {
+export async function getAdminStats(token: string): Promise<AdminStats> {
+  await assertAdmin(token);
+
   const [profilesSnap, listingsSnap] = await Promise.all([
     adminDb.collection('profiles').get(),
     adminDb.collection('listings').get(),
@@ -49,7 +51,9 @@ export async function getAdminStats(): Promise<AdminStats> {
 
 // ── Users ─────────────────────────────────────────────────────────────────────
 
-export async function adminGetAllUsers(): Promise<AdminUser[]> {
+export async function adminGetAllUsers(token: string): Promise<AdminUser[]> {
+  await assertAdmin(token);
+
   const profilesSnap = await adminDb.collection('profiles').get();
 
   // Fetch Firebase Auth users in a batch (max 100 per call)
@@ -90,13 +94,16 @@ export async function adminGetAllUsers(): Promise<AdminUser[]> {
 }
 
 export async function adminUpdateUser(
+  token: string,
   uid: string,
   fields: Partial<Pick<AdminUser, 'full_name' | 'rank' | 'airline' | 'fleet' | 'base' | 'bio'>>,
 ): Promise<void> {
+  await assertAdmin(token);
   await adminDb.collection('profiles').doc(uid).set(fields, { merge: true });
 }
 
-export async function adminDeleteUser(uid: string): Promise<void> {
+export async function adminDeleteUser(token: string, uid: string): Promise<void> {
+  await assertAdmin(token);
   await Promise.all([
     adminAuth.deleteUser(uid),
     adminDb.collection('profiles').doc(uid).delete(),

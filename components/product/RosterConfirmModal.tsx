@@ -23,6 +23,8 @@ interface RosterConfirmModalProps {
   previewData: RosterData | null;
   isSaving: boolean;
   savedRosterId: string | null;
+  /** UUID used in webcal subscription URLs so calendar apps can fetch the ICS without auth headers. */
+  calendarSecret: string | null;
   onConfirm: () => void;
   onReupload: () => void;
   onDone: () => void;
@@ -33,6 +35,7 @@ export function RosterConfirmModal({
   previewData,
   isSaving,
   savedRosterId,
+  calendarSecret,
   onConfirm,
   onReupload,
   onDone,
@@ -51,8 +54,12 @@ export function RosterConfirmModal({
   const subtitle = [monthFull, previewData?.year].filter(Boolean).join(' ');
   const crewDisplay = previewData?.crewName ?? 'Crew Member';
 
-  const calendarBase = `https://cemrosta2.vercel.app/api/roster/${savedRosterId}/calendar`;
-  const webcalUrl = `webcal://cemrosta2.vercel.app/api/roster/${savedRosterId}/calendar`;
+  const appBase = process.env.NEXT_PUBLIC_APP_URL ?? 'https://cemrosta.vercel.app';
+  // calendarSecret is appended as ?t= so webcal subscription links work without auth headers
+  const calendarSuffix = calendarSecret ? `?t=${calendarSecret}` : '';
+  const calendarBase = `${appBase}/api/roster/${savedRosterId}/calendar${calendarSuffix}`;
+  const webcalHost   = appBase.replace(/^https?:\/\//, '');
+  const webcalUrl    = `webcal://${webcalHost}/api/roster/${savedRosterId}/calendar${calendarSuffix}`;
   const googleCalUrl = `https://calendar.google.com/calendar/r?cid=${encodeURIComponent(webcalUrl)}`;
 
   return (

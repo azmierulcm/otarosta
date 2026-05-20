@@ -2,24 +2,21 @@
 
 import { adminDb } from '@/lib/firebase/admin';
 import { Timestamp } from 'firebase-admin/firestore';
+import { randomUUID } from 'crypto';
 import type { RosterData, DutyEvent } from '@/lib/types';
 import type { RosterSummary } from '@/lib/types/roster';
 import { calculateKilometers, calcTotalBlockMinutes } from '@/lib/utils/geo/haversine';
 import { extractDestinations } from '@/lib/utils/destinations';
 import { setVerifiedAt } from '@/lib/actions/users';
 import { PARSER_VERSION } from '@/lib/parser/version';
+import { verifyIdToken } from '@/lib/firebase/auth-helpers';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Roster persistence — Firestore CRUD
 //
-// Bug fixes in this revision:
-//   • airline field now uses the parsed IATA code (via RosterData.airline)
-//     instead of the hardcoded string 'MH'.
-//   • Duplicate roster detection — rejects uploads for the same userId +
-//     month + year combination to prevent double-entries.
-//   • totalBlockMinutes is now computed and stored on every save / update.
-//   • parserVersion is stamped on every document so future re-parse sweeps
-//     can target old-format rosters precisely.
+// All public functions accept an ID token (`token`) rather than a raw userId.
+// The caller's uid is always derived server-side from the verified token to
+// prevent IDOR attacks where a client passes an arbitrary userId string.
 // ─────────────────────────────────────────────────────────────────────────────
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -62,6 +59,20 @@ async function findDuplicateRoster(
   return snap.docs[0].id;
 }
 
+/**
+ * Verify that a roster doc exists and belongs to the given uid.
+ * Throws if not found or ownership mismatch.
+ */
+async function assertRosterOwner(
+  rosterId: string,
+  uid: string,
+): Promise<FirebaseFirestore.DocumentSnapshot> {
+  const doc = await adminDb.collection('rosters').doc(rosterId).get();
+  if (!doc.exists) throw new Error('Roster not found');
+  if (doc.data()?.userId !== uid) throw new Error('Forbidden');
+  return doc;
+}
+
 // ── Public API ────────────────────────────────────────────────────────────────
 
 export interface SaveRosterOptions {
@@ -69,12 +80,23 @@ export interface SaveRosterOptions {
   allowOverwrite?: boolean;
 }
 
+/**
+ * Save a parsed roster to Firestore.
+ *
+ * `token` must be a Firebase ID token from the authenticated user.
+ * The userId stored in the document is always the verified uid from the token.
+ *
+ * Returns `{ rosterId, calendarSecret }` where `calendarSecret` is a stable
+ * UUID that the client embeds in webcal subscription URLs so calendar apps can
+ * download the ICS without sending a Bearer token.
+ */
 export async function saveRoster(
-  userId: string,
+  token: string,
   rosterData: RosterData,
   icsContent?: string,
   options: SaveRosterOptions = {},
-): Promise<string> {
+): Promise<{ rosterId: string; calendarSecret: string }> {
+  const userId = await verifyIdToken(token);
   const { month, year } = rosterData;
 
   // ── Duplicate detection ────────────────────────────────────────────────────
@@ -96,8 +118,13 @@ export async function saveRoster(
     computeSummaryStats(rosterData.events);
 
   // ── Airline IATA code — use parsed value, fall back to 'MH' ──────────────
-  // Bug fix: previously hardcoded to 'MH' regardless of parsed airline.
   const airline = rosterData.airline ?? 'MH';
+
+  // ── Calendar secret — stable UUID for webcal subscription URLs ────────────
+  // Calendar apps don't support Bearer tokens, so we embed this secret in the
+  // webcal URL (?t=<calendarSecret>). It doesn't expire and is stored in the
+  // roster doc so the route can verify it server-side.
+  const calendarSecret = randomUUID();
 
   // ── Write to Firestore ─────────────────────────────────────────────────────
   const ref = await adminDb.collection('rosters').add({
@@ -114,6 +141,7 @@ export async function saveRoster(
     totalBlockMinutes,
     uniqueDestinations,
     parserVersion:     PARSER_VERSION,
+    calendarSecret,
     ...(rosterData.monthlyStats ? { monthlyStats: rosterData.monthlyStats } : {}),
     ...(icsContent ? { icsContent } : {}),
   });
@@ -121,10 +149,15 @@ export async function saveRoster(
   // Mark user as verified crew on first successful roster parse (idempotent)
   await setVerifiedAt(userId);
 
-  return ref.id;
+  return { rosterId: ref.id, calendarSecret };
 }
 
-export async function getUserRosters(userId: string): Promise<RosterSummary[]> {
+/**
+ * Return the list of rosters belonging to the authenticated caller.
+ */
+export async function getUserRosters(token: string): Promise<RosterSummary[]> {
+  const userId = await verifyIdToken(token);
+
   // Single-field query only — avoids needing a composite Firestore index.
   const snap = await adminDb
     .collection('rosters')
@@ -153,14 +186,47 @@ export async function getUserRosters(userId: string): Promise<RosterSummary[]> {
     .sort((a, b) => b.uploadedAt.localeCompare(a.uploadedAt)); // newest first
 }
 
-export async function deleteRoster(rosterId: string): Promise<void> {
+/**
+ * Delete a roster. Verifies the caller owns the document before deleting.
+ */
+export async function deleteRoster(rosterId: string, token: string): Promise<void> {
+  const uid = await verifyIdToken(token);
+  await assertRosterOwner(rosterId, uid);
   await adminDb.collection('rosters').doc(rosterId).delete();
 }
 
+/**
+ * Fetch a single roster. Verifies the caller owns the document.
+ */
+export async function getRoster(
+  rosterId: string,
+  token: string,
+): Promise<RosterData & { id: string }> {
+  const uid = await verifyIdToken(token);
+  const doc = await assertRosterOwner(rosterId, uid);
+  const d = doc.data()!;
+  return {
+    id:       doc.id,
+    month:    d.month,
+    year:     d.year,
+    crewName: d.crewName ?? undefined,
+    airline:  d.airline ?? 'MH',
+    events:   d.events as DutyEvent[],
+  };
+}
+
+/**
+ * Replace the events array on an existing roster.
+ * Verifies the caller owns the document before writing.
+ */
 export async function updateRosterEvents(
   rosterId: string,
   events: DutyEvent[],
+  token: string,
 ): Promise<void> {
+  const uid = await verifyIdToken(token);
+  await assertRosterOwner(rosterId, uid);
+
   const { totalSectors, totalKm, totalBlockMinutes, uniqueDestinations } =
     computeSummaryStats(events);
 
@@ -172,18 +238,4 @@ export async function updateRosterEvents(
     totalBlockMinutes,
     uniqueDestinations,
   });
-}
-
-export async function getRoster(rosterId: string): Promise<RosterData & { id: string }> {
-  const doc = await adminDb.collection('rosters').doc(rosterId).get();
-  if (!doc.exists) throw new Error('Roster not found');
-  const d = doc.data()!;
-  return {
-    id:       doc.id,
-    month:    d.month,
-    year:     d.year,
-    crewName: d.crewName ?? undefined,
-    airline:  d.airline ?? 'MH',
-    events:   d.events as DutyEvent[],
-  };
 }

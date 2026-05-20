@@ -50,6 +50,13 @@ export async function parseRosterPreview(formData: FormData): Promise<RosterData
   const fileName = file.name ?? 'unknown.pdf';
   const fileSizeBytes = file.size ?? 0;
 
+  // Guard: reject suspiciously large files before doing any parsing work.
+  // A normal single-month AIMS roster is well under 1 MB.
+  const MAX_FILE_BYTES = 10 * 1024 * 1024; // 10 MB
+  if (fileSizeBytes > MAX_FILE_BYTES) {
+    throw new Error('File too large. Please upload a single-month roster PDF (max 10 MB).');
+  }
+
   logger.info('orchestrator', 'Parse run started', {
     runId: logger.runId,
     fileName,
@@ -69,6 +76,18 @@ export async function parseRosterPreview(formData: FormData): Promise<RosterData
   try {
     const arrayBuffer = await file.arrayBuffer();
     const buffer = new Uint8Array(arrayBuffer);
+
+    // Guard: verify magic bytes — all PDFs start with %PDF (25 50 44 46).
+    // This catches files renamed to .pdf but containing other content.
+    if (
+      buffer.length < 4 ||
+      buffer[0] !== 0x25 || // %
+      buffer[1] !== 0x50 || // P
+      buffer[2] !== 0x44 || // D
+      buffer[3] !== 0x46    // F
+    ) {
+      throw new Error('Not a valid PDF file. Please export your AIMS roster as a PDF and try again.');
+    }
     const extraction = await nativeTextHandler(buffer, logger);
 
     rawText = extraction.text;
@@ -250,18 +269,29 @@ export async function parseRosterPreview(formData: FormData): Promise<RosterData
   };
 }
 
-// ── saveConfirmedRoster — unchanged from original ────────────────────────────
+// ── saveConfirmedRoster ───────────────────────────────────────────────────────
 
 export interface SaveResult {
-  rosterId: string;
-  icsContent: string;
+  rosterId:       string;
+  calendarSecret: string;
+  icsContent:     string;
 }
 
+/**
+ * Persist a confirmed roster for the authenticated caller.
+ *
+ * `token` is a Firebase ID token — the userId is always derived server-side.
+ * Callers can never write to an arbitrary user's roster collection.
+ */
 export async function saveConfirmedRoster(
-  userId: string,
+  token: string,
   previewData: RosterData,
 ): Promise<SaveResult> {
-  if (!userId) throw new Error('You must be signed in to save a roster.');
+  if (!token) throw new Error('You must be signed in to save a roster.');
+
+  // Verify the token up-front so we have the userId for the feedback record.
+  const { verifyIdToken } = await import('@/lib/firebase/auth-helpers');
+  const userId = await verifyIdToken(token);
 
   try {
     const { generateICS } = await import('@/lib/utils/ics');
@@ -271,7 +301,8 @@ export async function saveConfirmedRoster(
       previewData.month,
       previewData.year,
     );
-    const rosterId = await saveRoster(userId, previewData, icsContent);
+    // saveRoster verifies the token internally and uses the derived uid.
+    const { rosterId, calendarSecret } = await saveRoster(token, previewData, icsContent);
 
     // ── Fire-and-forget parse feedback ────────────────────────────────────
     // Runs after the roster is saved — never blocks the response to the user.
@@ -287,7 +318,7 @@ export async function saveConfirmedRoster(
       });
     }
 
-    return { rosterId, icsContent };
+    return { rosterId, calendarSecret, icsContent };
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
     console.error('[saveConfirmedRoster] failed:', err);

@@ -8,9 +8,12 @@ import { Timestamp } from 'firebase-admin/firestore';
  * Secured by CRON_SECRET header (set in Vercel env + vercel.json).
  */
 export async function GET(req: NextRequest) {
-  // Verify the request comes from Vercel Cron (or an authorised caller)
-  const secret = req.headers.get('authorization');
-  if (secret !== `Bearer ${process.env.CRON_SECRET}`) {
+  // Verify the request comes from Vercel Cron (or an authorised caller).
+  // Guard: if CRON_SECRET is not set the route must refuse all requests —
+  // otherwise `'Bearer undefined'` would be a valid secret.
+  const cronSecret = process.env.CRON_SECRET;
+  const authHeader = req.headers.get('authorization');
+  if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

@@ -56,18 +56,23 @@ export function RosterProvider({ children }: { children: React.ReactNode }) {
   const [error, setErrorState] = useState<string | null>(null);
 
   const selectRoster = useCallback(async (rosterId: string) => {
+    if (!user) return;
     setIsLoadingState(true);
     setActiveRosterId(rosterId);
     setErrorState(null);
     try {
-      const raw = await getRoster(rosterId);
+      const token = await user.getIdToken();
+      const raw = await getRoster(rosterId, token);
       setActiveRoster(enrichRoster(raw));
     } catch {
       setErrorState('Failed to load roster.');
     } finally {
       setIsLoadingState(false);
     }
-  }, []);
+  // user is a stable Firebase object; changes only on sign-in/sign-out which
+  // triggers a full context reset anyway.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
 
   // Fetch roster list whenever the logged-in user changes
   useEffect(() => {
@@ -81,7 +86,8 @@ export function RosterProvider({ children }: { children: React.ReactNode }) {
     let cancelled = false;
     setIsLoadingList(true);
 
-    getUserRosters(user.uid)
+    user.getIdToken()
+      .then((token) => getUserRosters(token))
       .then((list) => {
         if (cancelled) return;
         setRosters(list);
@@ -98,7 +104,7 @@ export function RosterProvider({ children }: { children: React.ReactNode }) {
       });
 
     return () => { cancelled = true; };
-  // selectRoster is useCallback([]) — stable reference, intentionally omitted.
+  // selectRoster is stable via useCallback([user]) — intentionally listed.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.uid]);
 
@@ -129,8 +135,13 @@ export function RosterProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const deleteRoster = useCallback(async (rosterId: string) => {
-    // Fire the Firestore delete in the background
-    deleteRosterAction(rosterId).catch(console.error);
+    // Fire the Firestore delete in the background — ownership is verified server-side
+    const fire = async () => {
+      if (!user) return;
+      const token = await user.getIdToken();
+      await deleteRosterAction(rosterId, token);
+    };
+    fire().catch(console.error);
 
     // Optimistically remove from the list and handle active-roster switching
     setRosters((prev) => {
@@ -150,7 +161,7 @@ export function RosterProvider({ children }: { children: React.ReactNode }) {
 
       return next;
     });
-  }, [selectRoster]);
+  }, [selectRoster, user]);
 
   const updateEvent = useCallback(async (eventId: string, patch: Partial<DutyEvent>) => {
     if (!activeRosterId || !activeRoster) return;
@@ -162,9 +173,11 @@ export function RosterProvider({ children }: { children: React.ReactNode }) {
     // Optimistic local update
     setActiveRoster((prev) => prev ? enrichRoster({ ...prev, events: updatedEvents }) : prev);
 
-    // Persist to Firestore (non-blocking — errors surface via thrown rejection)
-    await updateRosterEvents(activeRosterId, updatedEvents);
-  }, [activeRosterId, activeRoster]);
+    // Persist to Firestore (ownership is verified server-side)
+    if (!user) throw new Error('Not authenticated');
+    const token = await user.getIdToken();
+    await updateRosterEvents(activeRosterId, updatedEvents, token);
+  }, [activeRosterId, activeRoster, user]);
 
   const setLoading = useCallback((loading: boolean) => setIsLoadingState(loading), []);
   const setError = useCallback((err: string | null) => {

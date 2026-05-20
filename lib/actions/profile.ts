@@ -1,6 +1,7 @@
 'use server';
 
 import { adminDb } from '@/lib/firebase/admin';
+import { verifyIdToken } from '@/lib/firebase/auth-helpers';
 
 export interface ProfileData {
   full_name?: string;
@@ -12,18 +13,27 @@ export interface ProfileData {
 }
 
 /**
- * Upsert a user's profile using the Admin SDK, which bypasses Firestore
- * security rules. Returns { ok: true } on success, { ok: false, error } on
- * failure so the client can surface a real error message instead of guessing.
+ * Upsert the caller's own profile.
+ *
+ * `token` is a Firebase ID token obtained via `user.getIdToken()` on the client.
+ * The uid is always derived server-side from the verified token — callers cannot
+ * write to an arbitrary profile document.
  */
 export async function saveProfile(
-  userId: string,
+  token: string,
   data: ProfileData,
 ): Promise<{ ok: boolean; error?: string }> {
+  let uid: string;
+  try {
+    uid = await verifyIdToken(token);
+  } catch {
+    return { ok: false, error: 'Unauthenticated' };
+  }
+
   try {
     await adminDb
       .collection('profiles')
-      .doc(userId)
+      .doc(uid)
       .set(data, { merge: true });
     return { ok: true };
   } catch (err) {

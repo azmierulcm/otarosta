@@ -17,8 +17,10 @@ import {
 import type { Listing, ListingStatus } from '@/lib/types/marketplace';
 import { CATEGORY_LABELS, CONDITION_LABELS } from '@/lib/types/marketplace';
 
+// NEXT_PUBLIC_ADMIN_EMAILS is used client-side only as a UX hint to hide the
+// admin panel from non-admins. The real access check happens server-side in
+// each admin Server Action via assertAdmin(token).
 const ADMIN_EMAILS = (process.env.NEXT_PUBLIC_ADMIN_EMAILS ?? '').split(',').map((e) => e.trim()).filter(Boolean);
-console.log('[admin] ADMIN_EMAILS:', ADMIN_EMAILS, '| raw env:', process.env.NEXT_PUBLIC_ADMIN_EMAILS);
 
 type Tab = 'overview' | 'listings' | 'users';
 
@@ -95,11 +97,13 @@ export default function AdminClient() {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function OverviewTab() {
+  const { user } = useAuth();
   const [stats, setStats] = useState<AdminStats | null>(null);
 
   useEffect(() => {
-    getAdminStats().then(setStats);
-  }, []);
+    if (!user) return;
+    user.getIdToken().then((token) => getAdminStats(token)).then(setStats);
+  }, [user]);
 
   if (!stats) return <Loader2 size={20} className="animate-spin text-text-muted" />;
 
@@ -136,6 +140,7 @@ const STATUS_COLORS: Record<ListingStatus, string> = {
 };
 
 function ListingsTab() {
+  const { user } = useAuth();
   const [listings, setListings] = useState<Listing[]>([]);
   const [loading, setLoading]   = useState(true);
   const [actionId, setActionId] = useState<string | null>(null);
@@ -145,10 +150,11 @@ function ListingsTab() {
   const [filterStatus, setFilterStatus] = useState<ListingStatus | ''>('');
 
   const load = useCallback(async () => {
+    if (!user) return;
     setLoading(true);
     try { setListings(await adminGetAllListings()); }
     finally { setLoading(false); }
-  }, []);
+  }, [user]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -301,6 +307,7 @@ function ListingsTab() {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function UsersTab() {
+  const { user: authUser } = useAuth();
   const [users, setUsers]       = useState<AdminUser[]>([]);
   const [loading, setLoading]   = useState(true);
   const [actionId, setActionId] = useState<string | null>(null);
@@ -309,10 +316,14 @@ function UsersTab() {
   const [search, setSearch]     = useState('');
 
   const load = useCallback(async () => {
+    if (!authUser) return;
     setLoading(true);
-    try { setUsers(await adminGetAllUsers()); }
+    try {
+      const token = await authUser.getIdToken();
+      setUsers(await adminGetAllUsers(token));
+    }
     finally { setLoading(false); }
-  }, []);
+  }, [authUser]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -322,20 +333,23 @@ function UsersTab() {
   };
 
   const saveEdit = async () => {
-    if (!editId) return;
+    if (!editId || !authUser) return;
     setActionId(editId);
     try {
-      await adminUpdateUser(editId, editFields);
+      const token = await authUser.getIdToken();
+      await adminUpdateUser(token, editId, editFields);
       setUsers((p) => p.map((u) => u.uid === editId ? { ...u, ...editFields } : u));
       setEditId(null);
     } finally { setActionId(null); }
   };
 
   const remove = async (uid: string, email: string) => {
+    if (!authUser) return;
     if (!confirm(`Delete user ${email}? This is irreversible.`)) return;
     setActionId(uid);
     try {
-      await adminDeleteUser(uid);
+      const token = await authUser.getIdToken();
+      await adminDeleteUser(token, uid);
       setUsers((p) => p.filter((u) => u.uid !== uid));
     } finally { setActionId(null); }
   };

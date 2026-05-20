@@ -40,6 +40,43 @@ const nextConfig: NextConfig = {
     deviceSizes: [390, 640, 750, 828, 1080, 1200, 1920],
     imageSizes: [16, 32, 48, 64, 96, 128, 256],
   },
+
+  // ── Security headers ────────────────────────────────────────────────────────
+  // Applied to every response from the Next.js server.
+  async headers() {
+    return [
+      {
+        source: '/(.*)',
+        headers: [
+          // Prevent MIME-type sniffing
+          { key: 'X-Content-Type-Options',    value: 'nosniff' },
+          // Block clickjacking — allow same-origin framing (needed for OG image previews)
+          { key: 'X-Frame-Options',           value: 'SAMEORIGIN' },
+          // Enforce HTTPS for one year including sub-domains
+          { key: 'Strict-Transport-Security', value: 'max-age=31536000; includeSubDomains' },
+          // Restrict referrer info to same-origin for privacy
+          { key: 'Referrer-Policy',           value: 'strict-origin-when-cross-origin' },
+          // Lock down browser feature access
+          { key: 'Permissions-Policy',        value: 'camera=(), microphone=(), geolocation=()' },
+          // Content-Security-Policy
+          // 'unsafe-inline' is required for Tailwind CSS-in-JS and Next.js hydration scripts.
+          // 'unsafe-eval' is required in development by Next.js hot-reload.
+          {
+            key: 'Content-Security-Policy',
+            value: [
+              "default-src 'self'",
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+              "style-src 'self' 'unsafe-inline'",
+              "img-src 'self' data: blob: https://firebasestorage.googleapis.com https://storage.googleapis.com https://lh3.googleusercontent.com",
+              "font-src 'self' https://fonts.gstatic.com",
+              "connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://identitytoolkit.googleapis.com https://cdn.jsdelivr.net",
+              "frame-ancestors 'self'",
+            ].join('; '),
+          },
+        ],
+      },
+    ];
+  },
 };
 
 export default nextConfig;
