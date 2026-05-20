@@ -168,7 +168,7 @@ function FlightCardTile({ card }: { card: FlightCard }) {
   const companionLine = card.companion ? `${card.flight ?? ''} · ${card.companion}` : (card.flight ?? '');
 
   return (
-    <div className="w-[210px] shrink-0 rounded-2xl bg-white border border-border/60 p-4 flex flex-col gap-2.5 shadow-sm">
+    <div className="w-full rounded-2xl bg-white border border-border/60 p-4 flex flex-col gap-2.5 shadow-sm">
 
       {/* 1 — Badge + flight pair */}
       <div className="flex items-center justify-between gap-2">
@@ -540,50 +540,39 @@ export function FamilyCard() {
 
       {/* ── Header ───────────────────────────────────────────────────────────── */}
       <div className="bg-white px-6 pt-7 pb-6 border-b border-border/60">
-        <div className="flex items-start justify-between mb-5">
 
-          {/* Logo + name */}
-          <div className="flex flex-col gap-3">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full flex items-center justify-center text-white text-[18px] shrink-0"
-                   style={{ background: RED }}>✈</div>
-              <span className="text-[9px] font-black uppercase tracking-[0.3em] text-text-subtle">
-                Crew Family Hub
-              </span>
+        {/* Row 1: month+year left, buttons right */}
+        <div className="flex items-start justify-between gap-3 mb-4">
+          <div>
+            <div className="text-[28px] font-black leading-none tracking-tight" style={{ color: RED }}>
+              {monthLabel}
             </div>
-            <h2 className="text-[34px] md:text-[40px] font-black tracking-tight text-text leading-none">
-              {firstName}
-            </h2>
+            <div className="text-[14px] font-bold text-text-muted mt-0.5">{year}</div>
           </div>
-
-          {/* Month + year + actions */}
-          <div className="flex flex-col items-end gap-3 shrink-0">
-            <div className="text-right">
-              <div className="text-[30px] font-black leading-none tracking-tight" style={{ color: RED }}>
-                {monthLabel}
-              </div>
-              <div className="text-[15px] font-bold text-text-muted mt-0.5">{year}</div>
-            </div>
-            <div className="flex gap-2">
-              <button
-                onClick={handleShare}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-border text-[11px] font-bold text-text-muted hover:text-text hover:border-text-subtle transition-all"
-              >
-                {copied ? <Check size={11} className="text-green-500" /> : <Share2 size={11} />}
-                {copied ? 'Copied!' : 'Share'}
-              </button>
-              <button
-                onClick={handleDownload}
-                disabled={downloading}
-                className="flex items-center gap-1.5 px-4 py-1.5 rounded-full text-white text-[11px] font-black shadow-md transition-all disabled:opacity-60 active:scale-95"
-                style={{ background: RED }}
-              >
-                <Download size={11} />
-                {downloading ? 'Saving…' : 'Download Card'}
-              </button>
-            </div>
+          <div className="flex gap-2 shrink-0 pt-1">
+            <button
+              onClick={handleShare}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-border text-[11px] font-bold text-text-muted hover:text-text hover:border-text-subtle transition-all"
+            >
+              {copied ? <Check size={11} className="text-green-500" /> : <Share2 size={11} />}
+              {copied ? 'Copied!' : 'Share'}
+            </button>
+            <button
+              onClick={handleDownload}
+              disabled={downloading}
+              className="flex items-center gap-1.5 px-4 py-1.5 rounded-full text-white text-[11px] font-black shadow-md transition-all disabled:opacity-60 active:scale-95"
+              style={{ background: RED }}
+            >
+              <Download size={11} />
+              {downloading ? 'Saving…' : 'Download'}
+            </button>
           </div>
         </div>
+
+        {/* Row 2: name full width */}
+        <h2 className="text-[34px] md:text-[40px] font-black tracking-tight text-text leading-none mb-5">
+          {firstName}
+        </h2>
 
         {/* Stats strip */}
         <div className="flex gap-2 flex-wrap">
@@ -614,13 +603,10 @@ export function FamilyCard() {
               {flightCards.length} {flightCards.length === 1 ? 'Duty' : 'Duties'}
             </span>
           </div>
-          <div className="overflow-x-auto pb-2 pl-6 pr-3">
-            <div className="flex gap-3" style={{ width: 'max-content' }}>
-              {flightCards.map((card, i) => (
-                <FlightCardTile key={i} card={card} />
-              ))}
-              <div className="w-3 shrink-0" aria-hidden />
-            </div>
+          <div className="grid grid-cols-2 gap-3 px-6">
+            {flightCards.map((card, i) => (
+              <FlightCardTile key={i} card={card} />
+            ))}
           </div>
         </div>
       )}
