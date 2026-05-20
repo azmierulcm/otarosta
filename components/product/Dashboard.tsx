@@ -695,7 +695,7 @@ export const Dashboard = () => {
                 Share with your loved ones
               </span>
             </div>
-            <div className="bg-white rounded-[2rem] border border-border p-6 md:p-8">
+            <div className="rounded-[2rem] overflow-hidden border border-border">
               <FamilyCard />
             </div>
           </section>
