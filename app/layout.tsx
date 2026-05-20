@@ -1,8 +1,10 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, IBM_Plex_Mono } from "next/font/google";
+import Script from "next/script";
 import "../styles/globals.css";
 import { AuthProvider } from "@/lib/contexts/AuthContext";
 import { RosterProvider } from "@/lib/contexts/RosterContext";
+import { InstallBanner } from "@/components/shared/InstallBanner";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -94,8 +96,17 @@ export default function RootLayout({
         <AuthProvider>
           <RosterProvider>
             {children}
+            <InstallBanner />
           </RosterProvider>
         </AuthProvider>
+        {/* Register service worker — afterInteractive ensures it runs after hydration */}
+        <Script id="sw-register" strategy="afterInteractive">{`
+          if ('serviceWorker' in navigator) {
+            window.addEventListener('load', function () {
+              navigator.serviceWorker.register('/sw.js');
+            });
+          }
+        `}</Script>
       </body>
     </html>
   );
