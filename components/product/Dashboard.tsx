@@ -11,6 +11,7 @@ import { DutyCalendar } from './DutyCalendar';
 import { DestinationPatch } from './DestinationPatch';
 import { FileUploader } from './FileUploader';
 import { RosterTile, dayEventsToDuty } from './RosterTile';
+import { FamilyCard } from './family/FamilyCard';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -684,6 +685,20 @@ export const Dashboard = () => {
               </div>
             </div>
           </div>
+
+          {/* ── Family Hub ───────────────────────────────────────────────────── */}
+          <section className="mt-20">
+            <div className="flex items-center gap-4 mb-6 border-b border-border pb-4">
+              <h3 className="text-3xl font-bold text-text tracking-tighter uppercase italic">Family Hub.</h3>
+              <div className="h-px flex-1 bg-border/50" />
+              <span className="text-[10px] font-black uppercase tracking-[0.3em] text-text-subtle font-mono bg-surface-2 px-4 py-2 rounded-full border border-border">
+                Share with your loved ones
+              </span>
+            </div>
+            <div className="bg-white rounded-[2rem] border border-border p-6 md:p-8">
+              <FamilyCard />
+            </div>
+          </section>
         </>
       )}
     </div>
