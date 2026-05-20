@@ -13,6 +13,7 @@ import {
   Loader2, Check, ChevronDown, ArrowRight, Sparkles, Camera, Trash2,
   Lock, ShoppingBag, ExternalLink,
 } from 'lucide-react';
+import { FlipWords } from '@/components/shared/FlipWords';
 
 /* ── Options ──────────────────────────────────────────────────────────────── */
 const RANKS = [
@@ -249,18 +250,22 @@ export default function SettingsClient() {
 
       {/* Onboarding welcome banner */}
       {isOnboarding && (
-        <div className="mb-10 p-5 rounded-[2rem] bg-accent/5 border border-accent/15 flex items-start gap-4">
-          <div className="w-10 h-10 rounded-2xl bg-accent/10 flex items-center justify-center shrink-0">
-            <Sparkles size={18} className="text-accent" />
-          </div>
-          <div>
-            <div className="text-[11px] font-black uppercase tracking-widest text-accent font-mono mb-1">
-              Welcome aboard
-            </div>
-            <p className="text-[14px] text-text font-medium leading-snug">
-              Before you upload your first roster, tell us a bit about yourself — your name and rank help personalise the dashboard, passport, and recap cards.
-            </p>
-          </div>
+        <div className="mb-10 p-6 rounded-[2rem] bg-accent/5 border border-accent/15">
+          {/* Heading with flip language effect */}
+          <h2 className="text-2xl md:text-3xl font-black tracking-tighter text-text leading-none mb-3 flex items-baseline gap-2 flex-wrap">
+            Welcome Aboard.
+            <FlipWords
+              words={['Selamat Datang.', '欢迎登机.', 'Bienvenue.', 'Bienvenido.', '搭乗歡迎.', 'Willkommen.', 'أهلاً بك.']}
+              duration={3200}
+              className="text-accent italic"
+            />
+          </h2>
+
+          {/* Subtitle */}
+          <p className="text-[14px] text-text-muted font-bold leading-snug max-w-lg">
+            A few details first — your name and rank help us personalise everything from your dashboard to your digital passport.{' '}
+            <span className="text-text">Your passport and recap cards will thank you.</span>
+          </p>
         </div>
       )}
 
