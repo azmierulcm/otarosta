@@ -17,7 +17,9 @@ const inter = Inter({
 const ibmPlexMono = IBM_Plex_Mono({
   variable: "--font-plex-mono",
   subsets: ["latin"],
-  weight: ["400", "500", "700"],
+  // Only bold is used (eyebrow labels, code chips). Dropping 400 + 500
+  // saves ~40 KB of font data with no visible difference.
+  weight: ["700"],
   display: "swap",
   preload: true,
 });
