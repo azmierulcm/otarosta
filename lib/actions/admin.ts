@@ -27,6 +27,21 @@ export interface AdminStats {
   activeListings:  number;
   hiddenListings:  number;
   soldListings:    number;
+  openReports:     number;
+}
+
+export type ReportStatus = 'open' | 'resolved' | 'closed';
+
+export interface BugReport {
+  reportId:    string;
+  userId:      string;
+  userEmail:   string | null;
+  category:    string;
+  description: string;
+  rosterMonth: string | null;
+  rosterYear:  string | null;
+  createdAt:   string;
+  status:      ReportStatus;
 }
 
 // ── Stats ─────────────────────────────────────────────────────────────────────
@@ -34,9 +49,10 @@ export interface AdminStats {
 export async function getAdminStats(token: string): Promise<AdminStats> {
   await assertAdmin(token);
 
-  const [profilesSnap, listingsSnap] = await Promise.all([
+  const [profilesSnap, listingsSnap, reportsSnap] = await Promise.all([
     adminDb.collection('profiles').get(),
     adminDb.collection('listings').get(),
+    adminDb.collection('bug_reports').where('status', '==', 'open').get(),
   ]);
 
   const listings = listingsSnap.docs.map((d) => d.data());
@@ -46,6 +62,7 @@ export async function getAdminStats(token: string): Promise<AdminStats> {
     activeListings: listings.filter((l) => l.status === 'active').length,
     hiddenListings: listings.filter((l) => l.status === 'hidden').length,
     soldListings:   listings.filter((l) => l.status === 'sold').length,
+    openReports:    reportsSnap.size,
   };
 }
 
@@ -108,4 +125,38 @@ export async function adminDeleteUser(token: string, uid: string): Promise<void>
     adminAuth.deleteUser(uid),
     adminDb.collection('profiles').doc(uid).delete(),
   ]);
+}
+
+// ── Bug Reports ───────────────────────────────────────────────────────────────
+
+export async function adminGetBugReports(token: string): Promise<BugReport[]> {
+  await assertAdmin(token);
+  const snap = await adminDb
+    .collection('bug_reports')
+    .orderBy('createdAt', 'desc')
+    .limit(200)
+    .get();
+  return snap.docs.map((doc) => {
+    const d = doc.data();
+    return {
+      reportId:    d.reportId ?? doc.id,
+      userId:      d.userId ?? 'anonymous',
+      userEmail:   d.userEmail ?? null,
+      category:    d.category ?? 'General',
+      description: d.description ?? '',
+      rosterMonth: d.rosterMonth ?? null,
+      rosterYear:  d.rosterYear ?? null,
+      createdAt:   d.createdAt ?? '',
+      status:      (d.status as ReportStatus) ?? 'open',
+    };
+  });
+}
+
+export async function adminUpdateReportStatus(
+  token: string,
+  reportId: string,
+  status: ReportStatus,
+): Promise<void> {
+  await assertAdmin(token);
+  await adminDb.collection('bug_reports').doc(reportId).set({ status }, { merge: true });
 }

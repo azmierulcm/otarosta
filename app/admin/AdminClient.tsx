@@ -5,11 +5,12 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/contexts/AuthContext';
 import {
   Users, ShoppingBag, LayoutDashboard, Trash2, Pencil,
-  Check, X, Loader2, Shield, Eye, EyeOff,
+  Check, X, Loader2, Shield, Eye, EyeOff, Bug,
 } from 'lucide-react';
 import {
   getAdminStats, adminGetAllUsers, adminUpdateUser, adminDeleteUser,
-  type AdminUser, type AdminStats,
+  adminGetBugReports, adminUpdateReportStatus,
+  type AdminUser, type AdminStats, type BugReport, type ReportStatus,
 } from '@/lib/actions/admin';
 import {
   adminGetAllListings, adminSetListingStatus, adminDeleteListing, adminUpdateListing,
@@ -22,7 +23,7 @@ import { CATEGORY_LABELS } from '@/lib/types/marketplace';
 // each admin Server Action via assertAdmin(token).
 const ADMIN_EMAILS = (process.env.NEXT_PUBLIC_ADMIN_EMAILS ?? '').split(',').map((e) => e.trim()).filter(Boolean);
 
-type Tab = 'overview' | 'listings' | 'users';
+type Tab = 'overview' | 'listings' | 'users' | 'reports';
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -63,30 +64,12 @@ export default function AdminClient() {
       </div>
 
       {/* Tabs */}
-      <div className="flex items-center gap-1 bg-surface border border-border rounded-full p-1 w-fit">
-        {([
-          { id: 'overview',  label: 'Overview',  icon: LayoutDashboard },
-          { id: 'listings',  label: 'Listings',  icon: ShoppingBag },
-          { id: 'users',     label: 'Users',     icon: Users },
-        ] as { id: Tab; label: string; icon: React.ElementType }[]).map(({ id, label, icon: Icon }) => (
-          <button
-            key={id}
-            onClick={() => setTab(id)}
-            className="flex items-center gap-2 px-4 py-2 rounded-full text-[12px] font-black uppercase tracking-widest transition-all"
-            style={{
-              background: tab === id ? 'var(--accent)' : 'transparent',
-              color:      tab === id ? 'var(--accent-fg)' : 'var(--text-muted)',
-            }}
-          >
-            <Icon size={14} />
-            {label}
-          </button>
-        ))}
-      </div>
+      <ReportsTabBar tab={tab} setTab={setTab} />
 
       {tab === 'overview' && <OverviewTab />}
       {tab === 'listings' && <ListingsTab />}
       {tab === 'users'    && <UsersTab />}
+      {tab === 'reports'  && <ReportsTab />}
     </div>
   );
 }
@@ -112,10 +95,11 @@ function OverviewTab() {
     { label: 'Active listings',  value: stats.activeListings },
     { label: 'Hidden listings',  value: stats.hiddenListings },
     { label: 'Sold listings',    value: stats.soldListings },
+    { label: 'Open reports',     value: stats.openReports },
   ];
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
       {cards.map((c) => (
         <div key={c.label}
              className="flex flex-col gap-1 rounded-[var(--radius-xl)] border border-border bg-bg p-5 shadow-sm">
@@ -504,6 +488,243 @@ function UsersTab() {
         </table>
         {filtered.length === 0 && (
           <p className="text-center py-12 text-[13px] font-bold text-text-muted">No users found.</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Tab bar (extracted so it can read open-report count)
+// ─────────────────────────────────────────────────────────────────────────────
+
+function ReportsTabBar({ tab, setTab }: { tab: Tab; setTab: (t: Tab) => void }) {
+  const { user } = useAuth();
+  const [openCount, setOpenCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!user) return;
+    user.getIdToken()
+      .then((token) => getAdminStats(token))
+      .then((s) => setOpenCount(s.openReports))
+      .catch(() => { /* ignore */ });
+  }, [user]);
+
+  return (
+    <div className="flex items-center gap-1 bg-surface border border-border rounded-full p-1 w-fit flex-wrap">
+      {([
+        { id: 'overview',  label: 'Overview',  icon: LayoutDashboard },
+        { id: 'listings',  label: 'Listings',  icon: ShoppingBag },
+        { id: 'users',     label: 'Users',     icon: Users },
+        { id: 'reports',   label: 'Reports',   icon: Bug },
+      ] as { id: Tab; label: string; icon: React.ElementType }[]).map(({ id, label, icon: Icon }) => (
+        <button
+          key={id}
+          onClick={() => setTab(id)}
+          className="relative flex items-center gap-2 px-4 py-2 rounded-full text-[12px] font-black uppercase tracking-widest transition-all"
+          style={{
+            background: tab === id ? 'var(--accent)' : 'transparent',
+            color:      tab === id ? 'var(--accent-fg)' : 'var(--text-muted)',
+          }}
+        >
+          <Icon size={14} />
+          {label}
+          {id === 'reports' && openCount !== null && openCount > 0 && (
+            <span
+              className="ml-0.5 inline-flex items-center justify-center w-4 h-4 rounded-full text-[9px] font-black text-white"
+              style={{ background: 'var(--danger)' }}
+            >
+              {openCount > 99 ? '99+' : openCount}
+            </span>
+          )}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Reports
+// ─────────────────────────────────────────────────────────────────────────────
+
+const REPORT_STATUS_COLORS: Record<ReportStatus, string> = {
+  open:     'var(--danger)',
+  resolved: 'var(--success)',
+  closed:   'var(--text-muted)',
+};
+
+function ReportsTab() {
+  const { user } = useAuth();
+  const [reports, setReports]     = useState<BugReport[]>([]);
+  const [loading, setLoading]     = useState(true);
+  const [actionId, setActionId]   = useState<string | null>(null);
+  const [filterStatus, setFilterStatus] = useState<ReportStatus | ''>('open');
+  const [expanded, setExpanded]   = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    if (!user) return;
+    setLoading(true);
+    try {
+      const token = await user.getIdToken();
+      setReports(await adminGetBugReports(token));
+    } finally {
+      setLoading(false);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    load();
+  }, [load]);
+
+  const updateStatus = async (reportId: string, status: ReportStatus) => {
+    if (!user) return;
+    setActionId(reportId);
+    try {
+      const token = await user.getIdToken();
+      await adminUpdateReportStatus(token, reportId, status);
+      setReports((prev) =>
+        prev.map((r) => r.reportId === reportId ? { ...r, status } : r),
+      );
+    } finally {
+      setActionId(null); }
+  };
+
+  const visible = filterStatus
+    ? reports.filter((r) => r.status === filterStatus)
+    : reports;
+
+  if (loading) return <Loader2 size={20} className="animate-spin text-text-muted" />;
+
+  return (
+    <div className="space-y-4">
+      {/* Filter chips */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-[11px] font-black uppercase tracking-widest text-text-muted">Filter:</span>
+        {(['', 'open', 'resolved', 'closed'] as (ReportStatus | '')[]).map((s) => (
+          <button
+            key={s || 'all'}
+            onClick={() => setFilterStatus(s)}
+            className="px-3 py-1 rounded-full text-[11px] font-black uppercase tracking-wider transition-all border border-border"
+            style={{
+              background: filterStatus === s ? 'var(--accent)' : 'var(--surface)',
+              color:      filterStatus === s ? 'var(--accent-fg)' : 'var(--text-muted)',
+            }}
+          >
+            {s || 'All'}{s ? ` (${reports.filter((r) => r.status === s).length})` : ''}
+          </button>
+        ))}
+        <span className="ml-auto text-[12px] font-bold text-text-muted">{visible.length} report{visible.length !== 1 ? 's' : ''}</span>
+      </div>
+
+      {/* Table */}
+      <div className="rounded-[var(--radius-xl)] border border-border overflow-hidden">
+        <table className="w-full text-left">
+          <thead>
+            <tr className="border-b border-border bg-surface">
+              {['Category', 'Description', 'User', 'Date', 'Status', 'Actions'].map((h) => (
+                <th key={h} className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-text-subtle whitespace-nowrap">{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border">
+            {visible.map((r) => {
+              const isBusy    = actionId === r.reportId;
+              const isExpanded = expanded === r.reportId;
+              return (
+                <tr key={r.reportId} className="bg-bg hover:bg-surface transition-colors align-top">
+                  {/* Category */}
+                  <td className="px-4 py-3">
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-surface border border-border text-text-muted">
+                      {r.category}
+                    </span>
+                  </td>
+
+                  {/* Description (expandable) */}
+                  <td className="px-4 py-3 max-w-[320px]">
+                    <p
+                      className={`text-[13px] text-text cursor-pointer ${isExpanded ? '' : 'line-clamp-2'}`}
+                      onClick={() => setExpanded(isExpanded ? null : r.reportId)}
+                      title={isExpanded ? 'Click to collapse' : 'Click to expand'}
+                    >
+                      {r.description}
+                    </p>
+                    {r.rosterMonth && (
+                      <p className="text-[10px] text-text-subtle mt-1 font-mono">
+                        Roster: {r.rosterMonth} {r.rosterYear ?? ''}
+                      </p>
+                    )}
+                  </td>
+
+                  {/* User */}
+                  <td className="px-4 py-3">
+                    <p className="text-[12px] font-bold text-text truncate max-w-[160px]">{r.userEmail ?? r.userId}</p>
+                  </td>
+
+                  {/* Date */}
+                  <td className="px-4 py-3 text-[11px] text-text-muted font-mono whitespace-nowrap">
+                    {r.createdAt ? new Date(r.createdAt).toLocaleDateString('en-MY', {
+                      day: '2-digit', month: 'short', year: 'numeric',
+                    }) : '—'}
+                  </td>
+
+                  {/* Status badge */}
+                  <td className="px-4 py-3">
+                    <span
+                      className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider text-white"
+                      style={{ background: REPORT_STATUS_COLORS[r.status] }}
+                    >
+                      {r.status}
+                    </span>
+                  </td>
+
+                  {/* Actions */}
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-1">
+                      {isBusy ? (
+                        <Loader2 size={14} className="animate-spin text-text-muted" />
+                      ) : (
+                        <>
+                          {r.status !== 'resolved' && (
+                            <IconBtn
+                              onClick={() => updateStatus(r.reportId, 'resolved')}
+                              title="Mark resolved"
+                              color="var(--success)"
+                            >
+                              <Check size={13} />
+                            </IconBtn>
+                          )}
+                          {r.status !== 'closed' && (
+                            <IconBtn
+                              onClick={() => updateStatus(r.reportId, 'closed')}
+                              title="Close report"
+                              color="var(--text-muted)"
+                            >
+                              <X size={13} />
+                            </IconBtn>
+                          )}
+                          {r.status !== 'open' && (
+                            <IconBtn
+                              onClick={() => updateStatus(r.reportId, 'open')}
+                              title="Re-open"
+                              color="var(--danger)"
+                            >
+                              <Bug size={13} />
+                            </IconBtn>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+        {visible.length === 0 && (
+          <p className="text-center py-12 text-[13px] font-bold text-text-muted">
+            {filterStatus ? `No ${filterStatus} reports.` : 'No reports yet.'}
+          </p>
         )}
       </div>
     </div>
