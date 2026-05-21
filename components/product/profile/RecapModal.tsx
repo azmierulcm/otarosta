@@ -368,6 +368,14 @@ export function RecapModal({ isOpen, onClose, userId, earnedDestinations }: Reca
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, handleKeyDown]);
 
+  // Lock body scroll while open so the Leaflet map beneath can't intercept wheel events
+  useEffect(() => {
+    if (!isOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = prev; };
+  }, [isOpen]);
+
   const data = useMemo(
     () => buildCardData(period, rosters, earnedDestinations),
     [period, rosters, earnedDestinations],

@@ -98,7 +98,7 @@ export default function SummaryMapLeaflet({ mapCoords, topRoute }: SummaryMapLea
     <MapContainer
       center={kulLL}
       zoom={3}
-      scrollWheelZoom={true}
+      scrollWheelZoom={false}
       zoomControl={false}
       attributionControl={false}
       style={{ height: '100%', width: '100%', minHeight: 300, background: '#f2f2f0', position: 'relative' }}
