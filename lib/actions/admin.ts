@@ -33,15 +33,16 @@ export interface AdminStats {
 export type ReportStatus = 'open' | 'resolved' | 'closed';
 
 export interface BugReport {
-  reportId:    string;
-  userId:      string;
-  userEmail:   string | null;
-  category:    string;
-  description: string;
-  rosterMonth: string | null;
-  rosterYear:  string | null;
-  createdAt:   string;
-  status:      ReportStatus;
+  reportId:      string;
+  userId:        string;
+  userEmail:     string | null;
+  category:      string;
+  description:   string;
+  rosterMonth:   string | null;
+  rosterYear:    string | null;
+  createdAt:     string;
+  status:        ReportStatus;
+  attachmentUrl: string | null;
 }
 
 // ── Stats ─────────────────────────────────────────────────────────────────────
@@ -146,8 +147,9 @@ export async function adminGetBugReports(token: string): Promise<BugReport[]> {
       description: d.description ?? '',
       rosterMonth: d.rosterMonth ?? null,
       rosterYear:  d.rosterYear ?? null,
-      createdAt:   d.createdAt ?? '',
-      status:      (d.status as ReportStatus) ?? 'open',
+      createdAt:     d.createdAt ?? '',
+      status:        (d.status as ReportStatus) ?? 'open',
+      attachmentUrl: d.attachmentUrl ?? null,
     };
   });
 }

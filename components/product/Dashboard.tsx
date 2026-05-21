@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plane, Clock, MapPin, Upload, ChevronDown, Calendar, Trash2, AlertTriangle, Check, X, Pencil, Send, ChevronUp } from 'lucide-react';
+import { Plane, Clock, MapPin, Upload, ChevronDown, Calendar, Trash2, AlertTriangle, Check, X, Pencil, Send, ChevronUp, Paperclip, FileText, XCircle } from 'lucide-react';
 import { useRoster } from '@/lib/contexts/RosterContext';
 import { useAuth } from '@/lib/contexts/AuthContext';
 import { DutyEvent } from '@/lib/types';
@@ -208,20 +208,54 @@ function SupportWidget({
   const [open, setOpen]           = useState(false);
   const [category, setCategory]   = useState(BUG_CATEGORIES[0]);
   const [description, setDescription] = useState('');
+  const [file, setFile]           = useState<File | null>(null);
+  const [fileError, setFileError] = useState<string | null>(null);
   const [status, setStatus]       = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
+
+  const MAX_FILE_MB = 15;
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const picked = e.target.files?.[0] ?? null;
+    e.target.value = ''; // reset so same file can be re-selected after removal
+    if (!picked) return;
+    if (picked.type !== 'application/pdf') {
+      setFileError('Only PDF files are accepted.');
+      return;
+    }
+    if (picked.size > MAX_FILE_MB * 1024 * 1024) {
+      setFileError(`File is too large (max ${MAX_FILE_MB} MB).`);
+      return;
+    }
+    setFileError(null);
+    setFile(picked);
+  };
 
   const handleSubmit = async () => {
     if (description.trim().length < 10) return;
     setStatus('sending');
     try {
-      const res = await fetch('/api/support', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, userEmail, category, description, rosterMonth, rosterYear }),
-      });
+      let res: Response;
+      if (file) {
+        const fd = new FormData();
+        fd.append('userId',      userId      ?? '');
+        fd.append('userEmail',   userEmail   ?? '');
+        fd.append('category',    category);
+        fd.append('description', description);
+        if (rosterMonth) fd.append('rosterMonth', rosterMonth);
+        if (rosterYear)  fd.append('rosterYear',  rosterYear);
+        fd.append('file', file, file.name);
+        res = await fetch('/api/support', { method: 'POST', body: fd });
+      } else {
+        res = await fetch('/api/support', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId, userEmail, category, description, rosterMonth, rosterYear }),
+        });
+      }
       if (!res.ok) throw new Error('Server error');
       setStatus('sent');
       setDescription('');
+      setFile(null);
       setTimeout(() => { setStatus('idle'); setOpen(false); }, 3000);
     } catch {
       setStatus('error');
@@ -296,6 +330,46 @@ function SupportWidget({
                 <p className="mt-1 text-[10px] text-text-subtle font-mono">
                   {description.trim().length}/10 min chars
                 </p>
+              </div>
+
+              {/* File attachment */}
+              <div>
+                <p className="text-[10px] font-black text-text-subtle uppercase tracking-[0.2em] font-mono mb-3">
+                  Attach PDF <span className="font-normal normal-case tracking-normal opacity-60">(optional — helps us debug parsing issues)</span>
+                </p>
+                {file ? (
+                  <div className="flex items-center gap-3 px-4 py-3 rounded-xl border border-border bg-surface">
+                    <FileText size={14} className="text-accent shrink-0" aria-hidden="true" />
+                    <span className="text-[12px] font-mono text-text flex-1 truncate">{file.name}</span>
+                    <span className="text-[10px] text-text-subtle font-mono shrink-0">
+                      {(file.size / 1024 / 1024).toFixed(1)} MB
+                    </span>
+                    <button
+                      onClick={() => { setFile(null); setFileError(null); }}
+                      aria-label="Remove attachment"
+                      className="text-text-subtle hover:text-danger transition-colors"
+                    >
+                      <XCircle size={14} />
+                    </button>
+                  </div>
+                ) : (
+                  <label className="flex items-center gap-2 px-4 py-3 rounded-xl border border-dashed border-border hover:border-accent cursor-pointer transition-colors group">
+                    <Paperclip size={14} className="text-text-subtle group-hover:text-accent transition-colors" aria-hidden="true" />
+                    <span className="text-[12px] font-mono text-text-muted group-hover:text-text transition-colors">
+                      Click to attach your roster PDF
+                    </span>
+                    <input
+                      type="file"
+                      accept="application/pdf"
+                      className="sr-only"
+                      onChange={handleFileChange}
+                      disabled={status === 'sending' || status === 'sent'}
+                    />
+                  </label>
+                )}
+                {fileError && (
+                  <p className="mt-1.5 text-[11px] text-danger font-mono">{fileError}</p>
+                )}
               </div>
 
               {/* Submit */}

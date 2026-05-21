@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/contexts/AuthContext';
 import {
   Users, ShoppingBag, LayoutDashboard, Trash2, Pencil,
-  Check, X, Loader2, Shield, Eye, EyeOff, Bug,
+  Check, X, Loader2, Shield, Eye, EyeOff, Bug, FileText,
 } from 'lucide-react';
 import {
   getAdminStats, adminGetAllUsers, adminUpdateUser, adminDeleteUser,
@@ -653,6 +653,16 @@ function ReportsTab() {
                       <p className="text-[10px] text-text-subtle mt-1 font-mono">
                         Roster: {r.rosterMonth} {r.rosterYear ?? ''}
                       </p>
+                    )}
+                    {r.attachmentUrl && (
+                      <a
+                        href={r.attachmentUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 mt-1 text-[10px] font-bold text-accent hover:underline underline-offset-2"
+                      >
+                        <FileText size={10} /> Download PDF
+                      </a>
                     )}
                   </td>
 

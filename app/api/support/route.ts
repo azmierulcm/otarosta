@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { randomUUID } from 'crypto';
 import { Resend } from 'resend';
-import { adminDb } from '@/lib/firebase/admin';
+import { adminDb, adminBucket } from '@/lib/firebase/admin';
 import { Timestamp } from 'firebase-admin/firestore';
 
 const SUPPORT_EMAIL = 'mainemirul@gmail.com';
@@ -47,8 +48,26 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Too many requests. Please wait a few minutes.' }, { status: 429 });
     }
 
-    const body = await req.json();
-    const { userId, userEmail, category, description, rosterMonth, rosterYear } = body;
+    // Accept both JSON and multipart/form-data (when a PDF is attached)
+    const contentType = req.headers.get('content-type') ?? '';
+    let userId: string | undefined, userEmail: string | undefined,
+        category: string | undefined, description: string | undefined,
+        rosterMonth: string | undefined, rosterYear: string | undefined;
+    let attachedFile: File | null = null;
+
+    if (contentType.includes('multipart/form-data')) {
+      const fd = await req.formData();
+      userId      = fd.get('userId')      as string ?? undefined;
+      userEmail   = fd.get('userEmail')   as string ?? undefined;
+      category    = fd.get('category')    as string ?? undefined;
+      description = fd.get('description') as string ?? undefined;
+      rosterMonth = fd.get('rosterMonth') as string ?? undefined;
+      rosterYear  = fd.get('rosterYear')  as string ?? undefined;
+      attachedFile = fd.get('file') as File | null;
+    } else {
+      const body = await req.json();
+      ({ userId, userEmail, category, description, rosterMonth, rosterYear } = body);
+    }
 
     if (!description || description.trim().length < 10) {
       return NextResponse.json({ error: 'Description too short.' }, { status: 400 });
@@ -65,6 +84,33 @@ export async function POST(req: NextRequest) {
     const timestamp = new Date().toISOString();
     const reportId  = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 
+    // ── 1b. Upload attachment to Firebase Storage (if present) ───────────────
+    let attachmentUrl: string | null = null;
+    if (attachedFile && attachedFile.size > 0) {
+      try {
+        const MAX_BYTES = 15 * 1024 * 1024; // 15 MB
+        if (attachedFile.size > MAX_BYTES) {
+          return NextResponse.json({ error: 'Attached file is too large (max 15 MB).' }, { status: 400 });
+        }
+        const buffer    = Buffer.from(await attachedFile.arrayBuffer());
+        const safeName  = attachedFile.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+        const filePath  = `support-attachments/${reportId}/${safeName}`;
+        const fileRef   = adminBucket.file(filePath);
+        const dlToken   = randomUUID();
+        await fileRef.save(buffer, {
+          metadata: {
+            contentType: attachedFile.type || 'application/pdf',
+            metadata: { firebaseStorageDownloadTokens: dlToken },
+          },
+        });
+        const bucket   = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET ?? adminBucket.name;
+        attachmentUrl  = `https://firebasestorage.googleapis.com/v0/b/${bucket}/o/${encodeURIComponent(filePath)}?alt=media&token=${dlToken}`;
+      } catch (uploadErr) {
+        // File upload failure must not block the report being saved
+        console.error('[/api/support] Attachment upload failed:', uploadErr);
+      }
+    }
+
     // ── 1. Always save to Firestore (never lost even if email fails) ──────────
     await adminDb.collection('bug_reports').doc(reportId).set({
       reportId,
@@ -74,10 +120,11 @@ export async function POST(req: NextRequest) {
       description: description.trim(),
       rosterMonth: rosterMonth ?? null,
       rosterYear:  rosterYear  ?? null,
-      createdAt:   timestamp,
-      createdAtTs: Timestamp.now(),
+      createdAt:     timestamp,
+      createdAtTs:   Timestamp.now(),
       ip,
-      status:      'open',
+      status:        'open',
+      attachmentUrl: attachmentUrl ?? null,
     });
 
     // ── 2. Send email via Resend ──────────────────────────────────────────────
@@ -120,6 +167,12 @@ export async function POST(req: NextRequest) {
               <p style="margin: 0 0 8px; font-weight: bold; font-size: 13px;">Description:</p>
               <p style="margin: 0; font-size: 14px; line-height: 1.6; white-space: pre-wrap;">${safeDescription}</p>
             </div>
+
+            ${attachmentUrl ? `
+            <div style="margin-top: 16px; padding: 12px 16px; background: #fff; border: 1px solid #ddd; border-radius: 8px;">
+              <p style="margin: 0 0 6px; font-weight: bold; font-size: 12px;">📎 Attachment:</p>
+              <a href="${attachmentUrl}" style="font-size: 12px; color: #0070f3; word-break: break-all;">${attachmentUrl}</a>
+            </div>` : ''}
 
             <p style="margin-top: 24px; font-size: 11px; color: #999;">
               Logged in Firestore under bug_reports/${reportId}
