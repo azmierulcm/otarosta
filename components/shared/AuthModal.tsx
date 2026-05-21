@@ -5,8 +5,6 @@ import { Mail, Lock, Loader2, AlertCircle, LogIn, UserPlus, KeyRound, CheckCircl
 import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
-  GoogleAuthProvider,
-  signInWithPopup,
   sendPasswordResetEmail,
 } from 'firebase/auth';
 import { auth } from '@/lib/firebase/client';
@@ -70,25 +68,6 @@ export const AuthModal = () => {
     }
   };
 
-  const handleGoogle = async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const result = await signInWithPopup(auth, new GoogleAuthProvider());
-      closeAuthModal();
-      // Only redirect to settings on a truly new Google signup (no existing profile)
-      // We detect this by checking if it's a new user via metadata
-      const isNewUser = result.user.metadata.creationTime === result.user.metadata.lastSignInTime;
-      if (isNewUser) {
-        router.push('/settings?onboarding=1');
-      }
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Something went wrong';
-      setError(message.replace('Firebase: ', '').replace(/ \(auth\/[^)]+\)/, ''));
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   return (
     <Modal
@@ -240,35 +219,16 @@ export const AuthModal = () => {
         )}
       </form>}
 
-      {!isReset && <div className="relative my-6" aria-hidden="true">
-        <div className="absolute inset-0 flex items-center">
-          <div className="w-full border-t border-border" />
-        </div>
-        <div className="relative flex justify-center">
-          <span className="bg-bg px-3 text-[13px] text-text-muted">or</span>
-        </div>
-      </div>}
-
       {!isReset && (
-        <>
+        <p className="mt-6 text-center text-[13px] text-text-muted">
+          {isLogin ? "Don't have an account?" : 'Already have an account?'}{' '}
           <button
-            onClick={handleGoogle}
-            disabled={isLoading}
-            className="w-full border border-border rounded-[var(--radius-pill)] py-3 text-[15px] text-text hover:bg-surface transition-colors disabled:opacity-50 flex items-center justify-center gap-2 font-medium"
+            onClick={() => { setAuthView(isLogin ? 'signup' : 'login'); setError(null); }}
+            className="text-accent font-medium hover:underline underline-offset-4"
           >
-            Continue with Google
+            {isLogin ? 'Sign up' : 'Sign in'}
           </button>
-
-          <p className="mt-6 text-center text-[13px] text-text-muted">
-            {isLogin ? "Don't have an account?" : 'Already have an account?'}{' '}
-            <button
-              onClick={() => { setAuthView(isLogin ? 'signup' : 'login'); setError(null); }}
-              className="text-accent font-medium hover:underline underline-offset-4"
-            >
-              {isLogin ? 'Sign up' : 'Sign in'}
-            </button>
-          </p>
-        </>
+        </p>
       )}
     </Modal>
   );
