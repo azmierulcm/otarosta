@@ -214,8 +214,8 @@ function HomeOG() {
               flexDirection: 'column',
             }}
           >
-            <span>Today,</span>
-            <span>we negotiate.</span>
+            <span>From PDF Roster to</span>
+            <span>Shared Family Calendar.</span>
           </div>
           <div
             style={{
@@ -226,7 +226,7 @@ function HomeOG() {
               lineHeight: 1.45,
             }}
           >
-            Drop your PDF. Own your career.
+            Track your flights, sync with family, and look back at everywhere you&apos;ve been.
           </div>
         </div>
       </div>

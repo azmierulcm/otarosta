@@ -230,12 +230,10 @@ export const LandingHero = () => {
                 {'// BUILT FOR CREW'}
               </div>
               <h1 className="text-4xl md:text-6xl xl:text-7xl font-black tracking-tighter text-text leading-[0.92] mb-4 md:mb-6">
-                Your roster PDF has been holding you hostage{' '}
-                <span className="text-accent italic">since 2009.</span>
-                <br />Today, we negotiate.
+                From PDF Roster to Shared Family Calendar.
               </h1>
               <p className="text-base md:text-xl text-text-muted font-bold leading-snug tracking-tight max-w-lg">
-                Drop your AIMS PDF. Get a synced calendar, a lifetime destination passport, and the ability to explain your schedule to your family without drawing a diagram on a napkin.
+                Track your flights, sync with family, and look back at everywhere you&apos;ve been—all in one place.
               </p>
             </motion.div>
 
