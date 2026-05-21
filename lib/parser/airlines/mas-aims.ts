@@ -105,7 +105,12 @@ function resolveSimCode(code: string): string {
     const suffix   = m[4] ? ` — Part ${m[4]}` : '';
     return `A${m[1]} Simulator — ${sessType} Session ${m[3]}${suffix}`;
   }
-  // Non-simulator training codes (e.g. CRM/SMS class codes like C17SMSC1)
+  // CRM/SMS class codes: letter + digits + 2+letters + digits (e.g. C17SMSC1)
+  // These are ground training classes, not simulator sessions.
+  if (/^[A-Z]\d+[A-Z]{2,}\d+[A-Z]*$/.test(code)) {
+    return `Ground Training — ${code}`;
+  }
+  // Generic fallback for any other unrecognised training code
   return `Training — ${code}`;
 }
 
