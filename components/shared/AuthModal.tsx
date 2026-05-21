@@ -85,7 +85,7 @@ export const AuthModal = () => {
         </h2>
         <p className="text-text-muted font-bold text-[15px] mt-2">
           {isLogin
-            ? 'Sign in to your Cemrosta account.'
+            ? 'Sign in to your Otarosta account.'
             : 'Create an account to build your flight passport.'}
         </p>
       </div>

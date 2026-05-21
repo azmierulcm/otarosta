@@ -55,7 +55,7 @@ function Footer() {
           letterSpacing: '-0.01em',
         }}
       >
-        Cemrosta
+        Otarosta
       </span>
       <span
         style={{
@@ -65,7 +65,7 @@ function Footer() {
           color: SUBTLE,
         }}
       >
-        cemrosta.io
+        otarosta.com
       </span>
     </div>
   )

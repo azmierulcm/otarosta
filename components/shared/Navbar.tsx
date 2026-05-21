@@ -42,7 +42,7 @@ export const Navbar = () => {
               <div className="w-5 h-2 bg-accent/50 rounded-sm" />
               <div className="w-5 h-4 bg-accent rounded-sm" />
             </div>
-            <span className="text-[22px] font-bold text-text tracking-tight">Cemrosta</span>
+            <span className="text-[22px] font-bold text-text tracking-tight">Otarosta</span>
           </Link>
 
           {/* Desktop right */}

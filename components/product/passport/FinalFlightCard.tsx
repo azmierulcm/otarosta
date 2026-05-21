@@ -77,7 +77,7 @@ export const FinalFlightCard = ({ profile, stats, finalRoute, retirementDate }: 
             <p className="text-[10px] font-bold text-passport-gold uppercase tracking-widest">{profile.rank}</p>
          </div>
          <div className="text-passport-gold font-black text-sm tracking-tighter">
-            CEMROSTA
+            OTAROSTA
          </div>
       </div>
 

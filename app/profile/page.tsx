@@ -2,13 +2,13 @@ import { Metadata } from "next";
 import ProfileClient from "./ProfileClient";
 
 export const metadata: Metadata = {
-  title: "Your passport — Cemrosta",
+  title: "Your passport — Otarosta",
   description: "Your lifetime flight passport. Destinations, sectors, block hours, and monthly recap.",
   alternates: {
     canonical: "/profile",
   },
   openGraph: {
-    title: "Your passport — Cemrosta",
+    title: "Your passport — Otarosta",
     description: "Track your career milestones, destination stamps, and flight stats in one place.",
     images: ["/api/og/profile"],
   },

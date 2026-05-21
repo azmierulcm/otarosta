@@ -52,12 +52,12 @@ export async function POST(req: NextRequest) {
     if (apiKey) {
       const resend = new Resend(apiKey);
       await resend.emails.send({
-        from:    'Cemrosta Support <onboarding@resend.dev>',
+        from:    'Otarosta Support <onboarding@resend.dev>',
         to:      SUPPORT_EMAIL,
-        subject: `[Cemrosta] Bug Report — ${safeCategory} (${reportId})`,
+        subject: `[Otarosta] Bug Report — ${safeCategory} (${reportId})`,
         html: `
           <div style="font-family: monospace; max-width: 600px; margin: 0 auto; padding: 32px; background: #f9f9f9; border-radius: 12px;">
-            <h2 style="color: #e5484d; margin: 0 0 24px;">&#x1F6D1; Bug Report — Cemrosta</h2>
+            <h2 style="color: #e5484d; margin: 0 0 24px;">&#x1F6D1; Bug Report — Otarosta</h2>
 
             <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
               <tr>

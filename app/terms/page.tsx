@@ -4,13 +4,13 @@ import { Footer } from "@/components/shared/Footer";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Terms of Service — Cemrosta",
-  description: "The rules and guidelines governing your use of Cemrosta and its crew marketplace.",
+  title: "Terms of Service — Otarosta",
+  description: "The rules and guidelines governing your use of Otarosta and its crew marketplace.",
   alternates: { canonical: "/terms" },
   openGraph: {
-    title: "Terms of Service — Cemrosta",
-    description: "The rules and guidelines governing your use of Cemrosta and its crew marketplace.",
-    url: "https://cemrosta.vercel.app/terms",
+    title: "Terms of Service — Otarosta",
+    description: "The rules and guidelines governing your use of Otarosta and its crew marketplace.",
+    url: "https://otarosta.com/terms",
   },
 };
 
@@ -28,21 +28,21 @@ export default function TermsPage() {
           <section>
             <h2 className="text-xl font-black text-text mb-4 tracking-tight">1. Acceptable Use</h2>
             <p>
-              Cemrosta is built for airline crew members. You agree to use the service only for personal, non-commercial purposes. Do not attempt to reverse engineer the parser or scrape data from the marketplace.
+              Otarosta is built for airline crew members. You agree to use the service only for personal, non-commercial purposes. Do not attempt to reverse engineer the parser or scrape data from the marketplace.
             </p>
           </section>
 
           <section>
             <h2 className="text-xl font-black text-text mb-4 tracking-tight">2. Marketplace Conduct</h2>
             <p>
-              The marketplace is a classifieds platform. Cemrosta does not process payments or verify items. You use the marketplace at your own risk. We reserve the right to remove any listing for any reason.
+              The marketplace is a classifieds platform. Otarosta does not process payments or verify items. You use the marketplace at your own risk. We reserve the right to remove any listing for any reason.
             </p>
           </section>
 
           <section>
             <h2 className="text-xl font-black text-text mb-4 tracking-tight">3. Disclaimer of Liability</h2>
             <p>
-              Cemrosta is provided &quot;as is&quot;. We are not responsible for errors in calendar synchronization, missed flights, or inaccuracies in the destination passport. Always verify your roster with your airline&apos;s official system.
+              Otarosta is provided &quot;as is&quot;. We are not responsible for errors in calendar synchronization, missed flights, or inaccuracies in the destination passport. Always verify your roster with your airline&apos;s official system.
             </p>
           </section>
 

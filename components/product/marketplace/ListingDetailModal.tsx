@@ -166,7 +166,7 @@ export const ListingDetailModal = ({ listing, isOpen, onClose }: { listing: List
                        Buyer Protection
                     </p>
                     <p className="text-[11px] text-text-muted leading-snug font-bold tracking-tight">
-                       Cemrosta is not responsible for transactions. Arrange directly with the seller. Meet in a safe public location and verify authenticity.
+                       Otarosta is not responsible for transactions. Arrange directly with the seller. Meet in a safe public location and verify authenticity.
                     </p>
                  </div>
               </div>

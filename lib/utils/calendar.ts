@@ -39,7 +39,7 @@ function icsEscape(str: string): string {
 
 /** Unique ID for each event */
 function uid(event: DutyEvent): string {
-  return `cemrosta-${event.date}-${event.id ?? Math.random().toString(36).slice(2)}@cemrosta.app`;
+  return `otarosta-${event.date}-${event.id ?? Math.random().toString(36).slice(2)}@otarosta.app`;
 }
 
 function buildSummary(event: DutyEvent): string {
@@ -140,9 +140,9 @@ export function generateICS(roster: RosterData): string | null {
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
     'CALSCALE:GREGORIAN',
-    'PRODID:-//Cemrosta//Roster//EN',
+    'PRODID:-//Otarosta//Roster//EN',
     'METHOD:PUBLISH',
-    'X-WR-CALNAME:Cemrosta Roster',
+    'X-WR-CALNAME:Otarosta Roster',
     `X-WR-CALDESC:${roster.month} ${roster.year} roster`,
     vEvents,
     'END:VCALENDAR',

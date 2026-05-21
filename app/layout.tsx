@@ -34,13 +34,13 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://cemrosta.vercel.app"),
+  metadataBase: new URL("https://otarosta.com"),
   title: {
-    default: "Cemrosta — Your roster, transformed.",
-    template: "%s — Cemrosta",
+    default: "Otarosta — Your roster, transformed.",
+    template: "%s — Otarosta",
   },
   description:
-    "Cemrosta converts your AIMS roster PDF into a synced calendar, destination passport, and monthly recap card. Free forever for MAS crew.",
+    "Otarosta converts your AIMS roster PDF into a synced calendar, destination passport, and monthly recap card. Free forever for MAS crew.",
   manifest: "/manifest.webmanifest",
   icons: {
     icon: [
@@ -52,17 +52,17 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     locale: "en_MY",
-    url: "https://cemrosta.vercel.app",
-    siteName: "Cemrosta",
-    title: "Cemrosta — Your roster, transformed.",
+    url: "https://otarosta.com",
+    siteName: "Otarosta",
+    title: "Otarosta — Your roster, transformed.",
     description:
       "Drop your AIMS PDF. Get a synced calendar, lifetime destination passport, and proof your schedule exists — for your family. Free forever.",
-    images: [{ url: "/api/og/home", width: 1200, height: 630, alt: "Cemrosta — Your roster, transformed." }],
+    images: [{ url: "/api/og/home", width: 1200, height: 630, alt: "Otarosta — Your roster, transformed." }],
   },
   twitter: {
     card: "summary_large_image",
-    creator: "@cemrosta",
-    title: "Cemrosta — Your roster, transformed.",
+    creator: "@otarosta",
+    title: "Otarosta — Your roster, transformed.",
     description:
       "Drop your AIMS PDF. Get a synced calendar, lifetime destination passport, and proof your schedule exists — for your family. Free forever.",
     images: ["/api/og/home"],

@@ -62,7 +62,7 @@ export async function GET(
             ))}
         </div>
 
-        <div style={{ position: 'absolute', bottom: '40px', fontSize: '14px', color: '#5C6B85', letterSpacing: '4px' }}>CEMROSTA.COM</div>
+        <div style={{ position: 'absolute', bottom: '40px', fontSize: '14px', color: '#5C6B85', letterSpacing: '4px' }}>OTAROSTA.COM</div>
       </div>
     ),
     { width: 1080, height: 1350 } // Feed format

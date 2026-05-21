@@ -1,6 +1,6 @@
 @AGENTS.md
 
-# Cemrosta — Project Rules
+# Otarosta — Project Rules
 
 ## Working directory
 This folder (`cemrosta-clean`) is the **only** correct working directory.

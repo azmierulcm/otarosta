@@ -68,7 +68,7 @@ export async function GET(
     return new NextResponse(icsContent, {
       headers: {
         'Content-Type': 'text/calendar; charset=utf-8',
-        'Content-Disposition': `attachment; filename="cemrosta-${month}-${year}.ics"`,
+        'Content-Disposition': `attachment; filename="otarosta-${month}-${year}.ics"`,
         'Cache-Control': 'no-store',
       },
     });

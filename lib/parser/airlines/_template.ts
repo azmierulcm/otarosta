@@ -1,7 +1,7 @@
 import { ParsedRoster, ParsedDuty } from '../types';
 
 /**
- * Template for adding a new airline parser to Cemrosta.
+ * Template for adding a new airline parser to Otarosta.
  *
  * 1. Define the detection logic in lib/parser/index.ts
  * 2. Implement the parsing logic here.

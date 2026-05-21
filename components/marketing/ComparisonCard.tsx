@@ -27,7 +27,7 @@ const ComparisonCard = ({ type, content }: ComparisonCardProps) => {
         {isOld ? <X size={20} /> : <Check size={20} />}
       </div>
       <h4 className={`text-lg font-bold mb-4 uppercase tracking-tight ${isOld ? 'text-text-subtle' : 'text-accent'}`}>
-        {isOld ? 'The Old Way' : 'The Cemrosta Way'}
+        {isOld ? 'The Old Way' : 'The Otarosta Way'}
       </h4>
       <p className={`text-xl font-bold leading-snug ${isOld ? 'text-text-subtle' : 'text-text'}`}>
         {content}

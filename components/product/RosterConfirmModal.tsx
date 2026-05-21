@@ -54,7 +54,7 @@ export function RosterConfirmModal({
   const subtitle = [monthFull, previewData?.year].filter(Boolean).join(' ');
   const crewDisplay = previewData?.crewName ?? 'Crew Member';
 
-  const appBase = process.env.NEXT_PUBLIC_APP_URL ?? 'https://cemrosta.vercel.app';
+  const appBase = process.env.NEXT_PUBLIC_APP_URL ?? 'https://otarosta.com';
   // calendarSecret is appended as ?t= so webcal subscription links work without auth headers
   const calendarSuffix = calendarSecret ? `?t=${calendarSecret}` : '';
   const calendarBase = `${appBase}/api/roster/${savedRosterId}/calendar${calendarSuffix}`;

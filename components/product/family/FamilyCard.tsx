@@ -454,7 +454,7 @@ const PrintCard = React.forwardRef<HTMLDivElement, PrintCardProps>(
             </div>
           </div>
           <div style={{ ...S, fontSize:8, fontWeight:900, letterSpacing:'0.25em', textTransform:'uppercase', color:'#D1D5DB', textAlign:'right', whiteSpace:'nowrap' }}>
-            CEMROSTA.IO
+            OTAROSTA.IO
           </div>
         </div>
       </div>
@@ -489,7 +489,7 @@ export function FamilyCard() {
       if (!url) return;
       const a   = document.createElement('a');
       a.href     = url;
-      a.download = `cemrosta-family-${month.toLowerCase()}-${year}.png`;
+      a.download = `otarosta-family-${month.toLowerCase()}-${year}.png`;
       a.click();
     } catch (e) { console.error(e); }
     finally     { setDownloading(false); }
@@ -500,7 +500,7 @@ export function FamilyCard() {
       const url  = await capture();
       if (!url) return;
       const blob = await (await fetch(url)).blob();
-      const file = new File([blob], `cemrosta-family-${month.toLowerCase()}.png`, { type:'image/png' });
+      const file = new File([blob], `otarosta-family-${month.toLowerCase()}.png`, { type:'image/png' });
       if (navigator.share && navigator.canShare?.({ files:[file] })) {
         await navigator.share({ files:[file], title:`${crewName} · ${monthLabel} Schedule` });
         return;
@@ -640,7 +640,7 @@ export function FamilyCard() {
           </div>
         </div>
         <p className="text-[8px] font-black uppercase tracking-[0.22em] text-text-subtle shrink-0 mt-1">
-          CEMROSTA.IO
+          OTAROSTA.IO
         </p>
       </div>
     </div>

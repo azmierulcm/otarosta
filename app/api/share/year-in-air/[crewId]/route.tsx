@@ -53,7 +53,7 @@ export async function GET(
 
         {/* Top Bar */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '40px' }}>
-          <span style={{ fontSize: '32px', fontWeight: '900', color: '#D4AF37', letterSpacing: '4px' }}>CEMROSTA</span>
+          <span style={{ fontSize: '32px', fontWeight: '900', color: '#D4AF37', letterSpacing: '4px' }}>OTAROSTA</span>
           <span style={{ fontSize: '24px', fontWeight: '500', color: '#B8A878', letterSpacing: '2px' }}>Passport · 2026</span>
         </div>
 
@@ -127,7 +127,7 @@ export async function GET(
         </div>
 
         {/* Footer */}
-        <div style={{ marginTop: '40px', fontSize: '12px', color: '#5C6B85', letterSpacing: '4px' }}>CEMROSTA.COM</div>
+        <div style={{ marginTop: '40px', fontSize: '12px', color: '#5C6B85', letterSpacing: '4px' }}>OTAROSTA.COM</div>
       </div>
     ),
     dimensions

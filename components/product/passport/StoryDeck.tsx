@@ -79,7 +79,7 @@ const StoryDeck = () => {
               MA
            </div>
            <div>
-              <p className="text-xs font-black text-white leading-none">CEMROSTA</p>
+              <p className="text-xs font-black text-white leading-none">OTAROSTA</p>
               <p className="text-[10px] font-bold text-passport-gold-soft uppercase tracking-widest mt-0.5">Passport &apos;26</p>
            </div>
         </div>
@@ -162,7 +162,7 @@ const StoryDeck = () => {
             <Download size={16} />
             Save slide
          </button>
-         <p className="text-[10px] font-bold text-passport-secondary uppercase tracking-[0.4em]">Cemrosta.com</p>
+         <p className="text-[10px] font-bold text-passport-secondary uppercase tracking-[0.4em]">Otarosta.com</p>
       </div>
     </div>
   );

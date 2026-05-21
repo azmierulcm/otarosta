@@ -1,5 +1,5 @@
 /**
- * Cemrosta Analytics Event Taxonomy
+ * Otarosta Analytics Event Taxonomy
  * 
  * We use privacy-friendly analytics (Plausible/PostHog).
  * No PII is sent with these events.

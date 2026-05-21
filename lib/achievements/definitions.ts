@@ -26,7 +26,7 @@ export const ACHIEVEMENT_CATALOG: AchievementDefinition[] = [
     name: 'First mission',
     tier: 'common',
     category: 'career',
-    description: 'Your first sector logged on Cemrosta.',
+    description: 'Your first sector logged on Otarosta.',
     icon_key: 'plane',
     unlock: (stats) => stats.total_sectors >= 1
   },

@@ -163,7 +163,7 @@ function HeroShowcase() {
           </div>
           <div className="px-3 py-2 border-t text-center" style={{ borderColor: '#F0EDE8' }}>
             <span className="text-[7px] font-black tracking-widest uppercase font-mono" style={{ color: '#B0ABA5' }}>
-              cemrosta.io
+              otarosta.com
             </span>
           </div>
         </div>

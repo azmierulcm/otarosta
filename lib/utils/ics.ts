@@ -18,7 +18,7 @@ export function generateICS(events: DutyEvent[], crewName: string, month: string
       if (event.signOff) descParts.push(`Sign off: ${event.signOff}`);
       vevents.push([
         'BEGIN:VEVENT',
-        `UID:${event.id}@cemrosta.app`,
+        `UID:${event.id}@otarosta.app`,
         `DTSTART;TZID=Asia/Kuala_Lumpur:${toICSDateTime(event.date, event.std)}`,
         `DTEND;TZID=Asia/Kuala_Lumpur:${toICSDateTime(event.date, event.sta)}`,
         `SUMMARY:${event.flightNumber ?? 'Flight'} ${event.depPort}→${event.arrPort}`,
@@ -33,7 +33,7 @@ export function generateICS(events: DutyEvent[], crewName: string, month: string
       const off = event.signOff ?? '16:00';
       vevents.push([
         'BEGIN:VEVENT',
-        `UID:${event.id}@cemrosta.app`,
+        `UID:${event.id}@otarosta.app`,
         `DTSTART;TZID=Asia/Kuala_Lumpur:${toICSDateTime(event.date, on)}`,
         `DTEND;TZID=Asia/Kuala_Lumpur:${toICSDateTime(event.date, off)}`,
         `SUMMARY:${event.description ?? 'Standby'}`,
@@ -46,7 +46,7 @@ export function generateICS(events: DutyEvent[], crewName: string, month: string
   return [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
-    'PRODID:-//Cemrosta//Crew Roster//EN',
+    'PRODID:-//Otarosta//Crew Roster//EN',
     'CALSCALE:GREGORIAN',
     'METHOD:PUBLISH',
     `X-WR-CALNAME:${calName}`,

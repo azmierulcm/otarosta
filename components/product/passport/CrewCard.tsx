@@ -75,7 +75,7 @@ const CrewCard = ({ profile, stats }: CrewCardProps) => {
           Edition 2026
         </div>
         <div className="text-passport-gold font-black text-sm tracking-tighter">
-          CEMROSTA
+          OTAROSTA
         </div>
       </div>
 

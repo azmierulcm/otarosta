@@ -416,7 +416,7 @@ export function RecapModal({ isOpen, onClose, userId, earnedDestinations }: Reca
       try {
         await navigator.share({
           title: `My ${data.periodLabel} Roster Recap`,
-          text: 'Check out my flight stats on Cemrosta!',
+          text: 'Check out my flight stats on Otarosta!',
           url: window.location.origin + downloadUrl,
         });
       } catch { /* ignore */ }
@@ -547,7 +547,7 @@ export function RecapModal({ isOpen, onClose, userId, earnedDestinations }: Reca
               </div>
 
               <p className="text-center font-mono font-black uppercase tracking-widest mt-8 text-[10px] text-text-subtle">
-                {"// Mission Recap · Cemrosta"}
+                {"// Mission Recap · Otarosta"}
               </p>
             </div>
           </motion.div>
@@ -779,7 +779,7 @@ function LiveRosterCard({ data, profile }: { data: CardData; profile: CardProfil
               <Ico d={ICON.plane} size={8} />
             </span>
             <span className="font-bold tracking-tight" style={{ color: '#717171' }}>
-              cemrosta<span style={{ color: '#FF385C' }}>.io</span>
+              otarosta<span style={{ color: '#FF385C' }}>.com</span>
             </span>
           </div>
         </footer>

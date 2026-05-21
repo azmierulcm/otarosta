@@ -5,7 +5,7 @@ import { Footer } from '@/components/shared/Footer';
 import SettingsClient from './SettingsClient';
 
 export const metadata: Metadata = {
-  title: 'Settings — Cemrosta',
+  title: 'Settings — Otarosta',
   description: 'Set up your crew profile.',
 };
 

@@ -8,7 +8,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing required parameters' }, { status: 400 });
     }
 
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://cemrosta.vercel.app';
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://otarosta.com';
     
     const storiesUrl = `${baseUrl}/api/recap/${userId}/${year}/${month}/stories`;
     const cardUrl = `${baseUrl}/api/recap/${userId}/${year}/${month}/card`;

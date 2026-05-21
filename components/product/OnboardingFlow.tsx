@@ -106,7 +106,7 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
     // Mark that this user has started onboarding so on next session without a
     // roster we show the plain upload screen instead of the full wizard again.
     if (user) {
-      try { localStorage.setItem(`cemrosta-ob-${user.uid}`, '1'); } catch { /* */ }
+      try { localStorage.setItem(`otarosta-ob-${user.uid}`, '1'); } catch { /* */ }
     }
     setStep('profile');
   };

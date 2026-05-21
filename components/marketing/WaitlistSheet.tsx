@@ -64,7 +64,7 @@ export const WaitlistSheet = ({ isOpen, onClose, airline }: WaitlistSheetProps) 
         ) : (
           <>
             <h3 id={TITLE_ID} className="text-[28px] font-black text-text leading-tight tracking-tighter mb-3">
-              Bring Cemrosta to{' '}
+              Bring Otarosta to{' '}
               <span className="text-accent">{airline}.</span>
             </h3>
             <p className="text-text-muted font-bold text-[16px] leading-snug mb-10">

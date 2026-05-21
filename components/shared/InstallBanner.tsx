@@ -21,7 +21,7 @@ interface BeforeInstallPromptEvent extends Event {
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
 }
 
-const DISMISS_KEY  = 'cemrosta-install-dismissed';
+const DISMISS_KEY  = 'otarosta-install-dismissed';
 const DISMISS_DAYS = 30;
 
 function wasDismissed(): boolean {
@@ -101,7 +101,7 @@ export function InstallBanner() {
           transition={{ type: 'spring', damping: 28, stiffness: 320 }}
           className="fixed bottom-0 inset-x-0 z-[60] px-4 pb-6 md:hidden"
           role="dialog"
-          aria-label="Install Cemrosta"
+          aria-label="Install Otarosta"
         >
           <div className="bg-white rounded-[1.5rem] shadow-2xl shadow-black/25 border border-border overflow-hidden">
 
@@ -117,7 +117,7 @@ export function InstallBanner() {
                   </div>
                 </div>
                 <div className="leading-tight">
-                  <p className="text-[14px] font-black text-text tracking-tight">Cemrosta</p>
+                  <p className="text-[14px] font-black text-text tracking-tight">Otarosta</p>
                   <p className="text-[11px] font-bold text-text-muted">Add to Home Screen</p>
                 </div>
               </div>

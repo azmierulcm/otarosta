@@ -2,7 +2,7 @@ import { Metadata } from "next";
 import ModerationClient from "./ModerationClient";
 
 export const metadata: Metadata = {
-  title: "Moderation Queue — Cemrosta",
+  title: "Moderation Queue — Otarosta",
   robots: {
     index: false,
     follow: false,

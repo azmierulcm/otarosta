@@ -8,14 +8,14 @@ interface Props {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
   return {
-    title: `Crew Passport — Cemrosta`,
+    title: `Crew Passport — Otarosta`,
     description: `View this crew member's flight passport — destinations collected, sectors flown, and career stats.`,
     alternates: { canonical: `/profile/${id}` },
     openGraph: {
-      title: 'Crew Passport — Cemrosta',
-      description: 'Crew flight passport built with Cemrosta.',
+      title: 'Crew Passport — Otarosta',
+      description: 'Crew flight passport built with Otarosta.',
       images: ['/api/og/profile'],
-      url: `https://cemrosta.vercel.app/profile/${id}`,
+      url: `https://otarosta.com/profile/${id}`,
     },
   };
 }

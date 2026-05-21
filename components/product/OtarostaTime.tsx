@@ -10,11 +10,11 @@ interface TimeProps {
 }
 
 /**
- * Cemrosta Standard Time Component
+ * Otarosta Standard Time Component
  * Strictly handles timezone conversions using Luxon.
  * Defaults to Local Time for UI display.
  */
-export const CemrostaTime = ({ isoUtc, format = 'HH:mm', className }: TimeProps) => {
+export const OtarostaTime = ({ isoUtc, format = 'HH:mm', className }: TimeProps) => {
   if (!isoUtc) return <span className={className}>--:--</span>;
 
   let displayText = '--:--';

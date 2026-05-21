@@ -1,5 +1,5 @@
 /**
- * Standardized metric formatting for Cemrosta
+ * Standardized metric formatting for Otarosta
  */
 
 export function formatBlockHours(minutes: number): string {

@@ -4,13 +4,13 @@ import { Footer } from "@/components/shared/Footer";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Privacy Policy — Cemrosta",
-  description: "How Cemrosta collects, uses, and protects your flight data and personal information.",
+  title: "Privacy Policy — Otarosta",
+  description: "How Otarosta collects, uses, and protects your flight data and personal information.",
   alternates: { canonical: "/privacy" },
   openGraph: {
-    title: "Privacy Policy — Cemrosta",
-    description: "How Cemrosta collects, uses, and protects your flight data and personal information.",
-    url: "https://cemrosta.vercel.app/privacy",
+    title: "Privacy Policy — Otarosta",
+    description: "How Otarosta collects, uses, and protects your flight data and personal information.",
+    url: "https://otarosta.com/privacy",
   },
 };
 
@@ -28,7 +28,7 @@ export default function PrivacyPage() {
           <section>
             <h2 className="text-xl font-black text-text mb-4 tracking-tight">1. Data Sovereignty</h2>
             <p>
-              At Cemrosta, we believe your flight data is yours. We only process your airline rosters to generate calendar files and destination patches. We do not sell your personal data to third parties.
+              At Otarosta, we believe your flight data is yours. We only process your airline rosters to generate calendar files and destination patches. We do not sell your personal data to third parties.
             </p>
           </section>
 

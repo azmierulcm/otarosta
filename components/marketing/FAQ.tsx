@@ -7,7 +7,7 @@ import { Plus, Minus } from 'lucide-react';
 const FAQS = [
   {
     q: 'Is it really free? Will it stay free?',
-    a: 'Yes. Cemrosta is free forever for individual crew. We may offer optional paid features in future, but the core roster sync and destination passport will always be free.',
+    a: 'Yes. Otarosta is free forever for individual crew. We may offer optional paid features in future, but the core roster sync and destination passport will always be free.',
   },
   {
     q: 'Who can see my roster data?',
@@ -15,7 +15,7 @@ const FAQS = [
   },
   {
     q: 'Will my airline find out I\'m using this?',
-    a: 'No. Cemrosta is an independent tool with no connection to any carrier. We have no relationship with MAS, AirAsia, or any airline.',
+    a: 'No. Otarosta is an independent tool with no connection to any carrier. We have no relationship with MAS, AirAsia, or any airline.',
   },
   {
     q: 'Which airlines are supported?',

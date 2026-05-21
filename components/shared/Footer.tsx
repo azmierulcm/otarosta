@@ -17,25 +17,25 @@ export const Footer = () => {
                 <div className="w-5 h-2 bg-accent/50" />
                 <div className="w-5 h-4 bg-accent" />
               </div>
-              <span className="text-2xl font-bold tracking-tighter text-text">Cemrosta</span>
+              <span className="text-2xl font-bold tracking-tighter text-text">Otarosta</span>
             </Link>
             <p className="text-text-muted text-sm font-bold leading-snug mb-8 tracking-tight">
               Made for the crew, by the crew. <br />
               Own your flight data.
             </p>
             <div className="flex gap-3">
-              <a href="https://x.com/cemrosta" target="_blank" rel="noopener noreferrer" aria-label="Follow Cemrosta on X (Twitter)" className="w-10 h-10 bg-surface-2 border border-border rounded-full flex items-center justify-center text-text-muted hover:text-accent transition-all hover:shadow-sm">
+              <a href="https://x.com/otarosta" target="_blank" rel="noopener noreferrer" aria-label="Follow Otarosta on X (Twitter)" className="w-10 h-10 bg-surface-2 border border-border rounded-full flex items-center justify-center text-text-muted hover:text-accent transition-all hover:shadow-sm">
                 <X size={18} aria-hidden="true" />
               </a>
-              <a href="https://instagram.com/cemrosta" target="_blank" rel="noopener noreferrer" aria-label="Follow Cemrosta on Instagram" className="w-10 h-10 bg-surface-2 border border-border rounded-full flex items-center justify-center text-text-muted hover:text-accent transition-all hover:shadow-sm">
+              <a href="https://instagram.com/otarosta" target="_blank" rel="noopener noreferrer" aria-label="Follow Otarosta on Instagram" className="w-10 h-10 bg-surface-2 border border-border rounded-full flex items-center justify-center text-text-muted hover:text-accent transition-all hover:shadow-sm">
                 <Camera size={18} aria-hidden="true" />
               </a>
-              <a href="mailto:hello@cemrosta.com" aria-label="Email Cemrosta at hello@cemrosta.com" className="w-10 h-10 bg-surface-2 border border-border rounded-full flex items-center justify-center text-text-muted hover:text-accent transition-all hover:shadow-sm">
+              <a href="mailto:hello@otarosta.com" aria-label="Email Otarosta at hello@otarosta.com" className="w-10 h-10 bg-surface-2 border border-border rounded-full flex items-center justify-center text-text-muted hover:text-accent transition-all hover:shadow-sm">
                 <Mail size={18} aria-hidden="true" />
               </a>
             </div>
-            <a href="mailto:hello@cemrosta.com" className="mt-4 inline-block text-[12px] font-bold text-text-muted hover:text-accent transition-colors">
-              hello@cemrosta.com
+            <a href="mailto:hello@otarosta.com" className="mt-4 inline-block text-[12px] font-bold text-text-muted hover:text-accent transition-colors">
+              hello@otarosta.com
             </a>
           </div>
 
@@ -83,7 +83,7 @@ export const Footer = () => {
 
         <div className="pt-12 border-t border-border flex flex-col md:flex-row justify-between items-center gap-8">
           <p className="text-[10px] font-black text-text-subtle uppercase tracking-[0.4em] font-mono">
-            © 2026 Cemrosta • All Flights Reserved
+            © 2026 Otarosta • All Flights Reserved
           </p>
           {process.env.NODE_ENV === 'development' && (
             <div className="text-[10px] font-black text-text-subtle uppercase tracking-[0.4em] font-mono bg-surface-2 px-4 py-1 rounded-full border border-border">

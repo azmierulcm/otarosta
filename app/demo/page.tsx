@@ -4,8 +4,8 @@ import { Footer } from '@/components/shared/Footer';
 import DemoClient from './DemoClient';
 
 export const metadata: Metadata = {
-  title: 'Demo — Cemrosta',
-  description: 'See everything you unlock when you fly with Cemrosta.',
+  title: 'Demo — Otarosta',
+  description: 'See everything you unlock when you fly with Otarosta.',
 };
 
 export default function DemoPage() {

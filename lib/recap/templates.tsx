@@ -121,7 +121,7 @@ export function StoriesTemplate({
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', padding: '40px 80px 36px' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           <div style={{ display: 'flex', fontSize: 18, fontWeight: 800, color: GOLD_DIM, letterSpacing: '0.38em', textTransform: 'uppercase', fontFamily: MONO }}>
-            Cemrosta
+            Otarosta
           </div>
           <div style={{ display: 'flex', fontSize: 42, fontWeight: 700, color: PARCHMENT }}>
             Crew Logbook
@@ -212,7 +212,7 @@ export function StoriesTemplate({
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '28px 80px 56px' }}>
         <div style={{ display: 'flex', fontSize: 34, fontWeight: 700, color: PARCHMENT }}>{crewHandle}</div>
         {watermark && (
-          <div style={{ display: 'flex', fontSize: 26, fontWeight: 600, color: 'rgba(200,168,75,0.35)', fontFamily: MONO }}>cemrosta.com</div>
+          <div style={{ display: 'flex', fontSize: 26, fontWeight: 600, color: 'rgba(200,168,75,0.35)', fontFamily: MONO }}>otarosta.com</div>
         )}
       </div>
     </div>
@@ -257,7 +257,7 @@ export function CardTemplate({
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', padding: '20px 60px 16px' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           <div style={{ display: 'flex', fontSize: 11, fontWeight: 800, color: GOLD_DIM, letterSpacing: '0.38em', textTransform: 'uppercase', fontFamily: MONO }}>
-            Cemrosta
+            Otarosta
           </div>
           <div style={{ display: 'flex', fontSize: 24, fontWeight: 700, color: PARCHMENT }}>
             Crew Logbook
@@ -362,7 +362,7 @@ export function CardTemplate({
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 60px 22px' }}>
         <div style={{ display: 'flex', fontSize: 18, fontWeight: 700, color: PARCHMENT }}>{crewHandle}</div>
         {watermark && (
-          <div style={{ display: 'flex', fontSize: 14, fontWeight: 600, color: 'rgba(200,168,75,0.35)', fontFamily: MONO }}>cemrosta.com</div>
+          <div style={{ display: 'flex', fontSize: 14, fontWeight: 600, color: 'rgba(200,168,75,0.35)', fontFamily: MONO }}>otarosta.com</div>
         )}
       </div>
     </div>

@@ -111,7 +111,7 @@ export default function HomeClient() {
 
   useEffect(() => {
     if (!user) return;
-    const seen = localStorage.getItem(`cemrosta-ob-${user.uid}`) === '1';
+    const seen = localStorage.getItem(`otarosta-ob-${user.uid}`) === '1';
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setShowOnboarding(!seen);
   }, [user?.uid]); // eslint-disable-line react-hooks/exhaustive-deps

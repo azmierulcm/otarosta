@@ -81,7 +81,7 @@ export default function PublicProfileClient(_props: { id: string }) {
                 <div className="absolute top-0 right-0 w-32 h-32 bg-accent/20 blur-[60px] -mr-16 -mt-16 rounded-full" aria-hidden="true" />
                 <h3 className="text-2xl font-black mb-4 leading-tight">Elite Crew Community</h3>
                 <p className="text-text-subtle text-sm font-medium mb-8 leading-relaxed">
-                  Join Cemrosta to share your digital logbook and unlock exclusive mission rewards.
+                  Join Otarosta to share your digital logbook and unlock exclusive mission rewards.
                 </p>
                 <button className="w-full bg-accent py-4 rounded-2xl font-black text-sm hover:scale-[1.02] active:scale-95 transition-all">
                   Sign Up with Airline ID

@@ -51,7 +51,7 @@ export async function GET(
             <span style={{ fontSize: '14px', color: '#D4AF37', fontWeight: '700', marginTop: '5px' }}>SENIOR FIRST OFFICER</span>
         </div>
 
-        <div style={{ position: 'absolute', bottom: '60px', fontSize: '14px', color: '#5C6B85', letterSpacing: '4px' }}>CEMROSTA.COM</div>
+        <div style={{ position: 'absolute', bottom: '60px', fontSize: '14px', color: '#5C6B85', letterSpacing: '4px' }}>OTAROSTA.COM</div>
       </div>
     ),
     { width: 1080, height: 1920 } // Story format

@@ -12,7 +12,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   try {
     const listing = await getListing(id);
     return {
-      title: `${listing.title} — Marketplace | Cemrosta`,
+      title: `${listing.title} — Marketplace | Otarosta`,
       description: listing.description.slice(0, 150),
       openGraph: {
         title: listing.title,
@@ -21,7 +21,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       },
     };
   } catch {
-    return { title: 'Listing — Marketplace | Cemrosta' };
+    return { title: 'Listing — Marketplace | Otarosta' };
   }
 }
 

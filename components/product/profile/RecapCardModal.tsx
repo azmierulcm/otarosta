@@ -116,7 +116,7 @@ export function RecapCardModal({ isOpen, onClose, userId }: RecapCardModalProps)
       try {
         await navigator.share({
           title: `My ${periodLabel} Mission Recap`,
-          text: 'Check out my flight stats on Cemrosta!',
+          text: 'Check out my flight stats on Otarosta!',
           url: window.location.origin + imageUrl,
         });
       } catch {

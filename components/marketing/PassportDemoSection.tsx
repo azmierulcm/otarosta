@@ -205,7 +205,7 @@ function RecapCard() {
         </div>
 
         <p className="text-center text-[8px] font-black uppercase tracking-widest font-mono"
-           style={{ color: '#B0ABA5' }}>cemrosta.io</p>
+           style={{ color: '#B0ABA5' }}>otarosta.com</p>
       </div>
     </div>
   );

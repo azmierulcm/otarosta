@@ -79,7 +79,7 @@ export async function GET(
 
         {/* Footer */}
         <div style={{ position: 'absolute', bottom: '80px', fontSize: '14px', color: '#5C6B85', letterSpacing: '4px' }}>
-          CEMROSTA.COM
+          OTAROSTA.COM
         </div>
       </div>
     ),
