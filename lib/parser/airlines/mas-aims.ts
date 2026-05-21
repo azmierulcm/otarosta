@@ -371,6 +371,64 @@ function parseDayChunk(
     return duties;
   }
 
+  // ── 1b. Non-MH positioning / deadhead flight ─────────────────────────────
+  // Catches rows like "14:20 BA 422 LHR 15:20 AGP 19:05 19:35 PS 04:15 BA"
+  // The lookahead requires the flight number to be immediately followed by
+  // an IATA port code + time — this cleanly distinguishes "BA 422 LHR 15:20"
+  // (flight item column) from a bare "BA" duty-code suffix at the row end.
+  {
+    const posFlightRe = /\b([A-Z]{2})\s+(\d{1,4})\b(?=\s+[A-Z]{3}\s+\d{2}:\d{2})/g;
+    const posMatches  = [...chunk.matchAll(posFlightRe)].filter((m) => m[1] !== 'MH');
+
+    if (posMatches.length > 0) {
+      const beforeFirst    = chunk.substring(0, posMatches[0].index!);
+      const dutyStartTimes = beforeFirst.match(/(\d{2}:\d{2})/g);
+      const dutyStart      = dutyStartTimes?.at(-1);
+
+      posMatches.forEach((posM, idx) => {
+        try {
+          const flightNo    = `${posM[1]}${posM[2]}`;
+          const nextStart   = posMatches[idx + 1]?.index ?? chunk.length;
+          const flightChunk = chunk.substring(posM.index! + posM[0].length, nextStart);
+
+          const tokens  = tokenizeFlightChunk(flightChunk);
+          const f       = parseFlightTokens(tokens);
+          const isFirst = idx === 0;
+
+          duties.push({
+            id:       `${flightNo}-${dateISO}-${idx}`,
+            type:     'FLIGHT',
+            date:     dateISO,
+            day,
+            item:     flightNo,
+            signOn:   isFirst ? dutyStart : undefined,
+            signOff:  f.dutyEnd,
+            blockHrs: f.blockHrs,
+            dutyHrs:  f.dutyHrs,
+            dutyCode: f.dutyCode,
+            acType:   f.acType,
+            flight: {
+              flightNumber: flightNo,
+              depPort:      f.depPort,
+              arrPort:      f.arrPort ?? '',
+              std:          f.depTime,
+              sta:          f.arrTime ?? '',
+              signOn:       isFirst ? dutyStart : undefined,
+              signOff:      f.dutyEnd,
+            },
+          });
+        } catch (err) {
+          logger?.error('mas-aims:pos-flight',
+            `Failed to parse positioning flight at ${dateISO}`, {
+              error: String(err), chunk: chunk.slice(0, 200),
+            });
+        }
+      });
+
+      if (duties.length > 0) return duties;
+    }
+  }
+
   // ── 2. Standby ───────────────────────────────────────────────────────────
   const standbyRe = /\b(S\d+-\d+|SBY|ASB|STBY|SB|SA|SH)\b/i;
   const standbyM  = chunk.match(standbyRe);
