@@ -98,11 +98,17 @@ const SIM_SESSION_MAP: Record<string, string> = {
 };
 function resolveSimCode(code: string): string {
   if (TRAINING_CODES[code]) return TRAINING_CODES[code];
-  // Allow optional trailing letter suffix (e.g. 330CFF1C, 330CED1E, 330AOP23)
+  // Allow optional trailing letter suffix (e.g. 330CFF1C, 330CED1E, 330AOP23, 350AOP1Z)
   const m = code.match(/^(\d{3})([A-Z]{2,4})(\d+)([A-Z]*)$/);
   if (m) {
     const sessType = SIM_SESSION_MAP[m[2]] ?? m[2];
-    const suffix   = m[4] ? ` — Part ${m[4]}` : '';
+    // In AIMS, a 'Z' suffix denotes the CBT (Computer-Based Training) ground phase
+    // that precedes the actual simulator sessions (e.g. 350AOP1Z = OPC DAY-1 CBT).
+    // Numeric-only session IDs (e.g. 350AOP22, 350AOP35) are true simulator sessions.
+    if (m[4] === 'Z') {
+      return `Ground Training (CBT) — ${sessType} Day ${m[3]}`;
+    }
+    const suffix = m[4] ? ` — Part ${m[4]}` : '';
     return `A${m[1]} Simulator — ${sessType} Session ${m[3]}${suffix}`;
   }
   // CRM/SMS class codes: letter + digits + 2+letters + digits (e.g. C17SMSC1)
@@ -223,7 +229,7 @@ type FlightToken =
 
 // Work type codes that sit between the route and the block/duty hours columns.
 // Treating these like 'OP' ensures subsequent numeric fields are correctly parsed.
-const WORK_TYPE_CODES = new Set(['OP', 'SFP']);
+const WORK_TYPE_CODES = new Set(['OP', 'SFP', 'PS']);
 
 function tokenizeFlightChunk(raw: string): FlightToken[] {
   const tokens: FlightToken[] = [];
