@@ -92,13 +92,17 @@ const TRAINING_CODES: Record<string, string> = {
 const SIM_SESSION_MAP: Record<string, string> = {
   AOP: 'OPC', BLP: 'LPC', OPC: 'OPC', LPC: 'LPC',
   SIM: 'SIM', ETP: 'ETP', UPR: 'Upgrade', REC: 'Recurrent',
+  CFF: 'FFS',   // Full Flight Simulator (CAE)
+  CED: 'EDTO',  // Extended Diversion Time Operations
 };
 function resolveSimCode(code: string): string {
   if (TRAINING_CODES[code]) return TRAINING_CODES[code];
-  const m = code.match(/^(\d{3})([A-Z]{2,4})(\d+)$/);
+  // Allow optional trailing letter suffix (e.g. 330CFF1C, 330CED1E, 330AOP23)
+  const m = code.match(/^(\d{3})([A-Z]{2,4})(\d+)([A-Z]*)$/);
   if (m) {
     const sessType = SIM_SESSION_MAP[m[2]] ?? m[2];
-    return `A${m[1]} Simulator — ${sessType} Session ${m[3]}`;
+    const suffix   = m[4] ? ` — Part ${m[4]}` : '';
+    return `A${m[1]} Simulator — ${sessType} Session ${m[3]}${suffix}`;
   }
   return `Simulator — ${code}`;
 }
@@ -422,9 +426,9 @@ function parseDayChunk(
   const trnShortRe = /\b(SIM\/TRN|RECURRENT|TRAINING|SIM|TRN|GND|LPC|OPC|CRM|CBT|TRG|TDC\d*)\b/i;
   // Long AIMS alphanumeric training codes (e.g. "A353UPRR", "A353ETPR", "353RRCYA")
   const trnLongRe  = /\b([A-Z0-9]{5,}(?:OPC|SIM|TRN|UPR|ETP|REC|UPRR|ETPR|RRCYA)[A-Z0-9]*)\b/i;
-  // AIMS simulator session codes: 3-digit AC type + 2-4 letter session type + 2-digit session number
-  // e.g. "330AOP31", "350AOP34", "330BLP35", "330AOP35"
-  const aimsSimRe  = /\b(\d{3}[A-Z]{2,4}\d+)\b/;
+  // AIMS simulator session codes: 3-digit AC type + 2-4 letter session type + digits + optional letter suffix
+  // e.g. "330AOP31", "330CFF1C" (FFS), "330CED1E" (EDTO), "330BLP35"
+  const aimsSimRe  = /\b(\d{3}[A-Z]{2,4}\d+[A-Z]*)\b/;
   const trnM = chunk.match(trnShortRe) ?? chunk.match(trnLongRe) ?? chunk.match(aimsSimRe);
   if (trnM) {
     const code  = trnM[1].toUpperCase();
@@ -583,8 +587,16 @@ export function parseMasAims(text: string, logger?: ParseLogger): ParsedRoster {
   }
 
   // ── Date blocks ────────────────────────────────────────────────────────────
+  // Truncate at the monthly-stats / code-legend footer so the last date's chunk
+  // doesn't bleed into "Monthly Statistics", "Actual Block Hours", the code
+  // description table, etc.  Stats are extracted above from the full text.
+  const footerIdx = text.search(
+    /\bMonthly[\s\S]{0,15}Statistics\b|\bCode\s+Code\s+Description\b/i,
+  );
+  const textForChunks = footerIdx > 0 ? text.substring(0, footerIdx) : text;
+
   const dateRe      = /(\d{2})-([A-Z]{3})-(\d{4})/gi;
-  const dateMatches = [...text.matchAll(dateRe)];
+  const dateMatches = [...textForChunks.matchAll(dateRe)];
 
   if (dateMatches.length === 0) {
     logger?.error('mas-aims:dates', 'No DD-MMM-YYYY patterns found', { preview: text.slice(0, 200) });
@@ -608,8 +620,8 @@ export function parseMasAims(text: string, logger?: ParseLogger): ParsedRoster {
     const dayOfW  = getDayOfWeek(dateISO);
 
     const chunkStart = m.index! + m[0].length;
-    const chunkEnd   = dateMatches[i + 1]?.index ?? text.length;
-    const chunk      = text.substring(chunkStart, chunkEnd);
+    const chunkEnd   = dateMatches[i + 1]?.index ?? textForChunks.length;
+    const chunk      = textForChunks.substring(chunkStart, chunkEnd);
 
     try {
       duties.push(...parseDayChunk(chunk, dateISO, dayOfW, logger));
