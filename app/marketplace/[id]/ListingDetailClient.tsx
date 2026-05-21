@@ -90,7 +90,7 @@ export default function ListingDetailClient({ listing }: Props) {
                   src={images[imageIdx]}
                   alt={listing.title}
                   fill
-                  className="object-cover"
+                  className="object-contain"
                   sizes="(max-width: 768px) 100vw, 60vw"
                   priority
                 />
