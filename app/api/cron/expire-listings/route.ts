@@ -42,6 +42,5 @@ export async function GET(req: NextRequest) {
     deleted += chunk.length;
   }
 
-  console.log(`[expire-listings] deleted ${deleted} expired listings`);
   return NextResponse.json({ deleted });
 }

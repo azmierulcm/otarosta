@@ -1,12 +1,12 @@
-// Cemrosta Service Worker
+// Otarosta Service Worker
 // Strategy:
 //   /_next/static/** → cache-first (immutable hashed filenames, safe to cache forever)
 //   /api/**          → network-only  (always live data)
 //   navigate         → network-first, fall back to cached shell
 //   everything else  → stale-while-revalidate
 
-const CACHE = 'cemrosta-v1';
-const SHELL  = ['/'];
+const CACHE = 'otarosta-v1';
+const SHELL  = ['/', '/api/og/icon?size=192', '/api/og/icon?size=512'];
 
 // ── Install: pre-cache the app shell ──────────────────────────────────────────
 self.addEventListener('install', (event) => {
