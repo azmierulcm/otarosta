@@ -19,6 +19,42 @@ const PARCHMENT_DIM   = 'rgba(245,237,216,0.5)';
 const PARCHMENT_FAINT = 'rgba(245,237,216,0.35)';
 const MONO = 'IBM Plex Mono';
 
+// ── Brand badge — logo mark + otarosta.com in a gold pill ────────────────────
+function BrandBadge({ scale = 1 }: { scale?: number }) {
+  const iconSize  = Math.round(18 * scale);
+  const fontSize  = Math.round(18 * scale);
+  const gap       = Math.round(8  * scale);
+  const padX      = Math.round(16 * scale);
+  const padY      = Math.round(8  * scale);
+  const radius    = Math.round(10 * scale);
+  return (
+    <div style={{
+      display: 'flex',
+      alignItems: 'center',
+      gap,
+      backgroundColor: 'rgba(200,168,75,0.13)',
+      borderWidth: 1,
+      borderStyle: 'solid',
+      borderColor: 'rgba(200,168,75,0.38)',
+      borderRadius: radius,
+      paddingLeft: padX,
+      paddingRight: padX,
+      paddingTop: padY,
+      paddingBottom: padY,
+    }}>
+      <svg viewBox="0 0 28 28" width={iconSize} height={iconSize}>
+        <circle cx="20" cy="8" r="6" stroke={GOLD} strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+        <line x1="3" y1="25" x2="9" y2="19" stroke={GOLD} strokeWidth="2" strokeLinecap="round" />
+        <line x1="8" y1="27" x2="14" y2="21" stroke={GOLD} strokeWidth="2" strokeLinecap="round" />
+        <line x1="13" y1="26" x2="17" y2="20" stroke={GOLD} strokeWidth="2" strokeLinecap="round" />
+      </svg>
+      <div style={{ display: 'flex', fontFamily: MONO, fontSize, fontWeight: 700, color: GOLD, letterSpacing: '0.06em' }}>
+        otarosta.com
+      </div>
+    </div>
+  );
+}
+
 // Satori-safe perforated line — 1.5 px dashed, expressed as explicit sub-properties
 // to avoid any shorthand-parsing ambiguity
 const PERF_DIV = (
@@ -211,9 +247,7 @@ export function StoriesTemplate({
       {/* Footer */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '28px 80px 56px' }}>
         <div style={{ display: 'flex', fontSize: 34, fontWeight: 700, color: PARCHMENT }}>{crewHandle}</div>
-        {watermark && (
-          <div style={{ display: 'flex', fontSize: 26, fontWeight: 600, color: 'rgba(200,168,75,0.35)', fontFamily: MONO }}>otarosta.com</div>
-        )}
+        {watermark && <BrandBadge scale={1.3} />}
       </div>
     </div>
   );
@@ -361,9 +395,7 @@ export function CardTemplate({
       {/* Footer */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 60px 22px' }}>
         <div style={{ display: 'flex', fontSize: 18, fontWeight: 700, color: PARCHMENT }}>{crewHandle}</div>
-        {watermark && (
-          <div style={{ display: 'flex', fontSize: 14, fontWeight: 600, color: 'rgba(200,168,75,0.35)', fontFamily: MONO }}>otarosta.com</div>
-        )}
+        {watermark && <BrandBadge scale={0.85} />}
       </div>
     </div>
   );
