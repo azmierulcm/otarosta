@@ -17,6 +17,11 @@ const nextConfig: NextConfig = {
       'lucide-react',
       'framer-motion',
     ],
+    serverActions: {
+      // Roster PDFs can exceed the default 1 MB server-action body limit.
+      // 10 MB matches the MAX_FILE_BYTES guard in parseRosterPreview.
+      bodySizeLimit: '10mb',
+    },
   },
 
   images: {

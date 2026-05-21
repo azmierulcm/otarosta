@@ -14,6 +14,21 @@ export default function NewListingPage() {
   const router = useRouter();
   const [error, setError] = useState('');
 
+  async function uploadImage(file: File): Promise<string> {
+    if (!user) throw new Error('Not signed in');
+    const token = await user.getIdToken();
+    const fd = new FormData();
+    fd.append('file', file);
+    const res = await fetch('/api/listings/images', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: fd,
+    });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.error ?? 'Image upload failed');
+    return json.url as string;
+  }
+
   async function handleSubmit(data: ListingInput) {
     if (!user || !profile) return;
     setError('');
@@ -57,7 +72,7 @@ export default function NewListingPage() {
         </div>
       )}
 
-      <ListingForm onSubmit={handleSubmit} submitLabel="Post Listing" />
+      <ListingForm onSubmit={handleSubmit} submitLabel="Post Listing" uploadImage={uploadImage} />
     </div>
   );
 }

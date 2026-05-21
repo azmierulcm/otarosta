@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef } from 'react';
-import { Loader2, Upload, X, ImagePlus } from 'lucide-react';
+import { Loader2, Upload, X, ImagePlus, AlertCircle } from 'lucide-react';
 import Image from 'next/image';
 import type { ListingInput, ListingCategory, ListingCondition, ContactPref } from '@/lib/types/marketplace';
 import { CATEGORY_LABELS, CONDITION_LABELS } from '@/lib/types/marketplace';
@@ -10,6 +10,8 @@ interface ListingFormProps {
   initial?: Partial<ListingInput>;
   onSubmit: (data: ListingInput) => Promise<void>;
   submitLabel?: string;
+  /** Called with each selected File; must resolve to the Firebase Storage URL. */
+  uploadImage: (file: File) => Promise<string>;
 }
 
 const CATEGORIES = Object.entries(CATEGORY_LABELS) as [ListingCategory, string][];
@@ -33,7 +35,7 @@ function Field({ label, htmlFor, error, children }: { label: string; htmlFor?: s
 const INPUT_CLASS =
   'w-full px-3 py-2.5 rounded-[var(--radius-md)] border border-border bg-bg text-[14px] text-text placeholder:text-text-subtle focus:outline-none focus-visible:border-accent/50 focus-visible:ring-1 focus-visible:ring-accent/20 transition-colors';
 
-export function ListingForm({ initial = {}, onSubmit, submitLabel = 'Post Listing' }: ListingFormProps) {
+export function ListingForm({ initial = {}, onSubmit, submitLabel = 'Post Listing', uploadImage }: ListingFormProps) {
   const [title, setTitle] = useState(initial.title ?? '');
   const [category, setCategory] = useState<ListingCategory>(initial.category ?? 'other');
   const [condition, setCondition] = useState<ListingCondition>(initial.condition ?? 'good');
@@ -42,6 +44,8 @@ export function ListingForm({ initial = {}, onSubmit, submitLabel = 'Post Listin
   const [contactPref, setContactPref] = useState<ContactPref>(initial.contactPref ?? 'whatsapp');
   const [contactValue, setContactValue] = useState(initial.contactValue ?? '');
   const [images, setImages] = useState<string[]>(initial.images ?? []);
+  const [uploadingCount, setUploadingCount] = useState(0);
+  const [imageError, setImageError] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -76,18 +80,25 @@ export function ListingForm({ initial = {}, onSubmit, submitLabel = 'Post Listin
     }
   }
 
-  // Image upload — stores as Data URL for now; Firebase Storage upload deferred
+  // Upload images to Firebase Storage via API; store the returned download URLs.
   function handleImageFiles(files: FileList | null) {
     if (!files) return;
-    const remaining = 5 - images.length;
+    setImageError('');
+    const remaining = 5 - images.length - uploadingCount;
     const toAdd = Array.from(files).slice(0, remaining);
-    toAdd.forEach((file) => {
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-        const url = ev.target?.result as string;
+    if (toAdd.length === 0) return;
+
+    setUploadingCount((n) => n + toAdd.length);
+
+    toAdd.forEach(async (file) => {
+      try {
+        const url = await uploadImage(file);
         setImages((prev) => (prev.length < 5 ? [...prev, url] : prev));
-      };
-      reader.readAsDataURL(file);
+      } catch (err) {
+        setImageError(err instanceof Error ? err.message : 'Image upload failed');
+      } finally {
+        setUploadingCount((n) => Math.max(0, n - 1));
+      }
     });
   }
 
@@ -105,7 +116,7 @@ export function ListingForm({ initial = {}, onSubmit, submitLabel = 'Post Listin
         <div className="flex flex-wrap gap-2">
           {images.map((src, i) => (
             <div key={i} className="relative w-20 h-20 rounded-[var(--radius-md)] overflow-hidden border border-border group">
-              <Image src={src} alt={`Listing photo ${i + 1}`} fill className="object-cover" sizes="80px" />
+              <Image src={src} alt={`Listing photo ${i + 1}`} fill className="object-cover" sizes="80px" unoptimized />
               <button
                 type="button"
                 aria-label={`Remove photo ${i + 1}`}
@@ -116,18 +127,32 @@ export function ListingForm({ initial = {}, onSubmit, submitLabel = 'Post Listin
               </button>
             </div>
           ))}
-          {images.length < 5 && (
+          {/* Uploading placeholders */}
+          {Array.from({ length: uploadingCount }).map((_, i) => (
+            <div key={`uploading-${i}`} className="w-20 h-20 rounded-[var(--radius-md)] border border-border bg-surface flex items-center justify-center">
+              <Loader2 size={18} className="animate-spin text-text-subtle" aria-hidden="true" />
+            </div>
+          ))}
+          {/* Add button */}
+          {images.length + uploadingCount < 5 && (
             <button
               type="button"
               aria-label="Add listing photo"
               onClick={() => fileRef.current?.click()}
-              className="w-20 h-20 rounded-[var(--radius-md)] border-2 border-dashed border-border flex flex-col items-center justify-center gap-1 text-text-subtle hover:border-accent/40 hover:text-accent transition-colors"
+              disabled={uploadingCount > 0}
+              className="w-20 h-20 rounded-[var(--radius-md)] border-2 border-dashed border-border flex flex-col items-center justify-center gap-1 text-text-subtle hover:border-accent/40 hover:text-accent transition-colors disabled:opacity-50"
             >
               <ImagePlus size={20} aria-hidden="true" />
               <span className="text-[10px] font-semibold">Add</span>
             </button>
           )}
         </div>
+        {imageError && (
+          <p role="alert" className="flex items-center gap-1 text-[11px] text-danger">
+            <AlertCircle size={11} aria-hidden="true" />
+            {imageError}
+          </p>
+        )}
         <input
           ref={fileRef}
           id="listing-image-upload"
@@ -136,7 +161,7 @@ export function ListingForm({ initial = {}, onSubmit, submitLabel = 'Post Listin
           multiple
           aria-label="Upload listing photos"
           className="hidden"
-          onChange={(e) => handleImageFiles(e.target.files)}
+          onChange={(e) => { handleImageFiles(e.target.files); e.target.value = ''; }}
         />
       </div>
 
@@ -268,13 +293,15 @@ export function ListingForm({ initial = {}, onSubmit, submitLabel = 'Post Listin
       {/* Submit */}
       <button
         type="submit"
-        disabled={submitting}
+        disabled={submitting || uploadingCount > 0}
         className="w-full flex items-center justify-center gap-2 py-3 rounded-[var(--radius-pill)] bg-accent text-accent-fg text-[14px] font-semibold hover:bg-accent-hover disabled:opacity-60 transition-colors shadow-[var(--shadow-sm)]"
       >
         {submitting
           ? <Loader2 size={16} className="animate-spin" aria-hidden="true" />
+          : uploadingCount > 0
+          ? <Loader2 size={16} className="animate-spin" aria-hidden="true" />
           : <Upload size={16} aria-hidden="true" />}
-        {submitting ? 'Posting…' : submitLabel}
+        {submitting ? 'Posting…' : uploadingCount > 0 ? 'Uploading photos…' : submitLabel}
       </button>
     </form>
   );

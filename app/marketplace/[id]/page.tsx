@@ -30,9 +30,10 @@ export default async function ListingDetailPage({ params }: Props) {
   let listing;
   try {
     listing = await getListing(id);
-  } catch {
+  } catch (err) {
+    console.error('[ListingDetailPage] getListing failed for id=%s:', id, err);
     notFound();
   }
 
-  return <ListingDetailClient listing={listing} />;
+  return <ListingDetailClient listing={listing!} />;
 }
