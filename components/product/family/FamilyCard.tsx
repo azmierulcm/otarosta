@@ -570,11 +570,6 @@ export function FamilyCard() {
           </div>
         </div>
 
-        {/* Row 2: name full width */}
-        <h2 className="text-[34px] md:text-[40px] font-black tracking-tight text-text leading-none mb-5">
-          {firstName}
-        </h2>
-
         {/* Stats strip */}
         <div className="flex gap-2 flex-wrap">
           <div className="flex items-center gap-1.5 px-3 py-1 rounded-full border bg-red-50 border-red-100 text-[11px] font-bold" style={{ color: RED }}>
