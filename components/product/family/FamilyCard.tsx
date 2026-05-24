@@ -47,10 +47,14 @@ function subMin(time: string, mins: number) { return addMin(time, -mins); }
 
 interface Trip {
   id: string;
-  departDate?: string; departDay?: string; departFlight?: string;
-  departRoute?: string; departTime?: string;
+  // Send-off leg (departure from home base)
+  sendDate?: string; sendDay?: string; sendFlight?: string;
+  sendRoute?: string;   // "KUL → LHR" — base to ultimate destination
+  sendTime?: string;    // STD of first leg at home base
+  // Pick-up leg (arrival back at home base)
   returnDate?: string; returnDay?: string; returnFlight?: string;
-  returnRoute?: string; returnTime?: string;
+  returnRoute?: string; // "LHR → KUL" — last port to home base
+  returnTime?: string;  // STA of final leg at home base
   daysAway?: number;
 }
 
@@ -59,87 +63,140 @@ interface FreeDay    { date: string; day?: string; }
 
 interface FlightCard {
   kind:       'sendoff' | 'pickup';
-  badge:      string;       // "2 nights away" | "Same day" | ""
-  flight?:    string;       // this leg's number, e.g. "MH4"
-  companion?: string;       // paired leg's number, e.g. "MH1"
+  badge:      string;
+  flight?:    string;
+  companion?: string;
   date: string; day?: string;
   route?: string; time?: string;
 }
 
 // ── Derivation ────────────────────────────────────────────────────────────────
+//
+// Uses a location state machine: walk all FLIGHT events in chronological order
+// (sorted by date then STD), track where the pilot is, and open/close trips
+// when they depart from or arrive back at their home base.
+//
+// This correctly handles:
+//   • Multi-sector pairings (KUL→BKK→LHR→KUL) — shows KUL→LHR send-off
+//   • Same-day turnarounds (KUL→SIN→KUL) — 1 send-off + 1 pick-up on same day
+//   • Orphan returns (departed last month, arriving this month)
+//   • Orphan send-offs (departed this month, returning next month)
+//   • Home base inferred dynamically — no hardcoded KUL
 
-function deriveData(events: DutyEvent[], base = 'KUL') {
-  const sorted = [...events].sort((a,b) => a.date.localeCompare(b.date));
+function deriveData(events: DutyEvent[]) {
+  // Sort by date, then by STD within a day so morning/afternoon order is correct
+  const sorted = [...events].sort((a, b) => {
+    const d = a.date.localeCompare(b.date);
+    return d !== 0 ? d : (a.std ?? '').localeCompare(b.std ?? '');
+  });
 
-  const sends   = sorted.filter(e => e.type === 'FLIGHT' && e.depPort === base);
-  const picks   = sorted.filter(e => e.type === 'FLIGHT' && e.arrPort === base);
-  const standby = sorted.filter(e => e.type === 'STANDBY');
-  const off     = sorted.filter(e => e.type === 'OFF');
+  // Infer home base = most frequent departure port across all FLIGHT events
+  const portCounts: Record<string, number> = {};
+  sorted.forEach(e => {
+    if (e.type === 'FLIGHT' && e.depPort)
+      portCounts[e.depPort] = (portCounts[e.depPort] ?? 0) + 1;
+  });
+  const base = Object.entries(portCounts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? 'KUL';
 
-  const used  = new Set<string>();
+  const flights  = sorted.filter(e => e.type === 'FLIGHT');
+  const standby  = sorted.filter(e => e.type === 'STANDBY');
+  const off      = sorted.filter(e => e.type === 'OFF');
+
   const trips: Trip[] = [];
+  let openTrip: Trip | null = null;     // trip currently in progress
+  let ultimateArr: string | undefined;  // furthest destination reached so far
 
-  for (const s of sends) {
-    const ret = picks.find(p => p.date >= s.date && !used.has(p.date));
-    const trip: Trip = {
-      id:           `${s.date}-${s.flightNumber ?? ''}`,
-      departDate:   s.date,      departDay:    s.day,
-      departFlight: s.flightNumber ?? s.item,
-      departRoute:  s.depPort && s.arrPort ? `${s.depPort} → ${s.arrPort}` : undefined,
-      departTime:   s.std,
-    };
-    if (ret) {
-      used.add(ret.date);
-      trip.returnDate   = ret.date;  trip.returnDay    = ret.day;
-      trip.returnFlight = ret.flightNumber ?? ret.item;
-      trip.returnRoute  = ret.depPort && ret.arrPort ? `${ret.depPort} → ${ret.arrPort}` : undefined;
-      trip.returnTime   = ret.sta;
-      trip.daysAway     = Math.round((new Date(ret.date).getTime() - new Date(s.date).getTime()) / 86_400_000);
+  for (const e of flights) {
+    if (e.depPort === base) {
+      // ── Departing home base ──────────────────────────────────────────────
+      if (openTrip === null) {
+        // Fresh departure — start a new trip
+        openTrip = {
+          id:         `${e.date}-${e.flightNumber ?? e.item ?? ''}`,
+          sendDate:   e.date,
+          sendDay:    e.day,
+          sendFlight: e.flightNumber ?? e.item,
+          sendTime:   e.std,
+        };
+        ultimateArr = e.arrPort;
+      }
+      // If a trip is already open and the pilot departs base again, it means
+      // they returned home mid-pairing (e.g. brief tech stop). Close the old
+      // trip as an orphan send-off and start fresh.
+      else {
+        openTrip.sendRoute = base && ultimateArr ? `${base} → ${ultimateArr}` : undefined;
+        trips.push(openTrip);
+        openTrip = {
+          id:         `${e.date}-${e.flightNumber ?? e.item ?? ''}`,
+          sendDate:   e.date,
+          sendDay:    e.day,
+          sendFlight: e.flightNumber ?? e.item,
+          sendTime:   e.std,
+        };
+        ultimateArr = e.arrPort;
+      }
+    } else if (e.arrPort === base) {
+      // ── Returning home ───────────────────────────────────────────────────
+      const returnInfo = {
+        returnDate:   e.date,
+        returnDay:    e.day,
+        returnFlight: e.flightNumber ?? e.item,
+        returnRoute:  e.depPort ? `${e.depPort} → ${base}` : undefined,
+        returnTime:   e.sta,
+      };
+      if (openTrip !== null) {
+        // Close the open trip
+        const daysAway = Math.round(
+          (new Date(e.date).getTime() - new Date(openTrip.sendDate!).getTime()) / 86_400_000,
+        );
+        openTrip.sendRoute = base && ultimateArr ? `${base} → ${ultimateArr}` : undefined;
+        trips.push({ ...openTrip, ...returnInfo, daysAway });
+        openTrip = null;
+        ultimateArr = undefined;
+      } else {
+        // Orphan return — departed last month
+        trips.push({ id: `ret-${e.date}`, ...returnInfo });
+      }
+    } else {
+      // ── Mid-trip leg ─────────────────────────────────────────────────────
+      // Update ultimate destination so send-off route shows final stop, not
+      // the immediate next hop.
+      if (openTrip !== null && e.arrPort) ultimateArr = e.arrPort;
     }
-    trips.push(trip);
   }
 
-  // Orphan pick-ups — crew departed last month
-  for (const p of picks) {
-    if (!used.has(p.date)) {
-      trips.push({
-        id: `ret-${p.date}`,
-        returnDate: p.date, returnDay: p.day,
-        returnFlight: p.flightNumber ?? p.item,
-        returnRoute: p.depPort && p.arrPort ? `${p.depPort} → ${p.arrPort}` : undefined,
-        returnTime: p.sta,
-      });
-    }
+  // Any still-open trip means the pilot is away at month-end — orphan send-off
+  if (openTrip !== null) {
+    openTrip.sendRoute = base && ultimateArr ? `${base} → ${ultimateArr}` : undefined;
+    trips.push(openTrip);
   }
 
-  trips.sort((a,b) => (a.departDate ?? a.returnDate ?? '').localeCompare(b.departDate ?? b.returnDate ?? ''));
-
-  // Flatten trips → individual flight cards, sorted chronologically
+  // Flatten to FlightCard[]
   const flightCards: FlightCard[] = [];
   for (const t of trips) {
     const nights = t.daysAway ?? 0;
     const badge  = t.daysAway != null
       ? nights === 0 ? 'Same day' : `${nights} night${nights !== 1 ? 's' : ''} away`
       : '';
-    if (t.departDate)
+    if (t.sendDate)
       flightCards.push({
         kind: 'sendoff', badge,
-        flight: t.departFlight, companion: t.returnFlight,
-        date: t.departDate, day: t.departDay, route: t.departRoute, time: t.departTime,
+        flight: t.sendFlight, companion: t.returnFlight,
+        date: t.sendDate, day: t.sendDay, route: t.sendRoute, time: t.sendTime,
       });
     if (t.returnDate)
       flightCards.push({
         kind: 'pickup', badge,
-        flight: t.returnFlight, companion: t.departFlight,
+        flight: t.returnFlight, companion: t.sendFlight,
         date: t.returnDate, day: t.returnDay, route: t.returnRoute, time: t.returnTime,
       });
   }
-  flightCards.sort((a,b) => a.date.localeCompare(b.date));
+  flightCards.sort((a, b) => a.date.localeCompare(b.date));
 
   return {
     flightCards,
-    standbyDays: standby.map(e => ({ date:e.date, day:e.day, dutyStart:e.signOn, dutyEnd:e.signOff })),
-    freeDays:    off.map(e => ({ date:e.date, day:e.day })),
+    standbyDays: standby.map(e => ({ date: e.date, day: e.day, dutyStart: e.signOn, dutyEnd: e.signOff })),
+    freeDays:    off.map(e => ({ date: e.date, day: e.day })),
   };
 }
 
