@@ -84,7 +84,7 @@ interface FlightCard {
 //   • Home base inferred dynamically — no hardcoded KUL
 
 function deriveData(events: DutyEvent[]) {
-  // Sort by date, then by STD within a day so morning/afternoon order is correct
+  // Sort by date, then STD within a day — critical for correct transit detection
   const sorted = [...events].sort((a, b) => {
     const d = a.date.localeCompare(b.date);
     return d !== 0 ? d : (a.std ?? '').localeCompare(b.std ?? '');
@@ -98,19 +98,21 @@ function deriveData(events: DutyEvent[]) {
   });
   const base = Object.entries(portCounts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? 'KUL';
 
-  const flights  = sorted.filter(e => e.type === 'FLIGHT');
-  const standby  = sorted.filter(e => e.type === 'STANDBY');
-  const off      = sorted.filter(e => e.type === 'OFF');
+  const flights = sorted.filter(e => e.type === 'FLIGHT');
+  const standby = sorted.filter(e => e.type === 'STANDBY');
+  const off     = sorted.filter(e => e.type === 'OFF');
 
   const trips: Trip[] = [];
-  let openTrip: Trip | null = null;     // trip currently in progress
-  let ultimateArr: string | undefined;  // furthest destination reached so far
+  let openTrip: Trip | null = null;
+  let ultimateArr: string | undefined;
 
-  for (const e of flights) {
+  for (let i = 0; i < flights.length; i++) {
+    const e = flights[i];
+
     if (e.depPort === base) {
       // ── Departing home base ──────────────────────────────────────────────
       if (openTrip === null) {
-        // Fresh departure — start a new trip
+        // Fresh start — open a new trip
         openTrip = {
           id:         `${e.date}-${e.flightNumber ?? e.item ?? ''}`,
           sendDate:   e.date,
@@ -118,56 +120,62 @@ function deriveData(events: DutyEvent[]) {
           sendFlight: e.flightNumber ?? e.item,
           sendTime:   e.std,
         };
-        ultimateArr = e.arrPort;
       }
-      // If a trip is already open and the pilot departs base again, it means
-      // they returned home mid-pairing (e.g. brief tech stop). Close the old
-      // trip as an orphan send-off and start fresh.
-      else {
-        openTrip.sendRoute = base && ultimateArr ? `${base} → ${ultimateArr}` : undefined;
-        trips.push(openTrip);
-        openTrip = {
-          id:         `${e.date}-${e.flightNumber ?? e.item ?? ''}`,
-          sendDate:   e.date,
-          sendDay:    e.day,
-          sendFlight: e.flightNumber ?? e.item,
-          sendTime:   e.std,
-        };
-        ultimateArr = e.arrPort;
-      }
+      // Whether a fresh start or a same-day transit re-departure, always
+      // update the ultimate destination to wherever this leg is going.
+      ultimateArr = e.arrPort;
+
     } else if (e.arrPort === base) {
-      // ── Returning home ───────────────────────────────────────────────────
-      const returnInfo = {
-        returnDate:   e.date,
-        returnDay:    e.day,
-        returnFlight: e.flightNumber ?? e.item,
-        returnRoute:  e.depPort ? `${e.depPort} → ${base}` : undefined,
-        returnTime:   e.sta,
-      };
-      if (openTrip !== null) {
-        // Close the open trip
-        const daysAway = Math.round(
-          (new Date(e.date).getTime() - new Date(openTrip.sendDate!).getTime()) / 86_400_000,
-        );
-        openTrip.sendRoute = base && ultimateArr ? `${base} → ${ultimateArr}` : undefined;
-        trips.push({ ...openTrip, ...returnInfo, daysAway });
-        openTrip = null;
-        ultimateArr = undefined;
+      // ── Arriving at home base ────────────────────────────────────────────
+      // Is there another departure from base LATER the same day?
+      // If yes → this is a transit stop, not the end of the pairing.
+      const isTransit = flights.slice(i + 1).some(
+        f => f.date === e.date && f.depPort === base,
+      );
+
+      if (isTransit) {
+        // Mid-pairing pass-through home base (e.g. KNO→KUL→PEN).
+        // Keep the trip open; the next departure from base will update ultimateArr.
       } else {
-        // Orphan return — departed last month
-        trips.push({ id: `ret-${e.date}`, ...returnInfo });
+        // Real return — close the trip.
+        if (openTrip !== null) {
+          const daysAway = Math.round(
+            (new Date(e.date).getTime() - new Date(openTrip.sendDate!).getTime()) / 86_400_000,
+          );
+          openTrip.sendRoute = ultimateArr ? `${base} → ${ultimateArr}` : undefined;
+          trips.push({
+            ...openTrip,
+            returnDate:   e.date,
+            returnDay:    e.day,
+            returnFlight: e.flightNumber ?? e.item,
+            returnRoute:  e.depPort ? `${e.depPort} → ${base}` : undefined,
+            returnTime:   e.sta,
+            daysAway,
+          });
+          openTrip   = null;
+          ultimateArr = undefined;
+        } else {
+          // Orphan return — departed last month
+          trips.push({
+            id:           `ret-${e.date}`,
+            returnDate:   e.date,
+            returnDay:    e.day,
+            returnFlight: e.flightNumber ?? e.item,
+            returnRoute:  e.depPort ? `${e.depPort} → ${base}` : undefined,
+            returnTime:   e.sta,
+          });
+        }
       }
+
     } else {
       // ── Mid-trip leg ─────────────────────────────────────────────────────
-      // Update ultimate destination so send-off route shows final stop, not
-      // the immediate next hop.
       if (openTrip !== null && e.arrPort) ultimateArr = e.arrPort;
     }
   }
 
-  // Any still-open trip means the pilot is away at month-end — orphan send-off
+  // Pilot still away at month-end → orphan send-off
   if (openTrip !== null) {
-    openTrip.sendRoute = base && ultimateArr ? `${base} → ${ultimateArr}` : undefined;
+    openTrip.sendRoute = ultimateArr ? `${base} → ${ultimateArr}` : undefined;
     trips.push(openTrip);
   }
 
