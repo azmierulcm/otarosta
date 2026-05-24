@@ -720,6 +720,17 @@ export const Dashboard = () => {
             </section>
           )}
 
+          {/* ── Calendar ─────────────────────────────────────────────────────── */}
+          <section className="mb-16">
+            <div className="flex items-center gap-4 mb-6">
+              <h3 className="text-3xl font-bold text-text tracking-tighter uppercase italic">Calendar.</h3>
+              <div className="h-px flex-1 bg-border/50" />
+            </div>
+            <div className="max-w-sm">
+              <DutyCalendar onExport={handleExport} />
+            </div>
+          </section>
+
           {/* ── Family Hub ───────────────────────────────────────────────────── */}
           <section className="mb-16">
             <div className="flex items-center gap-4 mb-6 border-b border-border pb-4">
@@ -734,43 +745,27 @@ export const Dashboard = () => {
             </div>
           </section>
 
-          {/* ── Main content grid ────────────────────────────────────────────── */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-16">
-
-            {/* ── Duty tiles (formerly Timeline) ───────────────────────────── */}
-            <div className="order-2 lg:order-1 lg:col-span-8">
-              <div className="flex items-center gap-4 mb-6">
-                <h3 className="text-3xl font-bold text-text tracking-tighter uppercase italic">Roster Details.</h3>
-                <div className="h-px flex-1 bg-border/50" />
-                <p className="text-[10px] font-black text-text-subtle uppercase tracking-widest font-mono">
-                  Tap to edit
-                </p>
-                <Pencil size={11} className="text-text-subtle" />
-              </div>
-
-              <div className="bg-white rounded-[2rem] border border-border p-5">
-                <DutyGrid events={activeRoster.events} />
-              </div>
+          {/* ── Roster Details ───────────────────────────────────────────────── */}
+          <section>
+            <div className="flex items-center gap-4 mb-6">
+              <h3 className="text-3xl font-bold text-text tracking-tighter uppercase italic">Roster Details.</h3>
+              <div className="h-px flex-1 bg-border/50" />
+              <p className="text-[10px] font-black text-text-subtle uppercase tracking-widest font-mono">
+                Tap to edit
+              </p>
+              <Pencil size={11} className="text-text-subtle" />
             </div>
-
-            {/* ── Calendar (unchanged) ─────────────────────────────────────── */}
-            <div className="order-1 lg:order-2 lg:col-span-4">
-              <div className="sticky top-32">
-                <div className="flex items-center gap-4 mb-6">
-                  <h3 className="text-3xl font-bold text-text tracking-tighter uppercase italic">Calendar.</h3>
-                  <div className="h-px flex-1 bg-border/50" />
-                </div>
-                <DutyCalendar onExport={handleExport} />
-
-                <SupportWidget
-                  userId={user?.uid}
-                  userEmail={user?.email ?? undefined}
-                  rosterMonth={activeRoster.month}
-                  rosterYear={activeRoster.year}
-                />
-              </div>
+            <div className="bg-white rounded-[2rem] border border-border p-5">
+              <DutyGrid events={activeRoster.events} />
             </div>
-          </div>
+          </section>
+
+          <SupportWidget
+            userId={user?.uid}
+            userEmail={user?.email ?? undefined}
+            rosterMonth={activeRoster.month}
+            rosterYear={activeRoster.year}
+          />
         </>
       )}
     </div>
