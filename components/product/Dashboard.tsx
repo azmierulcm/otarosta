@@ -873,7 +873,7 @@ export const Dashboard = () => {
                   const flights  = activeRoster.events.filter(e => e.type === 'FLIGHT').length;
                   const standby  = activeRoster.events.filter(e => e.type === 'STANDBY').length;
                   const offDays  = activeRoster.events.filter(e => e.type === 'OFF').length;
-                  const blockHrs = activeRoster.monthlyStats?.actualBlockHours ?? activeRoster.stats?.totalBlockTime ?? '—';
+                  const blockHrs = activeRoster.stats?.totalBlockTime ?? '—';
                   const stats = [
                     { label: 'Flights',      value: flights,  sub: 'this month',    bg: 'bg-sky-50',    text: 'text-sky-700',   border: 'border-sky-100'   },
                     { label: 'Block Hours',  value: blockHrs, sub: 'logged',        bg: 'bg-accent/5',  text: 'text-accent',    border: 'border-accent/10' },
