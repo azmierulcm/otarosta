@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import Image from 'next/image';
 import { motion } from 'framer-motion';
 import { ArrowRight, Globe, Award, Share2, Download, Sparkles } from 'lucide-react';
 import { useAuth } from '@/lib/contexts/AuthContext';
@@ -89,8 +90,7 @@ function PatchCard({ entry, visits }: { entry: typeof DESTINATION_CATALOG[0]; vi
           </span>
         )}
         {patchUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={patchUrl} alt={`${entry.city} destination patch`} className="w-[88px] h-[88px] object-contain" />
+          <Image src={patchUrl} alt={`${entry.city} destination patch`} width={88} height={88} className="w-[88px] h-[88px] object-contain" />
         ) : (
           <div className="w-[56px] h-[56px]" style={{ color: regionColor }}>
             <Illustration size={56} />
@@ -163,8 +163,9 @@ function RecapCard() {
             ].map((d) => (
               <div key={d.city} className="flex flex-col items-center">
                 {d.patch && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={d.patch} alt={`${d.city} destination patch`} className="w-full aspect-square object-contain" />
+                  <div className="relative w-full aspect-square">
+                    <Image src={d.patch} alt={`${d.city} destination patch`} fill sizes="80px" className="object-contain" />
+                  </div>
                 )}
                 <p className="text-[8px] font-bold text-center mt-0.5" style={{ color: '#222' }}>{d.city}</p>
                 <p className="text-[7px]" style={{ color: '#717171' }}>{d.visits} visits</p>

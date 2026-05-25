@@ -666,6 +666,8 @@ function LiveRosterCard({ data, profile }: { data: CardData; profile: CardProfil
                       src={`/images/city_patches/${IATA_PATCH[d.code] ?? `${d.code.toLowerCase()}_patch.png`}`}
                       alt={`${d.city} stamp`}
                       className="w-full h-full object-contain"
+                      loading="lazy"
+                      decoding="async"
                       onError={(e) => {
                         (e.target as HTMLImageElement).style.display = 'none';
                         (e.target as HTMLImageElement).nextElementSibling?.removeAttribute('hidden');

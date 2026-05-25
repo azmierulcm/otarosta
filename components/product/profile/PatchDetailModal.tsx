@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useCallback } from 'react';
+import Image from 'next/image';
 
 const FOCUSABLE_SEL = 'a[href], button:not([disabled]), input, [tabindex]:not([tabindex="-1"])';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -169,13 +170,12 @@ export function PatchDetailModal({ isOpen, onClose, entry, earned }: PatchDetail
                 }}
               >
                 {patchImageUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
+                  <Image
                     src={patchImageUrl}
                     alt={`${entry.city} city patch`}
+                    width={200}
+                    height={200}
                     style={{
-                      width: '200px',
-                      height: '200px',
                       objectFit: 'contain',
                       filter: earned ? undefined : 'grayscale(1) opacity(0.35)',
                     }}

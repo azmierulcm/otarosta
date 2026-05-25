@@ -1,4 +1,5 @@
 import React from 'react';
+import Image from 'next/image';
 import { motion } from 'framer-motion';
 import { Destination } from '@/lib/types';
 import { getPatchImageUrl } from '@/lib/patches/patch-images';
@@ -14,10 +15,11 @@ export const DestinationPatch = ({ destination }: { destination: Destination }) 
     >
       {/* Stamp artwork — no card wrapper */}
       {patchImageUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
+        <Image
           src={patchImageUrl}
           alt={`${city} patch`}
+          width={176}
+          height={176}
           className="w-44 h-44 object-contain drop-shadow-sm"
         />
       ) : (

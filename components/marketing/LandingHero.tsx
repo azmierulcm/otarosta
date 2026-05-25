@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import Image from 'next/image';
 import { motion, useReducedMotion } from 'framer-motion';
 import { ArrowRight, CheckCircle2, ShieldCheck, Zap, Heart, Clock } from 'lucide-react';
 import { WaitlistSheet } from './WaitlistSheet';
@@ -104,10 +105,18 @@ function HeroShowcase() {
             <p className="text-[14px] font-black text-text mt-0.5">47 cities</p>
           </div>
           <div className="grid grid-cols-3 gap-1 p-2 flex-1">
-            {PASSPORT_PATCHES.map(({ src, iata }) => (
+            {PASSPORT_PATCHES.map(({ src, iata }, i) => (
               <div key={iata} className="flex flex-col items-center gap-0.5 py-1">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={src} alt={`${iata} destination patch`} className="w-full aspect-square object-contain" />
+                <div className="relative w-full aspect-square">
+                  <Image
+                    src={src}
+                    alt={`${iata} destination patch`}
+                    fill
+                    sizes="80px"
+                    className="object-contain"
+                    priority={i === 0}
+                  />
+                </div>
                 <span className="text-[7px] font-black text-text-subtle font-mono">{iata}</span>
               </div>
             ))}

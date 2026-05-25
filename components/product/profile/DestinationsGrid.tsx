@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import Image from 'next/image';
 import { Lock } from 'lucide-react';
 import { useReducedMotion, motion } from 'framer-motion';
 import {
@@ -101,11 +102,12 @@ function PatchCard({ entry, earned, index, reduceMotion, onClick }: PatchCardPro
         {/* Illustration or lock */}
         {isUnlocked ? (
           patchImageUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
+            <Image
               src={patchImageUrl}
               alt={`${entry.city} patch`}
               aria-hidden="true"
+              width={150}
+              height={150}
               className="w-[150px] h-[150px] object-contain"
             />
           ) : (
