@@ -5,6 +5,7 @@ import "../styles/globals.css";
 import { AuthProvider } from "@/lib/contexts/AuthContext";
 import { RosterProvider } from "@/lib/contexts/RosterContext";
 import { InstallBanner } from "@/components/shared/InstallBanner";
+import { BottomNav } from "@/components/shared/BottomNav";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -86,8 +87,11 @@ export default function RootLayout({
         </a>
         <AuthProvider>
           <RosterProvider>
-            {children}
+            <div className="pb-20 md:pb-0">
+              {children}
+            </div>
             <InstallBanner />
+            <BottomNav />
           </RosterProvider>
         </AuthProvider>
         {/* Register service worker — afterInteractive ensures it runs after hydration */}
