@@ -8,7 +8,14 @@ import type { EarnedDestination } from '@/lib/actions/destinations';
 import type { RosterSummary } from '@/lib/types/roster';
 import { TopDestinations, earnedToTopDest } from '@/components/product/TopDestinations';
 
-const SummaryMapLeaflet = dynamic(() => import('./SummaryMapLeaflet'), { ssr: false });
+const SummaryMapLeaflet = dynamic(() => import('./SummaryMapLeaflet'), {
+  ssr: false,
+  loading: () => (
+    <div className="w-full h-[280px] rounded-2xl bg-surface animate-pulse flex items-center justify-center">
+      <div className="w-8 h-8 border-4 border-accent/20 border-t-accent rounded-full animate-spin" />
+    </div>
+  ),
+});
 
 // ─────────────────────────────────────────────────────────────────────────────
 // RosterSummaryCard — visual language matches LiveRosterCard exactly

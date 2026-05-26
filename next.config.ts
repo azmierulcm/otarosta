@@ -75,11 +75,15 @@ const nextConfig: NextConfig = {
             key: 'Content-Security-Policy',
             value: [
               "default-src 'self'",
-              `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,
+              // apis.google.com needed for Firebase Auth Google Sign-In popup (api.js)
+              // accounts.google.com needed for the OAuth iframe
+              `script-src 'self' 'unsafe-inline' https://apis.google.com https://accounts.google.com${isDev ? " 'unsafe-eval'" : ""}`,
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: blob: https://firebasestorage.googleapis.com https://storage.googleapis.com https://lh3.googleusercontent.com https://flagcdn.com https://*.cartocdn.com https://*.basemaps.cartocdn.com",
               "font-src 'self' https://fonts.gstatic.com",
-              "connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://identitytoolkit.googleapis.com https://cdn.jsdelivr.net",
+              "connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://identitytoolkit.googleapis.com https://cdn.jsdelivr.net https://apis.google.com",
+              // accounts.google.com iframe is required for Google Sign-In popup flow
+              "frame-src 'self' https://accounts.google.com https://*.firebaseapp.com",
               "frame-ancestors 'self'",
             ].join('; '),
           },
