@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowRight, Briefcase, PlaneTakeoff, Heart, Bell, MapPin, Clock } from 'lucide-react';
 import { useAuth } from '@/lib/contexts/AuthContext';
@@ -165,8 +166,7 @@ function FlightDeckVisual() {
         <span className="text-[9px] font-black text-text-subtle uppercase tracking-widest shrink-0 font-mono">Earned</span>
         <div className="flex items-center gap-1.5">
           {FD_PATCHES.map(({ src, alt }) => (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img key={alt} src={src} alt={`${alt} destination patch`} className="w-7 h-7 object-contain drop-shadow-sm" />
+            <Image key={alt} src={src} alt={`${alt} destination patch`} width={28} height={28} className="object-contain drop-shadow-sm" />
           ))}
           <span className="text-[9px] font-black text-text-subtle bg-surface-2 border border-border rounded-full w-7 h-7 flex items-center justify-center shrink-0">
             +17

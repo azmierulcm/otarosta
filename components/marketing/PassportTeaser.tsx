@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import Image from 'next/image';
 import { motion, useReducedMotion } from 'framer-motion';
 import { ArrowRight, Lock, Sparkles } from 'lucide-react';
 import { useAuth } from '@/lib/contexts/AuthContext';
@@ -55,7 +56,7 @@ function MiniPatch({ entry, earned, index }: { entry: CatalogEntry; earned?: Ear
       >
         {isUnlocked && patchUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={patchUrl} alt={entry.city} className="w-16 h-16 object-contain drop-shadow-sm" />
+          <Image src={patchUrl} alt={entry.city} width={64} height={64} className="object-contain drop-shadow-sm" />
         ) : (
           <Lock size={20} className="text-text-subtle opacity-30" />
         )}
