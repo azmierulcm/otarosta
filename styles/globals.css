@@ -148,11 +148,6 @@ body {
   font-feature-settings: 'ss01', 'ss02';
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  /* Locks fixed elements (bottom nav) to layout viewport on iOS Safari.
-     Without this, the visual viewport jitters as browser chrome shows/hides
-     and takes the fixed nav with it. Setting one overflow axis forces the
-     other to 'auto', making body a proper scroll container. */
-  overflow-x: hidden;
 }
 
 /* Global keyboard focus ring — visible only on keyboard nav, never on mouse */
