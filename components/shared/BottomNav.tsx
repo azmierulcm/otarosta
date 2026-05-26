@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation'
 import { LayoutDashboard, MapPinned, ShoppingBag, Settings2 } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { haptics } from '@/lib/haptics'
+import { useAuth } from '@/lib/contexts/AuthContext'
 
 const navItems = [
   { icon: LayoutDashboard, label: 'Timeline', path: '/' },
@@ -15,7 +16,11 @@ const navItems = [
 
 export function BottomNav() {
   const pathname = usePathname()
+  const { user } = useAuth()
 
+  // Only authenticated users get the bottom nav.
+  // Unauthenticated visitors see the top Navbar on the landing page instead.
+  if (!user) return null
   if (pathname.startsWith('/admin') || pathname.startsWith('/demo')) return null
 
   return (
