@@ -454,7 +454,7 @@ export function RecapModal({ isOpen, onClose, userId, earnedDestinations }: Reca
             style={{ boxShadow: '0 32px 80px -16px rgba(0,0,0,0.35)' }}
           >
             {/* ── Left: 9:16 card preview ───────────────────────────── */}
-            <div className="flex-1 flex flex-col items-center gap-5 p-6 md:p-8
+            <div className="flex-1 min-h-0 flex flex-col items-center gap-5 p-6 md:p-8
                             border-b md:border-b-0 md:border-r border-border
                             bg-surface-2 overflow-y-auto">
               {/* Period tabs */}
@@ -484,7 +484,7 @@ export function RecapModal({ isOpen, onClose, userId, earnedDestinations }: Reca
             </div>
 
             {/* ── Right: actions ────────────────────────────────────── */}
-            <div className="w-full md:w-[360px] shrink-0 flex flex-col bg-bg p-8 md:p-10">
+            <div className="w-full md:w-[360px] shrink-0 flex flex-col bg-bg p-8 md:p-10 max-h-[48vh] md:max-h-none overflow-y-auto">
               {/* Close */}
               <div className="flex justify-end mb-6">
                 <button
@@ -497,7 +497,7 @@ export function RecapModal({ isOpen, onClose, userId, earnedDestinations }: Reca
               </div>
 
               {/* Accent bars */}
-              <div className="flex flex-col gap-1.5 mb-8">
+              <div className="hidden md:flex flex-col gap-1.5 mb-8">
                 <div style={{ width: 40, height: 5,  background: 'var(--accent)', opacity: 0.18 }} />
                 <div style={{ width: 40, height: 9,  background: 'var(--accent)', opacity: 0.5  }} />
                 <div style={{ width: 40, height: 20, background: 'var(--accent)' }} />
@@ -511,7 +511,7 @@ export function RecapModal({ isOpen, onClose, userId, earnedDestinations }: Reca
               </p>
 
               {/* Stats snapshot */}
-              <div className="grid grid-cols-2 gap-2 mb-8">
+              <div className="hidden md:grid grid-cols-2 gap-2 mb-8">
                 <MiniStat label="km in the sky"   value={data.totalKm.toLocaleString()} />
                 <MiniStat label="sectors flown"   value={data.flights.toString()} />
                 <MiniStat label="block hours"      value={data.blockHrs.toString()} />
@@ -519,7 +519,7 @@ export function RecapModal({ isOpen, onClose, userId, earnedDestinations }: Reca
               </div>
 
               {/* Actions */}
-              <div className="flex flex-col gap-3 mt-auto">
+              <div className="flex flex-col gap-3 mt-4 md:mt-auto">
                 <button
                   onClick={handleDownload}
                   disabled={isDownloading}
