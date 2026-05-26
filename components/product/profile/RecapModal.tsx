@@ -283,13 +283,23 @@ function buildDownloadUrl(userId: string, periodType: PeriodType): string {
 
 // ── Capture the card ref as a PNG blob ───────────────────────────────────────
 // Avatar is proxied through /api/proxy-image (same-origin) so canvas stays clean.
+// Explicit width/height are passed because html-to-image loses dimensions when
+// the element lives inside an overflow-y-auto flex container.
 
 async function captureCardBlob(el: HTMLElement): Promise<Blob> {
+  // Ensure element is scrolled into view so layout is fully rendered
+  el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  await new Promise((r) => setTimeout(r, 120));
+
+  const rect = el.getBoundingClientRect();
+  const w = Math.round(rect.width)  || 300;
+  const h = Math.round(rect.height) || Math.round(w * 16 / 9);
+
   // First pass warms up font/image cache; second pass produces the clean render.
   let dataUrl = '';
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
-      dataUrl = await toPng(el, { pixelRatio: 3, cacheBust: false });
+      dataUrl = await toPng(el, { pixelRatio: 3, cacheBust: false, width: w, height: h });
       if (dataUrl) break;
     } catch {
       if (attempt === 1) throw new Error('capture failed');
@@ -416,11 +426,22 @@ export function RecapModal({ isOpen, onClose, userId, earnedDestinations }: Reca
     if (!cardRef.current || isDownloading) return;
     setIsDownloading(true);
     try {
-      const blob      = await captureCardBlob(cardRef.current);
+      const blob     = await captureCardBlob(cardRef.current);
+      const filename = `Mission-Recap-${data.periodLabel.replace(/\s/g, '-')}.png`;
+      const file     = new File([blob], filename, { type: 'image/png' });
+
+      // On iOS, a.click() opens the file in the browser instead of saving it.
+      // Web Share API with files triggers the native "Save Image" sheet instead.
+      if (navigator.canShare?.({ files: [file] })) {
+        await navigator.share({ files: [file], title: filename });
+        return;
+      }
+
+      // Desktop fallback
       const objectUrl = URL.createObjectURL(blob);
       const a         = document.createElement('a');
       a.href          = objectUrl;
-      a.download      = `Mission-Recap-${data.periodLabel.replace(/\s/g, '-')}.png`;
+      a.download      = filename;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -434,10 +455,23 @@ export function RecapModal({ isOpen, onClose, userId, earnedDestinations }: Reca
 
   const handleCopy = async () => {
     try {
-      await navigator.clipboard.writeText(window.location.origin + downloadUrl);
+      if (cardRef.current && typeof ClipboardItem !== 'undefined') {
+        // Copy the actual card image so what gets pasted matches what's shown
+        const blob = await captureCardBlob(cardRef.current);
+        await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+      } else {
+        await navigator.clipboard.writeText(window.location.origin + downloadUrl);
+      }
       setIsCopied(true);
       setTimeout(() => setIsCopied(false), 2000);
-    } catch { /* ignore */ }
+    } catch {
+      // Final fallback — copy the web URL
+      try {
+        await navigator.clipboard.writeText(window.location.origin + downloadUrl);
+        setIsCopied(true);
+        setTimeout(() => setIsCopied(false), 2000);
+      } catch { /* ignore */ }
+    }
   };
 
   const handleShare = async () => {
@@ -569,8 +603,8 @@ export function RecapModal({ isOpen, onClose, userId, earnedDestinations }: Reca
                   style={{ color: 'var(--text)' }}
                 >
                   {isCopied
-                    ? <><Check size={16} className="text-success" strokeWidth={2.5} /> Link copied!</>
-                    : <><Copy size={16} /> Copy link</>}
+                    ? <><Check size={16} className="text-success" strokeWidth={2.5} /> Copied!</>
+                    : <><Copy size={16} /> Copy image</>}
                 </button>
 
                 {typeof navigator !== 'undefined' && !!navigator.share && (
