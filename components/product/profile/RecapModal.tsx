@@ -301,13 +301,21 @@ async function captureCardBlob(el: HTMLElement): Promise<Blob> {
     try {
       dataUrl = await toPng(el, { pixelRatio: 3, cacheBust: false, width: w, height: h });
       if (dataUrl) break;
-    } catch {
-      if (attempt === 1) throw new Error('capture failed');
+    } catch (err) {
+      console.error('[RecapModal] toPng attempt', attempt, err);
+      if (attempt === 1) throw err;
       await new Promise((r) => setTimeout(r, 400));
     }
   }
-  const res = await fetch(dataUrl);
-  return res.blob();
+  if (!dataUrl) throw new Error('capture produced empty output');
+
+  // Convert base64 data URL → Blob without fetch() — avoids browser data-URL fetch restrictions
+  const [header, base64] = dataUrl.split(',');
+  const mime = header.match(/:(.*?);/)?.[1] ?? 'image/png';
+  const bytes = atob(base64);
+  const arr = new Uint8Array(bytes.length);
+  for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
+  return new Blob([arr], { type: mime });
 }
 
 // ── Tiny inline SVG icon ──────────────────────────────────────────────────────
@@ -373,8 +381,8 @@ export function RecapModal({ isOpen, onClose, userId, earnedDestinations }: Reca
   const [period, setPeriod]     = useState<PeriodType>('month');
   const [isCopied, setIsCopied] = useState(false);
 
-  const panelRef   = useRef<HTMLDivElement>(null);
-  const triggerRef = useRef<HTMLElement | null>(null);
+  const panelRef      = useRef<HTMLDivElement>(null);
+  const triggerRef    = useRef<HTMLElement | null>(null);
 
   // Focus management
   useEffect(() => {
@@ -405,22 +413,25 @@ export function RecapModal({ isOpen, onClose, userId, earnedDestinations }: Reca
     return () => { document.body.style.overflow = prev; };
   }, [isOpen]);
 
+
   const data = useMemo(
     () => buildCardData(period, rosters, earnedDestinations),
     [period, rosters, earnedDestinations],
   );
 
-  // Profile for the card header
+  // Profile for the card header — avatarUrl always null so the initials fallback is used,
+  // which avoids any cross-origin image fetch during html-to-image canvas capture.
   const cardProfile = useMemo(() => {
     const name     = profile?.full_name || 'Crew Member';
     const rankLine = [profile?.rank, profile?.fleet].filter(Boolean).join(' · ') || 'Malaysia Airlines';
     const initials = name.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase();
-    return { name, rankLine, initials, avatarUrl: profile?.avatar_url ?? null };
+    return { name, rankLine, initials, avatarUrl: null };
   }, [profile]);
 
   const downloadUrl = buildDownloadUrl(userId, period);
   const cardRef     = useRef<HTMLDivElement>(null);
-  const [isDownloading, setIsDownloading] = useState(false);
+  const [isDownloading, setIsDownloading]   = useState(false);
+  const [downloadError,  setDownloadError]  = useState(false);
 
   const handleDownload = async () => {
     if (!cardRef.current || isDownloading) return;
@@ -448,6 +459,8 @@ export function RecapModal({ isOpen, onClose, userId, earnedDestinations }: Reca
       URL.revokeObjectURL(objectUrl);
     } catch (err) {
       console.error('[RecapModal] download failed', err);
+      setDownloadError(true);
+      setTimeout(() => setDownloadError(false), 3000);
     } finally {
       setIsDownloading(false);
     }
@@ -593,6 +606,8 @@ export function RecapModal({ isOpen, onClose, userId, earnedDestinations }: Reca
                 >
                   {isDownloading
                     ? <><div className="w-4 h-4 rounded-full border-2 border-white/40 border-t-white animate-spin" /> Downloading…</>
+                    : downloadError
+                    ? <>⚠ Could not capture card</>
                     : <><Download size={18} strokeWidth={2.5} /> Download PNG</>
                   }
                 </button>
@@ -667,11 +682,15 @@ function LiveRosterCard({ data, profile }: { data: CardData; profile: CardProfil
         {/* ── Header ── */}
         <header className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2.5 min-w-0">
-            {/* Avatar served via same-origin proxy so canvas capture doesn't taint */}
+            {/* Avatar: data: URL (pre-fetched) used directly; Firebase URLs proxied same-origin */}
             {profile.avatarUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
-                src={`/api/proxy-image?url=${encodeURIComponent(profile.avatarUrl)}`}
+                src={
+                  profile.avatarUrl.startsWith('data:')
+                    ? profile.avatarUrl
+                    : `/api/proxy-image?url=${encodeURIComponent(profile.avatarUrl)}`
+                }
                 alt={profile.name}
                 className="h-9 w-9 rounded-full object-cover shadow-md shrink-0"
               />
