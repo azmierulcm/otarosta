@@ -35,6 +35,24 @@ export const Navbar = () => {
             <span className="text-[22px] font-bold text-text tracking-tight">Otarosta</span>
           </Link>
 
+          {/* Mobile auth buttons — only shown to unauthenticated visitors */}
+          {!user && (
+            <div className="flex items-center gap-2 md:hidden">
+              <button
+                onClick={() => openAuthModal('login')}
+                className="px-3 py-1.5 rounded-[var(--radius-pill)] text-[13px] font-medium text-text-muted hover:bg-surface transition-colors"
+              >
+                Sign in
+              </button>
+              <button
+                onClick={() => openAuthModal('signup')}
+                className="px-4 py-1.5 rounded-[var(--radius-pill)] bg-accent text-accent-fg text-[13px] font-bold hover:bg-accent-hover transition-colors shadow-[var(--shadow-sm)]"
+              >
+                Get started
+              </button>
+            </div>
+          )}
+
           {/* Desktop right */}
           <div className="hidden md:flex items-center gap-2">
             {user ? (
