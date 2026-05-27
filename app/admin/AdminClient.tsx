@@ -136,7 +136,10 @@ function ListingsTab() {
   const load = useCallback(async () => {
     if (!user) return;
     setLoading(true);
-    try { setListings(await adminGetAllListings()); }
+    try {
+      const token = await user.getIdToken();
+      setListings(await adminGetAllListings(token));
+    }
     finally { setLoading(false); }
   }, [user]);
 
@@ -146,15 +149,25 @@ function ListingsTab() {
   }, [load]);
 
   const setStatus = async (id: string, status: ListingStatus) => {
+    if (!user) return;
     setActionId(id);
-    try { await adminSetListingStatus(id, status); await load(); }
+    try {
+      const token = await user.getIdToken();
+      await adminSetListingStatus(id, status, token);
+      await load();
+    }
     finally { setActionId(null); }
   };
 
   const remove = async (id: string) => {
+    if (!user) return;
     if (!confirm('Permanently delete this listing?')) return;
     setActionId(id);
-    try { await adminDeleteListing(id); setListings((p) => p.filter((l) => l.id !== id)); }
+    try {
+      const token = await user.getIdToken();
+      await adminDeleteListing(id, token);
+      setListings((p) => p.filter((l) => l.id !== id));
+    }
     finally { setActionId(null); }
   };
 
@@ -165,13 +178,14 @@ function ListingsTab() {
   };
 
   const saveEdit = async () => {
-    if (!editId) return;
+    if (!editId || !user) return;
     setActionId(editId);
     try {
+      const token = await user.getIdToken();
       await adminUpdateListing(editId, {
         title: editTitle,
         price: parseFloat(editPrice) || 0,
-      });
+      }, token);
       setListings((p) => p.map((l) =>
         l.id === editId ? { ...l, title: editTitle, price: parseFloat(editPrice) || l.price } : l,
       ));

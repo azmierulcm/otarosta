@@ -1,0 +1,10 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // All reads and writes must go through the server (Admin SDK via Next.js API routes / Server Actions).
+    // The client-side Firebase SDK is only used for Auth — never for direct Firestore access.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

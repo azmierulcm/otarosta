@@ -35,7 +35,8 @@ export default function ListingDetailClient({ listing }: Props) {
     if (!confirm('Delete this listing? This cannot be undone.')) return;
     setBusy(true);
     try {
-      await deleteListing(listing.id, user.uid);
+      const token = await user.getIdToken();
+      await deleteListing(listing.id, token);
       router.push('/marketplace');
     } finally {
       setBusy(false);
@@ -46,7 +47,8 @@ export default function ListingDetailClient({ listing }: Props) {
     if (!user) return;
     setBusy(true);
     try {
-      await setListingStatus(listing.id, user.uid, 'sold');
+      const token = await user.getIdToken();
+      await setListingStatus(listing.id, token, 'sold');
       router.refresh();
     } finally {
       setBusy(false);
@@ -57,7 +59,8 @@ export default function ListingDetailClient({ listing }: Props) {
     if (!user) return;
     setBusy(true);
     try {
-      await renewListing(listing.id, user.uid);
+      const token = await user.getIdToken();
+      await renewListing(listing.id, token);
       router.refresh();
     } finally {
       setBusy(false);
@@ -254,7 +257,6 @@ export default function ListingDetailClient({ listing }: Props) {
           isOpen={reportOpen}
           onClose={() => setReportOpen(false)}
           listingId={listing.id}
-          reportingUserId={user.uid}
         />
       )}
     </div>

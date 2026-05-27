@@ -3,25 +3,28 @@
 import React, { useState } from 'react';
 import { Flag, Loader2 } from 'lucide-react';
 import { Modal } from '@/components/shared/Modal';
+import { useAuth } from '@/lib/contexts/AuthContext';
 import { reportListing } from '@/lib/actions/listings';
 
 interface ReportModalProps {
   isOpen: boolean;
   onClose: () => void;
   listingId: string;
-  reportingUserId: string;
 }
 
 const TITLE_ID = 'report-modal-title';
 
-export function ReportModal({ isOpen, onClose, listingId, reportingUserId }: ReportModalProps) {
+export function ReportModal({ isOpen, onClose, listingId }: ReportModalProps) {
+  const { user } = useAuth();
   const [status, setStatus] = useState<'idle' | 'loading' | 'done' | 'error'>('idle');
   const [errorMsg, setErrorMsg] = useState('');
 
   async function handleReport() {
+    if (!user) return;
     setStatus('loading');
     try {
-      await reportListing(listingId, reportingUserId);
+      const token = await user.getIdToken();
+      await reportListing(listingId, token);
       setStatus('done');
     } catch (e: unknown) {
       setErrorMsg(e instanceof Error ? e.message : 'Something went wrong');

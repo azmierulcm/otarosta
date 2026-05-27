@@ -45,7 +45,8 @@ export default function EditListingPage() {
     if (!user) return;
     setError('');
     try {
-      await updateListing(listingId, user.uid, data);
+      const token = await user.getIdToken();
+      await updateListing(listingId, token, data);
       router.push(`/marketplace/${listingId}`);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Failed to update listing');

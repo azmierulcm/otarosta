@@ -6,7 +6,7 @@ import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { Flag, ShieldCheck, Trash2, Loader2, ExternalLink } from 'lucide-react';
 import { useAuth } from '@/lib/contexts/AuthContext';
-import { getModQueue, restoreListing, deleteListing } from '@/lib/actions/listings';
+import { getModQueue, restoreListing, adminDeleteListing } from '@/lib/actions/listings';
 import type { Listing } from '@/lib/types/marketplace';
 import { CATEGORY_LABELS, CONDITION_LABELS } from '@/lib/types/marketplace';
 
@@ -22,14 +22,16 @@ export default function ModerationClient() {
   const isAdmin = user?.email && ADMIN_EMAILS.includes(user.email);
 
   const fetchQueue = useCallback(async () => {
+    if (!user) return;
     setLoading(true);
     try {
-      const data = await getModQueue();
+      const token = await user.getIdToken();
+      const data = await getModQueue(token);
       setListings(data);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     if (!isLoading && isAdmin) {
@@ -43,20 +45,24 @@ export default function ModerationClient() {
   }, [isLoading, isAdmin, router]);
 
   async function handleRestore(id: string) {
+    if (!user) return;
     setActionId(id);
     try {
-      await restoreListing(id);
+      const token = await user.getIdToken();
+      await restoreListing(id, token);
       setListings((prev) => prev.filter((l) => l.id !== id));
     } finally {
       setActionId(null);
     }
   }
 
-  async function handleDelete(id: string, userId: string) {
+  async function handleDelete(id: string) {
+    if (!user) return;
     if (!confirm('Permanently delete this listing?')) return;
     setActionId(id);
     try {
-      await deleteListing(id, userId);
+      const token = await user.getIdToken();
+      await adminDeleteListing(id, token);
       setListings((prev) => prev.filter((l) => l.id !== id));
     } finally {
       setActionId(null);
@@ -143,7 +149,7 @@ export default function ModerationClient() {
                   Restore
                 </button>
                 <button
-                  onClick={() => handleDelete(listing.id, listing.userId)}
+                  onClick={() => handleDelete(listing.id)}
                   disabled={actionId === listing.id}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-pill)] border border-destructive/30 text-[12px] font-semibold text-destructive hover:bg-destructive/5 disabled:opacity-60 transition-colors"
                 >

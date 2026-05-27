@@ -2,6 +2,7 @@
 
 import { adminDb } from '@/lib/firebase/admin';
 import { Timestamp, FieldValue } from 'firebase-admin/firestore';
+import { verifyIdToken, assertAdmin } from '@/lib/firebase/auth-helpers';
 import { isVerifiedCrew } from '@/lib/actions/users';
 import type {
   Listing,
@@ -59,7 +60,7 @@ function docToListing(id: string, d: FirebaseFirestore.DocumentData): Listing {
 // ---------------------------------------------------------------------------
 
 export interface CreateListingOptions {
-  userId: string;
+  token: string;
   sellerName: string;
   sellerBase: string;
   sellerMemberSince: string;
@@ -67,7 +68,8 @@ export interface CreateListingOptions {
 }
 
 export async function createListing(opts: CreateListingOptions): Promise<string> {
-  const { userId, sellerName, sellerBase, sellerMemberSince, input } = opts;
+  const { token, sellerName, sellerBase, sellerMemberSince, input } = opts;
+  const userId = await verifyIdToken(token);
 
   const verified = await isVerifiedCrew(userId);
 
@@ -170,9 +172,10 @@ export async function getUserListings(userId: string): Promise<Listing[]> {
 
 export async function updateListing(
   listingId: string,
-  userId: string,
+  token: string,
   input: Partial<ListingInput>,
 ): Promise<void> {
+  const userId = await verifyIdToken(token);
   const ref = adminDb.collection('listings').doc(listingId);
   const doc = await ref.get();
   if (!doc.exists) throw new Error('Listing not found');
@@ -186,9 +189,10 @@ export async function updateListing(
 
 export async function setListingStatus(
   listingId: string,
-  userId: string,
+  token: string,
   status: ListingStatus,
 ): Promise<void> {
+  const userId = await verifyIdToken(token);
   const ref = adminDb.collection('listings').doc(listingId);
   const doc = await ref.get();
   if (!doc.exists) throw new Error('Listing not found');
@@ -196,7 +200,8 @@ export async function setListingStatus(
   await ref.update({ status, updatedAt: Timestamp.now() });
 }
 
-export async function deleteListing(listingId: string, userId: string): Promise<void> {
+export async function deleteListing(listingId: string, token: string): Promise<void> {
+  const userId = await verifyIdToken(token);
   const ref = adminDb.collection('listings').doc(listingId);
   const doc = await ref.get();
   if (!doc.exists) throw new Error('Listing not found');
@@ -208,7 +213,8 @@ export async function deleteListing(listingId: string, userId: string): Promise<
 // Renew
 // ---------------------------------------------------------------------------
 
-export async function renewListing(listingId: string, userId: string): Promise<void> {
+export async function renewListing(listingId: string, token: string): Promise<void> {
+  const userId = await verifyIdToken(token);
   const ref = adminDb.collection('listings').doc(listingId);
   const doc = await ref.get();
   if (!doc.exists) throw new Error('Listing not found');
@@ -225,7 +231,8 @@ export async function renewListing(listingId: string, userId: string): Promise<v
 // Report
 // ---------------------------------------------------------------------------
 
-export async function reportListing(listingId: string, reportingUserId: string): Promise<void> {
+export async function reportListing(listingId: string, token: string): Promise<void> {
+  const reportingUserId = await verifyIdToken(token);
   const ref = adminDb.collection('listings').doc(listingId);
 
   await adminDb.runTransaction(async (tx) => {
@@ -253,7 +260,8 @@ export async function reportListing(listingId: string, reportingUserId: string):
 // Admin — moderation queue
 // ---------------------------------------------------------------------------
 
-export async function getModQueue(): Promise<Listing[]> {
+export async function getModQueue(token: string): Promise<Listing[]> {
+  await assertAdmin(token);
   const snap = await adminDb
     .collection('listings')
     .where('status', '==', 'hidden')
@@ -263,7 +271,8 @@ export async function getModQueue(): Promise<Listing[]> {
     .sort((a, b) => b.reportCount - a.reportCount);
 }
 
-export async function restoreListing(listingId: string): Promise<void> {
+export async function restoreListing(listingId: string, token: string): Promise<void> {
+  await assertAdmin(token);
   await adminDb.collection('listings').doc(listingId).update({
     status: 'active',
     reportCount: 0,
@@ -276,7 +285,8 @@ export async function restoreListing(listingId: string): Promise<void> {
 // Admin — all listings (no auth check — server-only, called from admin pages)
 // ---------------------------------------------------------------------------
 
-export async function adminGetAllListings(): Promise<Listing[]> {
+export async function adminGetAllListings(token: string): Promise<Listing[]> {
+  await assertAdmin(token);
   const snap = await adminDb
     .collection('listings')
     .orderBy('createdAt', 'desc')
@@ -284,18 +294,21 @@ export async function adminGetAllListings(): Promise<Listing[]> {
   return snap.docs.map((doc) => docToListing(doc.id, doc.data()));
 }
 
-export async function adminSetListingStatus(listingId: string, status: ListingStatus): Promise<void> {
+export async function adminSetListingStatus(listingId: string, status: ListingStatus, token: string): Promise<void> {
+  await assertAdmin(token);
   await adminDb.collection('listings').doc(listingId).update({
     status,
     updatedAt: Timestamp.now(),
   });
 }
 
-export async function adminDeleteListing(listingId: string): Promise<void> {
+export async function adminDeleteListing(listingId: string, token: string): Promise<void> {
+  await assertAdmin(token);
   await adminDb.collection('listings').doc(listingId).delete();
 }
 
-export async function adminUpdateListing(listingId: string, input: Partial<ListingInput>): Promise<void> {
+export async function adminUpdateListing(listingId: string, input: Partial<ListingInput>, token: string): Promise<void> {
+  await assertAdmin(token);
   await adminDb.collection('listings').doc(listingId).update({
     ...input,
     updatedAt: Timestamp.now(),

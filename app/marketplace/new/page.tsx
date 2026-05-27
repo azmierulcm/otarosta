@@ -33,8 +33,9 @@ export default function NewListingPage() {
     if (!user || !profile) return;
     setError('');
     try {
+      const token = await user.getIdToken();
       const id = await createListing({
-        userId: user.uid,
+        token,
         sellerName: profile.full_name ?? user.displayName ?? 'Crew Member',
         sellerBase: profile.rank ?? 'KUL',
         sellerMemberSince: user.metadata.creationTime ?? new Date().toISOString(),
