@@ -12,7 +12,7 @@ import type { Listing } from '@/lib/types/marketplace';
 import {
   User2, Plane, Building2, MapPin, FileText,
   Loader2, Check, ChevronDown, ArrowRight, Camera, Trash2,
-  Lock, ShoppingBag, ExternalLink, Share2, Copy, RefreshCw, MessageCircle, AlertTriangle,
+  Lock, ShoppingBag, ExternalLink,
 } from 'lucide-react';
 import { FlipWords } from '@/components/shared/FlipWords';
 
@@ -104,12 +104,6 @@ export default function SettingsClient() {
   const [listings, setListings] = useState<Listing[]>([]);
   const [listingsLoading, setListingsLoading] = useState(false);
 
-  // Spouse Share state
-  const [shareToken, setShareToken] = useState<string | null>(null);
-  const [isResetting, setIsResetting] = useState(false);
-  const [showResetConfirm, setShowResetConfirm] = useState(false);
-  const [copied, setCopied] = useState(false);
-
   // Pre-fill from existing profile
   useEffect(() => {
     if (profile) {
@@ -123,7 +117,6 @@ export default function SettingsClient() {
         bio:       profile.bio       ?? '',
       });
       setAvatarUrl(profile.avatar_url ?? null);
-      setShareToken(profile.spouse_share_token ?? null);
     }
   }, [profile]);
 
@@ -207,42 +200,6 @@ export default function SettingsClient() {
     } finally {
       setPwResetLoading(false);
     }
-  };
-
-  const handleResetToken = async () => {
-    if (!user) return;
-    setIsResetting(true);
-    try {
-      const idToken = await user.getIdToken();
-      const res = await fetch('/api/user/share-token/reset', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${idToken}` },
-      });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error || 'Reset failed');
-      setShareToken(json.token);
-      setProfile({ ...(profile ?? { id: user.uid }), spouse_share_token: json.token });
-      setShowResetConfirm(false);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not reset link.');
-    } finally {
-      setIsResetting(false);
-    }
-  };
-
-  const shareUrl = typeof window !== 'undefined'
-    ? `${window.location.origin}/roster/view?token=${shareToken}`
-    : '';
-
-  const handleCopyLink = () => {
-    navigator.clipboard.writeText(shareUrl);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  const handleWhatsAppShare = () => {
-    const text = `Hey, here is my active flight roster: ${shareUrl}`;
-    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -558,77 +515,6 @@ export default function SettingsClient() {
         </div>
       )}
 
-      {/* ── Family Sharing ── */}
-      {!isOnboarding && (
-        <div className="mt-6 bg-white border border-border rounded-[2rem] p-6 shadow-sm">
-          <div className="text-[10px] font-black uppercase tracking-[0.35em] text-text-subtle font-mono mb-4">
-            Family Sharing
-          </div>
-
-          {shareToken ? (
-            <div className="space-y-3">
-              {/* Illustration strip */}
-              <div className="w-full rounded-2xl bg-gradient-to-br from-accent/8 to-accent/4 border border-accent/10 p-5 flex items-center gap-4">
-                <div className="w-12 h-12 rounded-2xl bg-accent/10 flex items-center justify-center shrink-0">
-                  <Share2 size={22} className="text-accent" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-[13px] font-black text-text leading-tight">Link active</p>
-                  <p className="text-[11px] font-bold text-text-muted mt-0.5 leading-snug">
-                    Your family can see your live roster — where you are and when you&apos;re home.
-                  </p>
-                </div>
-              </div>
-
-              {/* Primary: WhatsApp */}
-              <button
-                type="button"
-                onClick={handleWhatsAppShare}
-                className="w-full flex items-center justify-center gap-2.5 py-4 rounded-2xl bg-[#25D366] text-white text-[14px] font-black hover:opacity-90 active:scale-[0.98] transition-all shadow-lg shadow-[#25D366]/20"
-              >
-                <MessageCircle size={18} />
-                Send via WhatsApp
-              </button>
-
-              {/* Secondary: Copy */}
-              <button
-                type="button"
-                onClick={handleCopyLink}
-                className="w-full flex items-center justify-center gap-2.5 py-4 rounded-2xl bg-surface-2 border border-border text-[14px] font-black text-text hover:bg-white transition-all"
-              >
-                {copied ? <Check size={18} className="text-success" /> : <Copy size={18} />}
-                {copied ? 'Copied!' : 'Copy link'}
-              </button>
-
-              {/* Danger: Reset */}
-              <button
-                type="button"
-                onClick={() => setShowResetConfirm(true)}
-                className="w-full flex items-center justify-center gap-2 py-3 text-[12px] font-black text-danger/70 hover:text-danger transition-colors"
-              >
-                <RefreshCw size={13} />
-                Reset link
-              </button>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              <p className="text-[12px] font-bold text-text-muted leading-snug">
-                Generate a private link so your family can see your live roster — no account needed.
-              </p>
-              <button
-                type="button"
-                onClick={handleResetToken}
-                disabled={isResetting}
-                className="w-full flex items-center justify-center gap-2.5 py-4 rounded-2xl bg-accent text-accent-fg text-[14px] font-black hover:opacity-90 transition-all disabled:opacity-60 shadow-lg shadow-accent/20"
-              >
-                {isResetting ? <Loader2 size={18} className="animate-spin" /> : <Share2 size={18} />}
-                Create Share Link
-              </button>
-            </div>
-          )}
-        </div>
-      )}
-
       {/* ── My listings ── */}
       {!isOnboarding && (
         <div className="mt-6 bg-white border border-border rounded-[2rem] p-8 shadow-sm space-y-4">
@@ -689,39 +575,6 @@ export default function SettingsClient() {
         </div>
       )}
 
-      {/* ── Reset confirmation modal ── */}
-      {showResetConfirm && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white rounded-[2.5rem] p-8 max-w-sm w-full shadow-2xl animate-in zoom-in-95 duration-200">
-            <div className="w-16 h-16 rounded-3xl bg-danger/10 flex items-center justify-center mb-6">
-              <AlertTriangle size={32} className="text-danger" />
-            </div>
-            <h3 className="text-2xl font-black tracking-tight text-text leading-tight mb-2">
-              Reset share link?
-            </h3>
-            <p className="text-[14px] text-text-muted font-bold leading-relaxed mb-8">
-              The current link will stop working immediately. You&apos;ll need to send the new link to your family.
-            </p>
-            <div className="grid grid-cols-1 gap-3">
-              <button
-                type="button"
-                onClick={handleResetToken}
-                disabled={isResetting}
-                className="w-full py-4 rounded-full bg-danger text-white text-[15px] font-black hover:bg-danger-hover transition-all disabled:opacity-50"
-              >
-                {isResetting ? <Loader2 size={18} className="animate-spin mx-auto" /> : 'Yes, reset it'}
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowResetConfirm(false)}
-                className="w-full py-4 rounded-full text-[15px] font-black text-text-muted hover:text-text transition-colors"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

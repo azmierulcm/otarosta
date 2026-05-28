@@ -12,6 +12,7 @@ import { DestinationPatch } from './DestinationPatch';
 import { FileUploader } from './FileUploader';
 import { RosterTile, dayEventsToDuty } from './RosterTile';
 import { FamilyCard } from './family/FamilyCard';
+import { FamilyShareWidget } from './FamilyShareWidget';
 import { RecapModal } from './profile/RecapModal';
 import { getLifetimeDestinations, type EarnedDestination } from '@/lib/actions/destinations';
 
@@ -928,8 +929,13 @@ export const Dashboard = () => {
                   </span>
                 }
               >
-                <div className="rounded-[2rem] overflow-hidden border border-border">
-                  <FamilyCard />
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+                  {/* Share link management */}
+                  <FamilyShareWidget />
+                  {/* Visual family card */}
+                  <div className="rounded-[2rem] overflow-hidden border border-border">
+                    <FamilyCard />
+                  </div>
                 </div>
               </CollapsibleSection>
             );
