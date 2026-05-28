@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
+import { Timestamp } from 'firebase-admin/firestore';
+import type { DutyEvent } from '@/lib/types';
 
 export async function GET(request: NextRequest) {
   try {
@@ -10,48 +12,64 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Token required' }, { status: 400 });
     }
 
-    // 1. Find the user with this token
-    const profilesRef = adminDb.collection('profiles');
-    const querySnapshot = await profilesRef.where('spouse_share_token', '==', token).limit(1).get();
+    // 1. Resolve token → profile
+    const profileSnap = await adminDb
+      .collection('profiles')
+      .where('spouse_share_token', '==', token)
+      .limit(1)
+      .get();
 
-    if (querySnapshot.empty) {
+    if (profileSnap.empty) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 404 });
     }
 
-    const profileDoc = querySnapshot.docs[0];
-    const userId = profileDoc.id;
+    const profileDoc  = profileSnap.docs[0];
+    const userId      = profileDoc.id;
     const profileData = profileDoc.data();
 
-    // 2. Fetch the active roster for this user — sort in JS to avoid needing a composite index
-    const rostersRef = adminDb.collection('rosters');
-    const rosterSnapshot = await rostersRef
+    // 2. Fetch all rosters for this user and serialize cleanly
+    //    (never pass raw Firestore docs to JSON — Timestamps won't serialize)
+    const rosterSnap = await adminDb
+      .collection('rosters')
       .where('userId', '==', userId)
       .get();
 
-    if (rosterSnapshot.empty) {
+    if (rosterSnap.empty) {
       return NextResponse.json({ error: 'No roster found' }, { status: 404 });
     }
 
-    const rosterData = rosterSnapshot.docs
-      .map(d => d.data())
-      .sort((a, b) => {
-        const aTime = a.uploadedAt?.toMillis?.() ?? 0;
-        const bTime = b.uploadedAt?.toMillis?.() ?? 0;
-        return bTime - aTime;
-      })[0];
+    const rosters = rosterSnap.docs
+      .map(doc => {
+        const d = doc.data();
+        const uploadedAt =
+          d.uploadedAt instanceof Timestamp
+            ? d.uploadedAt.toDate().toISOString()
+            : typeof d.uploadedAt === 'string'
+            ? d.uploadedAt
+            : new Date(0).toISOString();
+
+        return {
+          month:      d.month      as string,
+          year:       d.year       as string,
+          events:     (d.events    as DutyEvent[]) ?? [],
+          airline:    (d.airline   as string | undefined) ?? undefined,
+          uploadedAt,
+        };
+      })
+      .sort((a, b) => b.uploadedAt.localeCompare(a.uploadedAt)); // newest first
 
     return NextResponse.json({
       pilot: {
-        full_name:  profileData.full_name || 'Pilot',
-        rank:       profileData.rank,
-        airline:    profileData.airline,
+        full_name:  profileData.full_name  || 'Pilot',
+        rank:       profileData.rank       ?? null,
+        airline:    profileData.airline    ?? null,
         avatar_url: profileData.avatar_url ?? null,
-        base:       profileData.base ?? 'KUL',
+        base:       profileData.base       ?? 'KUL',
       },
-      roster: rosterData,
+      rosters,
     });
   } catch (error) {
-    console.error('Error fetching shared roster:', error);
+    console.error('[roster/share]', error);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }
