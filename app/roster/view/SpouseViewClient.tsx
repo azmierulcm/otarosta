@@ -3,14 +3,16 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { DateTime } from 'luxon';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Plane, Clock, Home, AlertCircle, Loader2, MapPin,
-  ChevronLeft, ChevronRight, ArrowRight, X,
+  Plane, Moon, Coffee, ChevronRight, CalendarDays,
+  MapPin, BadgeCheck, AlertCircle, Loader2,
+  ChevronLeft, Clock, X,
 } from 'lucide-react';
 import { getAirportMeta } from '@/lib/utils/destinations';
 import type { DutyEvent } from '@/lib/types';
 
-// ─── API shape ────────────────────────────────────────────────────────────────
+// ─── API types ────────────────────────────────────────────────────────────────
 
 interface SharedRoster {
   month: string;
@@ -28,87 +30,162 @@ interface PilotInfo {
   base: string;
 }
 
+// ─── Card data model (adapted from your design) ────────────────────────────────
+
+type CardType = 'flight' | 'off' | 'standby' | 'training' | 'blank';
+
+interface Sector {
+  from: string;
+  to: string;
+  flight: string;
+  depart: string;
+  arrive: string;
+}
+
+interface CardItem {
+  date: number;
+  dateStr: string;
+  day: string;         // "Mon" etc.
+  type: CardType;
+  code?: string;
+  home: string;
+  start?: string;
+  end?: string;
+  work?: string;
+  continues: boolean;
+  sectors: Sector[];
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-type DayStatus = 'FLIGHT' | 'STANDBY' | 'LAYOVER' | 'DUTY' | 'OFF_DO' | 'OFF_D' | 'EMPTY';
+function cn(...parts: (string | boolean | undefined | null)[]): string {
+  return parts.filter(Boolean).join(' ');
+}
 
 function cityName(iata?: string | null): string {
-  if (!iata) return '';
+  if (!iata) return iata ?? '';
   return getAirportMeta(iata).city || iata;
 }
 
-function getDayStatus(evts: DutyEvent[]): DayStatus {
-  if (!evts.length) return 'EMPTY';
-  if (evts.some(e => e.type === 'FLIGHT'))   return 'FLIGHT';
-  if (evts.some(e => e.type === 'LAYOVER'))  return 'LAYOVER';
-  if (evts.some(e => e.type === 'STANDBY'))  return 'STANDBY';
-  if (evts.some(e => e.type === 'TRAINING' || e.type === 'GROUND')) return 'DUTY';
-  // OFF subtypes — check the duty code
-  const off = evts.find(e => e.type === 'OFF');
-  if (off?.item === 'DO') return 'OFF_DO';
-  return 'OFF_D';
-}
-
-// Header bar colours — match reference image colour scheme
-const HEADER_BG: Record<DayStatus, string> = {
-  FLIGHT:  'bg-sky-500',
-  LAYOVER: 'bg-sky-500',         // overnight away still shows blue
-  STANDBY: 'bg-amber-500',
-  DUTY:    'bg-purple-600',
-  OFF_DO:  'bg-emerald-600',
-  OFF_D:   'bg-green-700',
-  EMPTY:   'bg-gray-200',
-};
-
-// Cell body background (lighter shade beneath the header)
-const CELL_BG: Record<DayStatus, string> = {
-  FLIGHT:  'bg-sky-50',
-  LAYOVER: 'bg-indigo-50',
-  STANDBY: 'bg-amber-50',
-  DUTY:    'bg-purple-50',
-  OFF_DO:  'bg-emerald-50',
-  OFF_D:   'bg-green-50',
-  EMPTY:   'bg-gray-50',
-};
-
-// ─── "Continues next day" detection ───────────────────────────────────────────
-// A flight arrives next day when its STA is earlier than STD (crossed midnight)
-
-function isOvernight(f: DutyEvent): boolean {
+function isOvernightFlight(f: DutyEvent): boolean {
   if (!f.std || !f.sta) return false;
   return f.sta < f.std;
 }
 
-function hasLayoverTonight(evts: DutyEvent[]): boolean {
-  return evts.some(e => e.type === 'LAYOVER');
+// Convert our DutyEvent[] for a given day into a CardItem
+function buildCardItem(
+  dateStr: string,
+  events: DutyEvent[],
+  base: string,
+): CardItem {
+  const dt  = DateTime.fromISO(dateStr);
+  const day = dt.toFormat('ccc'); // "Mon", "Tue" …
+
+  const flights  = events.filter(e => e.type === 'FLIGHT');
+  const standby  = events.find(e => e.type === 'STANDBY');
+  const layover  = events.find(e => e.type === 'LAYOVER');
+  const off      = events.find(e => e.type === 'OFF');
+  const training = events.find(e => e.type === 'TRAINING' || e.type === 'GROUND');
+
+  // ── Flight day ──
+  if (flights.length > 0) {
+    const first = flights[0];
+    const last  = flights[flights.length - 1];
+    const overnight = isOvernightFlight(last);
+    const sectors: Sector[] = flights.map(f => ({
+      from:   f.depPort || '—',
+      to:     f.arrPort || '—',
+      flight: f.item || f.flightNumber || '—',
+      depart: f.std || f.signOn || '—',
+      arrive: `${f.sta || f.signOff || '—'}${isOvernightFlight(f) ? '+' : ''}`,
+    }));
+    // Also attach layover sector if exists (represents the overnight leg)
+    if (layover && layover.depPort && layover.arrPort) {
+      sectors.push({
+        from:   layover.depPort,
+        to:     layover.arrPort,
+        flight: layover.item || 'LAY',
+        depart: layover.signOn || '—',
+        arrive: layover.signOff || '—',
+      });
+    }
+    return {
+      date: dt.day, dateStr, day,
+      type: 'flight',
+      code: first.item || first.flightNumber,
+      home: base,
+      start: first.std || first.signOn,
+      end:  `${last.sta || last.signOff || ''}${overnight ? '+' : ''}`,
+      work: first.dutyCode,
+      continues: overnight || !!layover,
+      sectors,
+    };
+  }
+
+  // ── Standby day (includes LAYOVER-only days — pilot away on standby) ──
+  if (standby || (layover && !flights.length)) {
+    const ev = standby || layover!;
+    const sectors: Sector[] = (ev.depPort && ev.arrPort) ? [{
+      from:   ev.depPort,
+      to:     ev.arrPort,
+      flight: ev.item || '',
+      depart: ev.signOn || '—',
+      arrive: ev.signOff || '—',
+    }] : [];
+    return {
+      date: dt.day, dateStr, day,
+      type: 'standby',
+      code: ev.item,
+      home: base,
+      start: ev.signOn,
+      end:   ev.signOff,
+      continues: false,
+      sectors,
+    };
+  }
+
+  // ── Training / ground duty ──
+  if (training) {
+    return {
+      date: dt.day, dateStr, day,
+      type: 'training',
+      code: training.item || training.description,
+      home: base,
+      start: training.signOn,
+      end:   training.signOff,
+      continues: false,
+      sectors: [],
+    };
+  }
+
+  // ── Off day ──
+  if (off) {
+    return {
+      date: dt.day, dateStr, day,
+      type: 'off',
+      code: off.item || 'D',
+      home: base,
+      continues: false,
+      sectors: [],
+    };
+  }
+
+  // ── Blank / rest ──
+  return {
+    date: dt.day, dateStr, day,
+    type: 'blank',
+    home: base,
+    continues: false,
+    sectors: [],
+  };
 }
 
-function continuesNextDay(evts: DutyEvent[]): boolean {
-  const flights = evts.filter(e => e.type === 'FLIGHT');
-  return flights.some(isOvernight) || hasLayoverTonight(evts);
-}
-
-// ─── Calendar week grouping ───────────────────────────────────────────────────
-
-interface CalDay {
-  date: string;
-  dayNum: number;
-  status: DayStatus;
-  events: DutyEvent[];
-  isToday: boolean;
-  isPast: boolean;
-}
-
-type CalCell = CalDay | null;
-
-function buildCalendar(
-  roster: SharedRoster,
-  now: DateTime,
-): { weeks: CalCell[][]; eventMap: Map<string, DutyEvent[]> } {
+// Build the full month's card list (all days, including blanks with no events)
+function buildRosterCards(roster: SharedRoster, base: string): CardItem[] {
   const start = DateTime.fromFormat(`${roster.month} ${roster.year}`, 'MMMM yyyy');
-  if (!start.isValid) return { weeks: [], eventMap: new Map() };
+  if (!start.isValid) return [];
 
-  // Build event map
+  // Group events by date
   const eventMap = new Map<string, DutyEvent[]>();
   for (const e of roster.events ?? []) {
     const list = eventMap.get(e.date) ?? [];
@@ -117,51 +194,255 @@ function buildCalendar(
   }
 
   const daysInMonth = start.daysInMonth ?? 30;
-  // Monday-first: Luxon weekday Mon=1…Sun=7 → offset = weekday-1
-  const firstOffset = start.weekday === 7 ? 6 : start.weekday - 1;
-
-  const cells: CalCell[] = [];
-  for (let i = 0; i < firstOffset; i++) cells.push(null);
-
+  const cards: CardItem[] = [];
   for (let d = 1; d <= daysInMonth; d++) {
     const dt      = start.set({ day: d });
     const dateStr = dt.toFormat('yyyy-MM-dd');
-    const evts    = eventMap.get(dateStr) ?? [];
-    cells.push({
-      date:    dateStr,
-      dayNum:  d,
-      status:  getDayStatus(evts),
-      events:  evts,
-      isToday: dt.hasSame(now, 'day'),
-      isPast:  dt < now.startOf('day'),
-    });
+    cards.push(buildCardItem(dateStr, eventMap.get(dateStr) ?? [], base));
   }
-
-  // Pad to complete last row
-  while (cells.length % 7 !== 0) cells.push(null);
-
-  // Slice into weeks
-  const weeks: CalCell[][] = [];
-  for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
-
-  return { weeks, eventMap };
+  return cards;
 }
 
-// ─── Hero status ──────────────────────────────────────────────────────────────
+// ─── Type styles ──────────────────────────────────────────────────────────────
 
-interface HeroStatus {
-  label: string;
-  subtitle: string;
-  tag: string;
-  gradient: string;
-  Icon: React.ElementType;
+const TYPE_STYLES: Record<CardType, {
+  card: string; bar: string; badge: string; text: string;
+}> = {
+  flight:   { card: 'bg-sky-50 border-sky-200',       bar: 'from-sky-600 to-cyan-500',       badge: 'bg-sky-100 text-sky-700',       text: 'text-sky-900'     },
+  off:      { card: 'bg-emerald-50 border-emerald-200', bar: 'from-emerald-700 to-lime-600',  badge: 'bg-emerald-100 text-emerald-700', text: 'text-emerald-900' },
+  standby:  { card: 'bg-yellow-50 border-yellow-200',  bar: 'from-yellow-600 to-amber-400',   badge: 'bg-yellow-100 text-yellow-800',  text: 'text-yellow-900'  },
+  training: { card: 'bg-fuchsia-50 border-fuchsia-200', bar: 'from-fuchsia-700 to-pink-500', badge: 'bg-fuchsia-100 text-fuchsia-700', text: 'text-fuchsia-900' },
+  blank:    { card: 'bg-slate-50 border-slate-200',    bar: 'from-slate-300 to-slate-200',    badge: 'bg-slate-100 text-slate-500',    text: 'text-slate-700'   },
+};
+
+const TYPE_LABEL: Record<CardType, string> = {
+  flight: 'Flight', off: 'Off', standby: 'Standby', training: 'Training', blank: 'Rest',
+};
+
+// ─── RosterCard ───────────────────────────────────────────────────────────────
+
+function RosterCard({
+  item, isSelected, onClick, isToday,
+}: {
+  item: CardItem;
+  isSelected: boolean;
+  onClick: () => void;
+  isToday: boolean;
+}) {
+  const style = TYPE_STYLES[item.type];
+
+  return (
+    <motion.button
+      type="button"
+      layout
+      onClick={onClick}
+      whileTap={{ scale: 0.97 }}
+      className={cn(
+        'group relative min-h-[132px] w-full overflow-hidden rounded-3xl border p-3 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg',
+        style.card,
+        isSelected  && 'ring-2 ring-slate-950/80',
+        isToday     && 'ring-2 ring-accent shadow-md',
+      )}
+    >
+      {/* Gradient bar */}
+      <div className={cn('absolute inset-x-0 top-0 h-9 bg-gradient-to-r', style.bar)} />
+
+      {/* Header row */}
+      <div className="relative z-10 flex items-center justify-between">
+        <span className={cn(
+          'grid h-8 w-8 place-items-center rounded-lg border border-white/70 bg-white text-sm font-black shadow-sm',
+          isToday && 'bg-accent text-accent-fg border-accent/30',
+        )}>
+          {String(item.date).padStart(2, '0')}
+        </span>
+        <div className="flex items-center gap-1 text-white/90">
+          {item.type === 'flight' &&
+            Array.from({ length: Math.min(item.sectors.length || 1, 3) }).map((_, i) => (
+              <Plane key={i} size={12} />
+            ))
+          }
+          {item.continues && <ChevronRight size={14} strokeWidth={3} />}
+        </div>
+      </div>
+
+      {/* Body */}
+      <div className="mt-8 space-y-2">
+        <div className="flex items-center justify-between gap-1">
+          <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+            {item.day}
+          </span>
+          <span className={cn('rounded-full px-2 py-0.5 text-[10px] font-bold', style.badge)}>
+            {TYPE_LABEL[item.type]}
+          </span>
+        </div>
+
+        {/* Off / Training */}
+        {(item.type === 'off' || item.type === 'training') && (
+          <div className="grid place-items-center py-2">
+            <div className={cn('text-2xl font-black', style.text)}>{item.code || '—'}</div>
+            <div className="mt-1 flex items-center gap-1 text-[11px] font-semibold text-slate-500">
+              <MapPin size={11} />{item.home}
+            </div>
+          </div>
+        )}
+
+        {/* Blank / Rest */}
+        {item.type === 'blank' && (
+          <div className="flex h-12 items-center justify-center rounded-2xl border border-dashed border-slate-300 text-[11px] font-semibold text-slate-400">
+            Rest
+          </div>
+        )}
+
+        {/* Flight / Standby with sectors */}
+        {(item.type === 'flight' || item.type === 'standby') && (
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between gap-1 text-[11px] text-slate-600">
+              <span>{item.start}</span>
+              <span className={cn('text-[15px] font-black', style.text)}>{item.code}</span>
+              <span>{item.end}</span>
+            </div>
+            {item.sectors.slice(0, 2).map((s, i) => (
+              <div
+                key={`${item.dateStr}-${s.flight}-${i}`}
+                className="rounded-2xl bg-white/70 px-2.5 py-1.5 shadow-sm ring-1 ring-black/5"
+              >
+                <div className="flex items-center justify-between text-[10px] font-bold text-slate-500">
+                  <span>{s.depart}</span>
+                  <span className="text-slate-800">{s.flight}</span>
+                  <span>{s.arrive}</span>
+                </div>
+                <div className="mt-0.5 flex items-center justify-between text-[11px] font-black text-slate-800">
+                  <span>{s.from}</span>
+                  <Plane size={10} className="text-slate-400" />
+                  <span>{s.to}</span>
+                </div>
+              </div>
+            ))}
+            {item.sectors.length > 2 && (
+              <p className="text-center text-[10px] font-bold text-slate-500">
+                +{item.sectors.length - 2} more sector{item.sectors.length - 2 > 1 ? 's' : ''}
+              </p>
+            )}
+          </div>
+        )}
+      </div>
+    </motion.button>
+  );
 }
 
-function buildHero(
-  rosters: SharedRoster[],
-  now: DateTime,
-  base: string,
-): HeroStatus {
+// ─── Detail Panel ─────────────────────────────────────────────────────────────
+
+function DetailPanel({
+  item,
+  onClose,
+}: {
+  item: CardItem;
+  onClose: () => void;
+}) {
+  const style = TYPE_STYLES[item.type];
+
+  return (
+    <motion.div
+      key={item.dateStr}
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: 20 }}
+      transition={{ duration: 0.18 }}
+      className="sticky bottom-4 z-20 mx-auto mt-4 w-full rounded-[2rem] border border-white/70 bg-white/95 p-4 shadow-2xl shadow-slate-900/15 backdrop-blur-md"
+    >
+      {/* Header */}
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className={cn('rounded-xl px-3 py-1 text-sm font-black', style.badge)}>
+              {String(item.date).padStart(2, '0')} {item.day}
+            </span>
+            {item.type === 'flight' && item.work && (
+              <span className="rounded-xl bg-slate-100 px-3 py-1 text-sm font-bold text-slate-600">
+                {item.work}
+              </span>
+            )}
+            {item.continues && (
+              <span className="rounded-xl bg-amber-50 px-3 py-1 text-sm font-bold text-amber-700 flex items-center gap-1">
+                <ChevronRight size={13} strokeWidth={3} /> Continues next day
+              </span>
+            )}
+          </div>
+          <h2 className="mt-2 text-xl font-black tracking-tight text-slate-950">
+            {item.code || 'Open Day'}
+          </h2>
+          <p className="mt-0.5 text-sm text-slate-500">
+            {item.start && item.end
+              ? `${item.work ? `${item.work} · ` : ''}${item.start} → ${item.end}`
+              : `Base: ${item.home}`}
+          </p>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <div className="grid h-11 w-11 place-items-center rounded-2xl bg-slate-950 text-white">
+            {item.type === 'off'      ? <Coffee size={18} />     :
+             item.type === 'training' ? <BadgeCheck size={18} /> :
+             item.type === 'standby'  ? <Clock size={18} />      :
+             <Plane size={18} />}
+          </div>
+          <button
+            onClick={onClose}
+            className="grid h-11 w-11 place-items-center rounded-2xl border border-border bg-surface-2 text-text-muted hover:bg-white transition-colors"
+          >
+            <X size={18} />
+          </button>
+        </div>
+      </div>
+
+      {/* Sectors */}
+      {item.sectors.length > 0 ? (
+        <div className="mt-4 grid gap-2 grid-cols-1 sm:grid-cols-2">
+          {item.sectors.map((s, i) => (
+            <div
+              key={`${s.flight}-${i}`}
+              className="rounded-3xl bg-slate-50 p-3 ring-1 ring-slate-200"
+            >
+              <div className="flex items-center justify-between text-[11px] font-bold text-slate-500 mb-3">
+                <span>Sector {i + 1}</span>
+                <span className="font-black text-slate-700">{s.flight}</span>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-[20px] font-black text-slate-950 leading-none">{s.from}</p>
+                  <p className="text-[11px] font-semibold text-slate-500 mt-1">{cityName(s.from)}</p>
+                  <p className="text-[13px] font-black text-slate-700 mt-1">{s.depart}</p>
+                </div>
+                <div className="flex flex-1 items-center gap-2 text-slate-300">
+                  <span className="h-px flex-1 bg-slate-300" />
+                  <Plane size={16} className="text-slate-400" />
+                  <span className="h-px flex-1 bg-slate-300" />
+                </div>
+                <div className="text-right">
+                  <p className="text-[20px] font-black text-slate-950 leading-none">{s.to}</p>
+                  <p className="text-[11px] font-semibold text-slate-500 mt-1">{cityName(s.to)}</p>
+                  <p className="text-[13px] font-black text-slate-700 mt-1">{s.arrive}</p>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="mt-4 rounded-3xl bg-slate-50 p-4 text-sm font-semibold text-slate-500 ring-1 ring-slate-200">
+          {item.type === 'off'
+            ? `Rest day at ${item.home}.`
+            : item.type === 'blank'
+            ? 'No duty scheduled.'
+            : `${item.code || 'Duty'} at ${item.home}.`}
+        </div>
+      )}
+    </motion.div>
+  );
+}
+
+// ─── Hero status (today) ──────────────────────────────────────────────────────
+
+function buildHeroLabel(rosters: SharedRoster[], now: DateTime, base: string): {
+  label: string; sub: string; tag: string; grad: string;
+} {
   const todayStr = now.toFormat('yyyy-MM-dd');
   const nowTime  = now.toFormat('HH:mm');
   const allEvts  = rosters.flatMap(r => r.events ?? []);
@@ -170,398 +451,54 @@ function buildHero(
   const flying = today.find(
     e => e.type === 'FLIGHT' && e.std && e.sta && nowTime >= e.std && nowTime <= e.sta,
   );
-  if (flying) {
+  if (flying) return {
+    label: 'In the Air',
+    sub:   `${cityName(flying.depPort)} → ${cityName(flying.arrPort)}`,
+    tag:   flying.sta ? `Lands at ${flying.sta} local` : 'Currently flying',
+    grad:  'from-sky-600 to-cyan-500',
+  };
+
+  if (today.find(e => e.type === 'LAYOVER')) {
+    const lay = today.find(e => e.type === 'LAYOVER')!;
     return {
-      label:    'In the Air',
-      subtitle: `${cityName(flying.depPort)} → ${cityName(flying.arrPort)}`,
-      tag:      flying.sta ? `Lands at ${flying.sta} local` : 'Currently flying',
-      gradient: 'from-sky-500 to-sky-600',
-      Icon:     Plane,
+      label: 'On Layover', sub: cityName(lay.arrPort) || 'Away',
+      tag: '', grad: 'from-indigo-600 to-purple-500',
     };
   }
 
-  const layover = today.find(e => e.type === 'LAYOVER');
-  if (layover) {
-    const c = cityName(layover.arrPort) || 'Away';
-    // Find next home day
-    const homeDate = allEvts
-      .map(e => e.date).filter(d => d > todayStr)
-      .sort()
-      .find(d => getDayStatus(allEvts.filter(e => e.date === d)) === 'EMPTY' ||
-                 getDayStatus(allEvts.filter(e => e.date === d)) === 'OFF_DO' ||
-                 getDayStatus(allEvts.filter(e => e.date === d)) === 'OFF_D');
-    const homeIn = homeDate
-      ? Math.ceil(DateTime.fromISO(homeDate).diff(now, 'days').days)
-      : null;
-    return {
-      label:    'On Layover',
-      subtitle: c,
-      tag:      homeIn != null ? (homeIn <= 1 ? 'Back tomorrow' : `Back in ${homeIn} days`) : '',
-      gradient: 'from-indigo-500 to-indigo-600',
-      Icon:     MapPin,
-    };
-  }
-
-  const standby = today.find(
-    e => e.type === 'STANDBY' && e.signOn && e.signOff && nowTime >= e.signOn && nowTime <= e.signOff,
-  );
-  if (standby) {
-    return {
-      label:    'On Standby',
-      subtitle: `Available until ${standby.signOff}`,
-      tag:      'May be called for a flight',
-      gradient: 'from-amber-500 to-amber-600',
-      Icon:     Clock,
-    };
-  }
+  const sby = today.find(e => e.type === 'STANDBY' && e.signOn && e.signOff
+    && nowTime >= e.signOn! && nowTime <= e.signOff!);
+  if (sby) return {
+    label: 'On Standby', sub: `Until ${sby.signOff}`,
+    tag: 'May be called for a flight', grad: 'from-amber-500 to-yellow-400',
+  };
 
   // Find next trip
   const sorted = Array.from(new Set(allEvts.map(e => e.date))).sort();
-  const nextTrip = sorted.find(d => {
-    if (d <= todayStr) return false;
-    const s = getDayStatus(allEvts.filter(e => e.date === d));
-    return s === 'FLIGHT' || s === 'STANDBY' || s === 'LAYOVER';
-  });
-  const daysAway = nextTrip
-    ? Math.ceil(DateTime.fromISO(nextTrip).diff(now, 'days').days)
-    : null;
+  const next = sorted.find(d => d > todayStr && ['FLIGHT','STANDBY','LAYOVER'].includes(
+    allEvts.filter(e => e.date === d)[0]?.type,
+  ));
+  const daysTo = next ? Math.ceil(DateTime.fromISO(next).diff(now, 'days').days) : null;
 
   return {
-    label:    'At Home',
-    subtitle: cityName(base) || base,
-    tag:      daysAway != null
-      ? (daysAway <= 1 ? 'Next trip tomorrow' : `Next trip in ${daysAway} days`)
-      : 'No upcoming trips',
-    gradient: 'from-emerald-500 to-emerald-600',
-    Icon:     Home,
+    label: 'At Home',
+    sub:   cityName(base) || base,
+    tag:   daysTo != null ? (daysTo <= 1 ? 'Next trip tomorrow' : `Next trip in ${daysTo} days`) : 'No upcoming trips',
+    grad:  'from-emerald-600 to-lime-500',
   };
 }
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
+// ─── Main component ───────────────────────────────────────────────────────────
+
+const FILTERS: { key: CardType | 'all'; label: string }[] = [
+  { key: 'all',      label: 'All'      },
+  { key: 'flight',   label: 'Flight'   },
+  { key: 'off',      label: 'Off'      },
+  { key: 'standby',  label: 'Standby'  },
+  { key: 'training', label: 'Training' },
+];
 
 const DOW = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-
-function PlaneIcons({ count }: { count: number }) {
-  return (
-    <span className="flex items-center gap-[2px]">
-      {Array.from({ length: Math.min(count, 4) }).map((_, i) => (
-        <Plane key={i} size={8} className="text-white/80" />
-      ))}
-    </span>
-  );
-}
-
-function DayCellComp({
-  cell,
-  isSelected,
-  onTap,
-}: {
-  cell: CalCell;
-  isSelected: boolean;
-  onTap: () => void;
-}) {
-  if (!cell) {
-    return <div className="rounded-lg bg-transparent" />;
-  }
-
-  const { dayNum, status, events, isToday, isPast } = cell;
-  const flights  = events.filter(e => e.type === 'FLIGHT');
-  const standby  = events.find(e => e.type === 'STANDBY');
-  const off      = events.find(e => e.type === 'OFF');
-  const carries  = continuesNextDay(events);
-
-  const headerBg = HEADER_BG[status];
-  const cellBg   = CELL_BG[status];
-
-  // Brief cell body text
-  let bodyLine1 = '';
-  let bodyLine2 = '';
-
-  if (status === 'FLIGHT') {
-    const f = flights[0];
-    bodyLine1 = f?.item || '';
-    bodyLine2 = flights.length > 1
-      ? `+${flights.length - 1} leg${flights.length > 2 ? 's' : ''}`
-      : (f?.depPort && f?.arrPort ? `${f.depPort}→${f.arrPort}` : '');
-  } else if (status === 'LAYOVER') {
-    const f = flights[0];
-    bodyLine1 = f?.item || '';
-    bodyLine2 = 'Layover';
-  } else if (status === 'STANDBY') {
-    bodyLine1 = standby?.item || 'SBY';
-    bodyLine2 = standby?.signOn ? `${standby.signOn}` : '';
-  } else if (status === 'DUTY') {
-    const d = events.find(e => e.type === 'TRAINING' || e.type === 'GROUND');
-    bodyLine1 = d?.item || 'DTY';
-  } else if (status === 'OFF_DO') {
-    bodyLine1 = 'DO';
-  } else if (status === 'OFF_D') {
-    bodyLine1 = off?.item || 'D';
-  }
-
-  return (
-    <button
-      onClick={onTap}
-      className={`
-        rounded-lg overflow-hidden flex flex-col transition-all duration-100
-        ${isSelected ? 'ring-2 ring-offset-1 ring-text scale-[1.04] shadow-lg z-10 relative' : ''}
-        ${isPast && !isToday ? 'opacity-60' : ''}
-      `}
-    >
-      {/* Coloured header strip */}
-      <div className={`${headerBg} px-1 py-[3px] flex items-center justify-between gap-0.5`}>
-        <span className={`text-white font-black leading-none ${isToday ? 'text-[13px]' : 'text-[12px]'}`}>
-          {dayNum}
-        </span>
-        <div className="flex items-center gap-[2px]">
-          {status === 'FLIGHT' && <PlaneIcons count={flights.length} />}
-          {carries && <ArrowRight size={7} className="text-white/90" />}
-        </div>
-      </div>
-
-      {/* Body */}
-      <div className={`${cellBg} flex-1 flex flex-col items-center justify-center px-0.5 py-[3px] min-h-[38px]`}>
-        {bodyLine1 ? (
-          <span className="text-[9px] font-black text-center leading-tight truncate w-full text-center">
-            {bodyLine1}
-          </span>
-        ) : null}
-        {bodyLine2 ? (
-          <span className="text-[8px] font-bold text-center leading-tight truncate w-full text-center text-text-muted">
-            {bodyLine2}
-          </span>
-        ) : null}
-      </div>
-    </button>
-  );
-}
-
-function DayDetailCard({
-  cell,
-  onClose,
-}: {
-  cell: CalDay;
-  onClose: () => void;
-}) {
-  const { date, dayNum, status, events } = cell;
-  const dt       = DateTime.fromISO(date);
-  const flights  = events.filter(e => e.type === 'FLIGHT');
-  const standby  = events.find(e => e.type === 'STANDBY');
-  const layover  = events.find(e => e.type === 'LAYOVER');
-  const offEvt   = events.find(e => e.type === 'OFF');
-  const dutyEvt  = events.find(e => e.type === 'TRAINING' || e.type === 'GROUND');
-  const carries  = continuesNextDay(events);
-  const headerBg = HEADER_BG[status];
-
-  return (
-    <div className="col-span-7 mt-1 mb-2 animate-in slide-in-from-top-2 duration-150">
-      <div className="bg-white rounded-2xl border border-border shadow-lg overflow-hidden">
-
-        {/* ── Card header (matches reference image top bar) ── */}
-        <div className={`${headerBg} px-4 py-3 flex items-center justify-between`}>
-          <div className="flex items-center gap-3">
-            {/* Date badge */}
-            <div className="bg-white/20 rounded-lg w-9 h-9 flex items-center justify-center">
-              <span className="text-white font-black text-[18px] leading-none">{dayNum}</span>
-            </div>
-            <div>
-              <p className="text-white/70 text-[10px] font-black uppercase tracking-widest leading-none mb-0.5">
-                {dt.toFormat('EEEE')}
-              </p>
-              <p className="text-white font-black text-[13px] leading-none">
-                {dt.toFormat('d MMMM yyyy')}
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            {/* Plane icons per leg */}
-            {flights.length > 0 && (
-              <div className="flex items-center gap-1">
-                {Array.from({ length: Math.min(flights.length, 4) }).map((_, i) => (
-                  <Plane key={i} size={14} className="text-white/80" />
-                ))}
-              </div>
-            )}
-            {/* Continues-next-day arrow */}
-            {carries && (
-              <div className="bg-white/25 rounded-md px-1.5 py-0.5 flex items-center gap-0.5">
-                <ArrowRight size={12} className="text-white" />
-              </div>
-            )}
-            {/* Close */}
-            <button onClick={onClose} className="ml-1 text-white/70 hover:text-white transition-colors">
-              <X size={18} />
-            </button>
-          </div>
-        </div>
-
-        {/* ── Flight sectors ── */}
-        {flights.length > 0 && (
-          <div className="divide-y divide-border/60">
-            {flights.map((f, idx) => {
-              const overnight = isOvernight(f);
-              const hasMore   = idx < flights.length - 1; // more legs follow
-
-              return (
-                <div key={f.id || idx} className="px-4 py-3">
-                  {/* Route row */}
-                  <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-[18px] font-black text-text tracking-tight">
-                      {f.depPort || '—'}
-                    </span>
-                    <div className="flex flex-col items-center gap-0.5">
-                      <span className="text-[13px] font-black text-accent tracking-wide">
-                        {f.item || f.flightNumber || '—'}
-                      </span>
-                      {f.acType && (
-                        <span className="text-[8px] font-bold text-text-subtle uppercase tracking-widest">
-                          {f.acType}
-                        </span>
-                      )}
-                    </div>
-                    <span className="text-[18px] font-black text-text tracking-tight">
-                      {f.arrPort || '—'}
-                    </span>
-                  </div>
-
-                  {/* City names */}
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-[10px] font-bold text-text-muted">{cityName(f.depPort)}</span>
-                    <span className="text-[10px] font-bold text-text-muted">{cityName(f.arrPort)}</span>
-                  </div>
-
-                  {/* Times row — matches reference: STD  ...  STA+ */}
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <span className="text-[16px] font-black text-text">{f.std || f.signOn || '—'}</span>
-                      {f.dutyCode && (
-                        <span className="ml-1.5 text-[11px] font-black text-text-muted">{f.dutyCode}</span>
-                      )}
-                    </div>
-
-                    {/* Middle dots (indicates more sectors or long haul) */}
-                    <span className="text-[14px] font-black text-text-subtle tracking-[4px]">···</span>
-
-                    <div className="text-right">
-                      <span className="text-[16px] font-black text-text">
-                        {f.sta || f.signOff || '—'}
-                        {overnight && <span className="text-accent text-[12px] ml-0.5">+</span>}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* "More sectors below" indicator */}
-                  {hasMore && (
-                    <div className="mt-2 flex items-center gap-2 text-text-subtle">
-                      <div className="flex-1 border-t border-dashed border-border" />
-                      <span className="text-[9px] font-black uppercase tracking-widest">next sector</span>
-                      <div className="flex-1 border-t border-dashed border-border" />
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        {/* ── Standby ── */}
-        {standby && (
-          <div className="px-4 py-3 border-t border-border/60">
-            <div className="flex items-center justify-between">
-              <span className="text-[15px] font-black text-danger uppercase tracking-wide">Stand By</span>
-              <span className="text-[15px] font-black text-text">{standby.item || ''}</span>
-            </div>
-            {(standby.signOn || standby.signOff) && (
-              <div className="flex items-center justify-between mt-1">
-                <span className="text-[14px] font-black text-text">{standby.signOn || ''}</span>
-                <span className="text-[12px] text-text-subtle font-bold tracking-[4px]">···</span>
-                <span className="text-[14px] font-black text-text">{standby.signOff || ''}</span>
-              </div>
-            )}
-            {standby.depPort && (
-              <p className="text-[11px] font-bold text-text-muted mt-1">{standby.depPort}</p>
-            )}
-          </div>
-        )}
-
-        {/* ── Layover ── */}
-        {layover && (
-          <div className="px-4 py-3 border-t border-border/60 flex items-center justify-between">
-            <div>
-              <p className="text-[11px] font-black uppercase tracking-widest text-text-subtle mb-0.5">Layover</p>
-              <p className="text-[15px] font-black text-text">
-                {cityName(layover.arrPort) || layover.arrPort || 'Away'}
-              </p>
-            </div>
-            {layover.hotel && (
-              <p className="text-[11px] font-bold text-text-muted text-right max-w-[120px] leading-snug">
-                {layover.hotel}
-              </p>
-            )}
-          </div>
-        )}
-
-        {/* ── Off / Duty day ── */}
-        {!flights.length && !standby && (status === 'OFF_DO' || status === 'OFF_D' || status === 'DUTY') && (
-          <div className="px-4 py-4 flex items-center justify-between">
-            <div>
-              <p className="text-[22px] font-black text-text">
-                {dutyEvt?.item || offEvt?.item || (status === 'OFF_DO' ? 'DO' : 'D')}
-              </p>
-              <p className="text-[12px] font-bold text-text-muted">
-                {status === 'OFF_DO'
-                  ? 'Day Off'
-                  : status === 'OFF_D'
-                  ? 'Off Duty at Base'
-                  : (dutyEvt?.description || 'Ground Duty')}
-              </p>
-            </div>
-            {(offEvt?.depPort || dutyEvt?.depPort) && (
-              <span className="text-[18px] font-black text-text-muted">
-                {offEvt?.depPort || dutyEvt?.depPort}
-              </span>
-            )}
-          </div>
-        )}
-
-        {/* ── Empty day ── */}
-        {status === 'EMPTY' && (
-          <div className="px-4 py-4">
-            <p className="text-[13px] font-bold text-text-muted">No duty scheduled.</p>
-          </div>
-        )}
-
-      </div>
-    </div>
-  );
-}
-
-// ─── Hero Banner ──────────────────────────────────────────────────────────────
-
-function HeroBanner({ status, pilot }: { status: HeroStatus; pilot: PilotInfo }) {
-  return (
-    <div className={`bg-gradient-to-br ${status.gradient} px-5 pt-12 pb-8 rounded-b-[2.5rem] shadow-xl relative overflow-hidden`}>
-      <status.Icon size={130} strokeWidth={1} className="absolute -right-6 -bottom-4 opacity-[0.07] pointer-events-none" />
-      <div className="relative z-10">
-        <p className="text-[10px] font-black uppercase tracking-[0.4em] text-white/50 mb-2">
-          {pilot.full_name}{pilot.rank ? ` · ${pilot.rank}` : ''}
-        </p>
-        <h1 className="text-[2.4rem] font-black tracking-tighter text-white leading-none mb-1">
-          {status.label}
-        </h1>
-        <p className="text-[17px] font-black text-white/85 mb-4">{status.subtitle}</p>
-        {status.tag && (
-          <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/20 backdrop-blur-sm">
-            <span className="w-1.5 h-1.5 rounded-full bg-white/80 animate-pulse" />
-            <span className="text-[11px] font-black text-white">{status.tag}</span>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function SpouseViewClient() {
   const searchParams = useSearchParams();
@@ -572,7 +509,8 @@ export default function SpouseViewClient() {
   const [error, setError]               = useState<string | null>(null);
   const [now, setNow]                   = useState(() => DateTime.now());
   const [selectedIdx, setSelectedIdx]   = useState(0);
-  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [selected, setSelected]         = useState<CardItem | null>(null);
+  const [filter, setFilter]             = useState<CardType | 'all'>('all');
 
   useEffect(() => {
     const t = setInterval(() => setNow(DateTime.now()), 60_000);
@@ -591,61 +529,53 @@ export default function SpouseViewClient() {
       .finally(() => setLoading(false));
   }, [token]);
 
-  const handleMonthChange = (idx: number) => {
-    setSelectedIdx(idx);
-    setSelectedDate(null);
-  };
-
   const roster = apiData?.rosters[selectedIdx];
 
-  const { weeks, eventMap } = useMemo(
-    () => roster ? buildCalendar(roster, now) : { weeks: [], eventMap: new Map() },
-    [roster, now],
+  const cards = useMemo(
+    () => roster ? buildRosterCards(roster, apiData?.pilot.base ?? 'KUL') : [],
+    [roster, apiData?.pilot.base],
   );
 
-  const heroStatus = useMemo(
-    () => apiData ? buildHero(apiData.rosters, now, apiData.pilot.base) : null,
+  const stats = useMemo(() => ({
+    flights:  cards.filter(c => c.type === 'flight').length,
+    sectors:  cards.reduce((n, c) => n + c.sectors.length, 0),
+    offDays:  cards.filter(c => c.type === 'off').length,
+  }), [cards]);
+
+  const hero = useMemo(
+    () => apiData ? buildHeroLabel(apiData.rosters, now, apiData.pilot.base) : null,
     [apiData, now],
   );
 
-  const selectedCell = useMemo((): CalDay | null => {
-    if (!selectedDate) return null;
-    for (const week of weeks) {
-      for (const cell of week) {
-        if (cell?.date === selectedDate) return cell;
-      }
-    }
-    return null;
-  }, [selectedDate, weeks]);
+  const todayStr = now.toFormat('yyyy-MM-dd');
 
-  // Which week index contains the selected date
-  const selectedWeekIdx = useMemo(() => {
-    if (!selectedDate) return -1;
-    return weeks.findIndex(week => week.some(c => c?.date === selectedDate));
-  }, [selectedDate, weeks]);
+  const filtered = useMemo(
+    () => filter === 'all' ? cards : cards.filter(c => c.type === filter),
+    [cards, filter],
+  );
 
   // ── Loading ──
   if (loading) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-surface-1 gap-3">
-        <Loader2 size={28} className="animate-spin text-accent" />
-        <p className="text-[12px] font-black uppercase tracking-[0.3em] text-text-muted">Loading roster…</p>
+      <div className="min-h-screen flex flex-col items-center justify-center bg-[#f6f7f5] gap-3">
+        <Loader2 size={28} className="animate-spin text-sky-600" />
+        <p className="text-[12px] font-black uppercase tracking-[0.3em] text-slate-500">Loading roster…</p>
       </div>
     );
   }
 
   // ── Error ──
-  if (error || !apiData || !heroStatus || !roster) {
+  if (error || !apiData || !roster || !hero) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-surface-1 p-8 text-center gap-4">
-        <div className="w-20 h-20 rounded-[2rem] bg-danger/10 flex items-center justify-center">
-          <AlertCircle size={36} className="text-danger" />
+      <div className="min-h-screen flex flex-col items-center justify-center bg-[#f6f7f5] p-8 text-center gap-4">
+        <div className="w-20 h-20 rounded-[2rem] bg-red-50 flex items-center justify-center">
+          <AlertCircle size={36} className="text-red-500" />
         </div>
         <div>
-          <h1 className="text-xl font-black text-text mb-2">
+          <h1 className="text-xl font-black text-slate-950 mb-2">
             {error === 'no-token' ? 'Missing link' : 'Link not found'}
           </h1>
-          <p className="text-[13px] text-text-muted font-bold leading-relaxed max-w-xs mx-auto">
+          <p className="text-[13px] text-slate-500 font-bold leading-relaxed max-w-xs mx-auto">
             {error === 'no-token'
               ? 'This page needs a share link from the pilot.'
               : 'This link may have expired or been reset. Ask the pilot to share a new one.'}
@@ -653,7 +583,7 @@ export default function SpouseViewClient() {
         </div>
         <button
           onClick={() => window.location.reload()}
-          className="px-6 py-3 rounded-full border border-border text-[13px] font-black text-text-muted hover:text-text"
+          className="px-6 py-3 rounded-full border border-slate-200 text-[13px] font-black text-slate-500 hover:text-slate-900 bg-white"
         >
           Try again
         </button>
@@ -664,34 +594,67 @@ export default function SpouseViewClient() {
   const { pilot, rosters } = apiData;
 
   return (
-    <div className="min-h-screen bg-surface-1 pb-16">
+    <main className="min-h-screen bg-[#f6f7f5] px-4 py-6 text-slate-950">
+      <div className="mx-auto max-w-7xl space-y-4">
 
-      {/* ── Hero ── */}
-      <HeroBanner status={heroStatus} pilot={pilot} />
+        {/* ── Header ── */}
+        <header className="overflow-hidden rounded-[2rem] bg-slate-950 p-5 text-white shadow-xl shadow-slate-900/15">
+          <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+            <div>
+              <div className={cn(
+                'inline-flex items-center gap-2 rounded-full px-3 py-1 text-[11px] font-black uppercase tracking-[0.2em]',
+                `bg-gradient-to-r ${hero.grad} bg-clip-text text-transparent`,
+              )}>
+                <CalendarDays size={13} className="text-white/60" />
+                <span className="text-white/70">{hero.label}</span>
+                {hero.sub && <span className="text-white/50">· {hero.sub}</span>}
+              </div>
+              <h1 className="mt-3 text-2xl font-black tracking-tight md:text-4xl">
+                {pilot.full_name}
+                {pilot.rank && <span className="ml-2 text-white/50 font-bold text-lg">{pilot.rank}</span>}
+              </h1>
+              <p className="mt-1 text-[13px] text-white/55 font-bold">
+                {roster.month} {roster.year} Duty Roster
+                {hero.tag && <span className="ml-2 text-amber-400">· {hero.tag}</span>}
+              </p>
+            </div>
+            <div className="grid grid-cols-3 gap-2 md:min-w-72">
+              {[
+                { n: stats.flights,  label: 'Flight days' },
+                { n: stats.sectors,  label: 'Sectors'     },
+                { n: stats.offDays,  label: 'Off days'    },
+              ].map(s => (
+                <div key={s.label} className="rounded-3xl bg-white/10 p-3 text-center">
+                  <p className="text-2xl font-black">{s.n}</p>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-white/50">{s.label}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </header>
 
-      <div className="px-3 mt-5 space-y-4">
-
-        {/* ── Month picker ── */}
+        {/* ── Month picker (only if > 1 month uploaded) ── */}
         {rosters.length > 1 && (
-          <div className="flex items-center gap-2 px-1">
+          <div className="flex items-center gap-2">
             <button
               disabled={selectedIdx >= rosters.length - 1}
-              onClick={() => handleMonthChange(selectedIdx + 1)}
-              className="w-8 h-8 rounded-full border border-border bg-white flex items-center justify-center disabled:opacity-30"
+              onClick={() => { setSelectedIdx(i => i + 1); setSelected(null); }}
+              className="w-9 h-9 rounded-full border border-slate-200 bg-white flex items-center justify-center disabled:opacity-30 shadow-sm"
             >
               <ChevronLeft size={15} />
             </button>
             <div className="flex-1 overflow-x-auto scrollbar-hide">
-              <div className="flex gap-1.5 justify-center">
+              <div className="flex gap-2 justify-center">
                 {rosters.map((r, idx) => (
                   <button
                     key={`${r.month}-${r.year}`}
-                    onClick={() => handleMonthChange(idx)}
-                    className={`px-3 py-1.5 rounded-full text-[12px] font-black whitespace-nowrap transition-all ${
+                    onClick={() => { setSelectedIdx(idx); setSelected(null); }}
+                    className={cn(
+                      'px-4 py-2 rounded-full text-[12px] font-black whitespace-nowrap transition-all shadow-sm',
                       idx === selectedIdx
-                        ? 'bg-accent text-accent-fg shadow-sm'
-                        : 'bg-white border border-border text-text-muted'
-                    }`}
+                        ? 'bg-slate-950 text-white'
+                        : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50',
+                    )}
                   >
                     {r.month} {r.year}
                   </button>
@@ -700,82 +663,84 @@ export default function SpouseViewClient() {
             </div>
             <button
               disabled={selectedIdx <= 0}
-              onClick={() => handleMonthChange(selectedIdx - 1)}
-              className="w-8 h-8 rounded-full border border-border bg-white flex items-center justify-center disabled:opacity-30"
+              onClick={() => { setSelectedIdx(i => i - 1); setSelected(null); }}
+              className="w-9 h-9 rounded-full border border-slate-200 bg-white flex items-center justify-center disabled:opacity-30 shadow-sm"
             >
               <ChevronRight size={15} />
             </button>
           </div>
         )}
 
-        {/* ── Calendar ── */}
-        <div className="bg-white rounded-[1.75rem] border border-border shadow-sm overflow-hidden">
+        {/* ── Filter tabs ── */}
+        <section className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+          {FILTERS.map(f => (
+            <button
+              key={f.key}
+              onClick={() => { setFilter(f.key); setSelected(null); }}
+              className={cn(
+                'whitespace-nowrap rounded-full px-4 py-2 text-[13px] font-bold transition-all shadow-sm',
+                filter === f.key
+                  ? 'bg-slate-950 text-white shadow-slate-900/20'
+                  : 'bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50',
+              )}
+            >
+              {f.label}
+            </button>
+          ))}
+        </section>
 
-          {/* Month title */}
-          <div className="px-4 pt-4 pb-2 flex items-center justify-between">
-            <h2 className="text-[14px] font-black text-text">{roster.month} {roster.year}</h2>
-            {/* Legend */}
-            <div className="flex items-center gap-2">
-              {[
-                { label: 'Flight', bg: 'bg-sky-500' },
-                { label: 'Standby', bg: 'bg-amber-500' },
-                { label: 'Off', bg: 'bg-emerald-600' },
-              ].map(l => (
-                <span key={l.label} className="flex items-center gap-1 text-[8px] font-black text-text-subtle uppercase tracking-wider">
-                  <span className={`w-2 h-2 rounded-sm ${l.bg}`} />
-                  {l.label}
-                </span>
-              ))}
-            </div>
-          </div>
-
-          {/* DOW headers — Monday first */}
-          <div className="grid grid-cols-7 px-2 pb-1">
+        {/* ── Desktop DOW header ── */}
+        {filter === 'all' && (
+          <div className="hidden grid-cols-7 gap-2 lg:grid">
             {DOW.map(d => (
-              <div key={d} className="text-center text-[9px] font-black uppercase tracking-widest text-text-subtle py-1">
+              <div key={d} className="rounded-2xl bg-[#7c1d0c] px-3 py-2 text-center text-[13px] font-black uppercase tracking-wide text-white">
                 {d}
               </div>
             ))}
           </div>
+        )}
 
-          {/* Weeks */}
-          <div className="px-2 pb-3 space-y-1">
-            {weeks.map((week, wIdx) => (
-              <React.Fragment key={wIdx}>
-                {/* Week row */}
-                <div className="grid grid-cols-7 gap-1">
-                  {week.map((cell, cIdx) => (
-                    <DayCellComp
-                      key={cell ? cell.date : `pad-${wIdx}-${cIdx}`}
-                      cell={cell}
-                      isSelected={cell?.date === selectedDate}
-                      onTap={() => {
-                        if (!cell) return;
-                        setSelectedDate(prev => prev === cell.date ? null : cell.date);
-                      }}
-                    />
-                  ))}
-                </div>
+        {/* ── Card grid ── */}
+        <section className={cn(
+          'grid gap-3',
+          filter === 'all'
+            ? 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 lg:gap-2'
+            : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3',
+        )}>
+          {filtered.map(item => (
+            <RosterCard
+              key={item.dateStr}
+              item={item}
+              isSelected={selected?.dateStr === item.dateStr}
+              isToday={item.dateStr === todayStr}
+              onClick={() => setSelected(prev => prev?.dateStr === item.dateStr ? null : item)}
+            />
+          ))}
+        </section>
 
-                {/* Detail panel — inserted after the week that contains the selected day */}
-                {wIdx === selectedWeekIdx && selectedCell && (
-                  <DayDetailCard
-                    cell={selectedCell}
-                    onClose={() => setSelectedDate(null)}
-                  />
-                )}
-              </React.Fragment>
-            ))}
+        {/* ── Detail panel ── */}
+        <AnimatePresence>
+          {selected && (
+            <DetailPanel item={selected} onClose={() => setSelected(null)} />
+          )}
+        </AnimatePresence>
+
+        {/* ── Legend ── */}
+        <section className="rounded-[2rem] bg-white p-4 ring-1 ring-slate-200 shadow-sm">
+          <h3 className="text-[13px] font-black text-slate-950 mb-3">Legend</h3>
+          <div className="grid gap-2 text-[12px] text-slate-600 grid-cols-2 lg:grid-cols-4">
+            <div className="rounded-2xl bg-sky-50 p-2.5"><b className="text-sky-800">Blue</b> — Flight duty with sectors</div>
+            <div className="rounded-2xl bg-emerald-50 p-2.5"><b className="text-emerald-800">Green</b> — Day off (D / DO)</div>
+            <div className="rounded-2xl bg-yellow-50 p-2.5"><b className="text-yellow-800">Yellow</b> — Standby block</div>
+            <div className="rounded-2xl bg-fuchsia-50 p-2.5"><b className="text-fuchsia-800">Purple</b> — Training / ground</div>
           </div>
-        </div>
+        </section>
 
-        {/* ── Footer ── */}
-        <div className="text-center py-3">
-          <p className="text-[11px] font-black text-text-subtle uppercase tracking-[0.2em]">Shared via Otarosta</p>
-          <p className="text-[9px] text-text-subtle/50 font-bold mt-0.5">Live read-only · Auto-updates</p>
-        </div>
+        <p className="text-center text-[11px] font-bold text-slate-400 pb-4">
+          Shared via Otarosta · Live read-only view
+        </p>
 
       </div>
-    </div>
+    </main>
   );
 }
