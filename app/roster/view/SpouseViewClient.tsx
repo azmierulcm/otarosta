@@ -593,11 +593,22 @@ export default function SpouseViewClient() {
           </div>
         </header>
 
-        {/* ── Two-column layout ── */}
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_420px] lg:items-start">
+        {/* ── Detail card — above the calendar ── */}
+        <div className="mx-auto w-full max-w-xl">
+          <AnimatePresence mode="wait">
+            {activeDay && (
+              <RosterDetailCard
+                key={activeDay.dateStr}
+                day={activeDay}
+                monthYear={monthYear}
+                todayStr={todayStr}
+              />
+            )}
+          </AnimatePresence>
+        </div>
 
-          {/* LEFT — calendar + stats */}
-          <div className="space-y-4">
+        {/* ── Calendar + bottom sections ── */}
+        <div className="space-y-4">
 
             {/* Calendar grid */}
             <section className="rounded-[2rem] border border-black/10 bg-white p-4 shadow-sm sm:p-6">
@@ -696,21 +707,6 @@ export default function SpouseViewClient() {
               </div>
             </section>
           </div>
-
-          {/* RIGHT — sticky detail card */}
-          <div className="lg:sticky lg:top-6">
-            <AnimatePresence mode="wait">
-              {activeDay && (
-                <RosterDetailCard
-                  key={activeDay.dateStr}
-                  day={activeDay}
-                  monthYear={monthYear}
-                  todayStr={todayStr}
-                />
-              )}
-            </AnimatePresence>
-          </div>
-        </div>
 
         <p className="text-center text-[11px] font-bold text-slate-400 pb-2">
           Shared via Otarosta · Live read-only view
