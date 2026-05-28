@@ -4,20 +4,20 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { DateTime } from 'luxon';
 import {
-  Plane, Clock, Home, AlertCircle, Loader2,
-  MapPin, ChevronLeft, ChevronRight, ChevronUp,
+  Plane, Clock, Home, AlertCircle, Loader2, MapPin,
+  ChevronLeft, ChevronRight, ArrowRight, X,
 } from 'lucide-react';
 import { getAirportMeta } from '@/lib/utils/destinations';
 import type { DutyEvent } from '@/lib/types';
 
-// ─── Types coming from the API ────────────────────────────────────────────────
+// ─── API shape ────────────────────────────────────────────────────────────────
 
 interface SharedRoster {
-  month: string;       // e.g. "May"
-  year: string;        // e.g. "2025"
+  month: string;
+  year: string;
   events: DutyEvent[];
   airline?: string;
-  uploadedAt: string;  // ISO string — already serialized server-side
+  uploadedAt: string;
 }
 
 interface PilotInfo {
@@ -28,96 +28,126 @@ interface PilotInfo {
   base: string;
 }
 
-interface ApiResponse {
-  pilot: PilotInfo;
-  rosters: SharedRoster[];
-}
-
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-type DayStatus = 'HOME' | 'FLIGHT' | 'LAYOVER' | 'STANDBY' | 'DUTY';
+type DayStatus = 'FLIGHT' | 'STANDBY' | 'LAYOVER' | 'DUTY' | 'OFF_DO' | 'OFF_D' | 'EMPTY';
 
-function city(iata?: string | null): string {
+function cityName(iata?: string | null): string {
   if (!iata) return '';
   return getAirportMeta(iata).city || iata;
 }
 
 function getDayStatus(evts: DutyEvent[]): DayStatus {
-  if (evts.some(e => e.type === 'FLIGHT'))                          return 'FLIGHT';
-  if (evts.some(e => e.type === 'LAYOVER'))                         return 'LAYOVER';
-  if (evts.some(e => e.type === 'STANDBY'))                         return 'STANDBY';
+  if (!evts.length) return 'EMPTY';
+  if (evts.some(e => e.type === 'FLIGHT'))   return 'FLIGHT';
+  if (evts.some(e => e.type === 'LAYOVER'))  return 'LAYOVER';
+  if (evts.some(e => e.type === 'STANDBY'))  return 'STANDBY';
   if (evts.some(e => e.type === 'TRAINING' || e.type === 'GROUND')) return 'DUTY';
-  return 'HOME';
+  // OFF subtypes — check the duty code
+  const off = evts.find(e => e.type === 'OFF');
+  if (off?.item === 'DO') return 'OFF_DO';
+  return 'OFF_D';
 }
 
-function dayBg(status: DayStatus, isToday: boolean, isSelected: boolean): string {
-  if (isSelected) {
-    const map: Record<DayStatus, string> = {
-      FLIGHT:  'bg-sky-500 text-white shadow-lg shadow-sky-200',
-      LAYOVER: 'bg-indigo-500 text-white shadow-lg shadow-indigo-200',
-      STANDBY: 'bg-amber-500 text-white shadow-lg shadow-amber-200',
-      DUTY:    'bg-purple-500 text-white shadow-lg shadow-purple-200',
-      HOME:    'bg-emerald-500 text-white shadow-lg shadow-emerald-200',
-    };
-    return map[status];
-  }
-  if (isToday) {
-    const map: Record<DayStatus, string> = {
-      FLIGHT:  'bg-sky-400 text-white ring-2 ring-sky-300 ring-offset-1',
-      LAYOVER: 'bg-indigo-400 text-white ring-2 ring-indigo-300 ring-offset-1',
-      STANDBY: 'bg-amber-400 text-white ring-2 ring-amber-300 ring-offset-1',
-      DUTY:    'bg-purple-400 text-white ring-2 ring-purple-300 ring-offset-1',
-      HOME:    'bg-emerald-400 text-white ring-2 ring-emerald-300 ring-offset-1',
-    };
-    return map[status];
-  }
-  const map: Record<DayStatus, string> = {
-    FLIGHT:  'bg-sky-100 text-sky-700',
-    LAYOVER: 'bg-indigo-100 text-indigo-700',
-    STANDBY: 'bg-amber-100 text-amber-700',
-    DUTY:    'bg-purple-100 text-purple-700',
-    HOME:    'bg-emerald-50 text-emerald-600',
-  };
-  return map[status];
+// Header bar colours — match reference image colour scheme
+const HEADER_BG: Record<DayStatus, string> = {
+  FLIGHT:  'bg-sky-500',
+  LAYOVER: 'bg-sky-500',         // overnight away still shows blue
+  STANDBY: 'bg-amber-500',
+  DUTY:    'bg-purple-600',
+  OFF_DO:  'bg-emerald-600',
+  OFF_D:   'bg-green-700',
+  EMPTY:   'bg-gray-200',
+};
+
+// Cell body background (lighter shade beneath the header)
+const CELL_BG: Record<DayStatus, string> = {
+  FLIGHT:  'bg-sky-50',
+  LAYOVER: 'bg-indigo-50',
+  STANDBY: 'bg-amber-50',
+  DUTY:    'bg-purple-50',
+  OFF_DO:  'bg-emerald-50',
+  OFF_D:   'bg-green-50',
+  EMPTY:   'bg-gray-50',
+};
+
+// ─── "Continues next day" detection ───────────────────────────────────────────
+// A flight arrives next day when its STA is earlier than STD (crossed midnight)
+
+function isOvernight(f: DutyEvent): boolean {
+  if (!f.std || !f.sta) return false;
+  return f.sta < f.std;
 }
 
-function describeDayEvents(evts: DutyEvent[]): string[] {
-  if (evts.length === 0) return ['Day off · At home'];
+function hasLayoverTonight(evts: DutyEvent[]): boolean {
+  return evts.some(e => e.type === 'LAYOVER');
+}
 
-  const lines: string[] = [];
+function continuesNextDay(evts: DutyEvent[]): boolean {
   const flights = evts.filter(e => e.type === 'FLIGHT');
-  const layover = evts.find(e => e.type === 'LAYOVER');
-  const standby = evts.find(e => e.type === 'STANDBY');
-  const duty    = evts.find(e => e.type === 'TRAINING' || e.type === 'GROUND');
-
-  for (const f of flights) {
-    const from = city(f.depPort) || f.depPort || '?';
-    const to   = city(f.arrPort) || f.arrPort || '?';
-    const dep  = f.std ? ` · departs ${f.std}` : '';
-    const arr  = f.sta ? ` · arrives ${f.sta}` : '';
-    lines.push(`✈ ${from} → ${to}${dep}${arr}`);
-  }
-
-  if (layover) {
-    const c     = city(layover.arrPort) || layover.arrPort || 'Away';
-    const hotel = layover.hotel ? ` · ${layover.hotel}` : '';
-    lines.push(`🏨 Layover in ${c}${hotel}`);
-  }
-
-  if (standby) {
-    const times = standby.signOn && standby.signOff
-      ? ` ${standby.signOn}–${standby.signOff}` : '';
-    lines.push(`⏳ On standby${times}`);
-  }
-
-  if (duty && lines.length === 0) {
-    lines.push(`📋 ${duty.description || duty.item || 'Duty day'}`);
-  }
-
-  return lines.length ? lines : ['Day off · At home'];
+  return flights.some(isOvernight) || hasLayoverTonight(evts);
 }
 
-// ─── Hero status (always reflects today regardless of selected month) ─────────
+// ─── Calendar week grouping ───────────────────────────────────────────────────
+
+interface CalDay {
+  date: string;
+  dayNum: number;
+  status: DayStatus;
+  events: DutyEvent[];
+  isToday: boolean;
+  isPast: boolean;
+}
+
+type CalCell = CalDay | null;
+
+function buildCalendar(
+  roster: SharedRoster,
+  now: DateTime,
+): { weeks: CalCell[][]; eventMap: Map<string, DutyEvent[]> } {
+  const start = DateTime.fromFormat(`${roster.month} ${roster.year}`, 'MMMM yyyy');
+  if (!start.isValid) return { weeks: [], eventMap: new Map() };
+
+  // Build event map
+  const eventMap = new Map<string, DutyEvent[]>();
+  for (const e of roster.events ?? []) {
+    const list = eventMap.get(e.date) ?? [];
+    list.push(e);
+    eventMap.set(e.date, list);
+  }
+
+  const daysInMonth = start.daysInMonth ?? 30;
+  // Monday-first: Luxon weekday Mon=1…Sun=7 → offset = weekday-1
+  const firstOffset = start.weekday === 7 ? 6 : start.weekday - 1;
+
+  const cells: CalCell[] = [];
+  for (let i = 0; i < firstOffset; i++) cells.push(null);
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dt      = start.set({ day: d });
+    const dateStr = dt.toFormat('yyyy-MM-dd');
+    const evts    = eventMap.get(dateStr) ?? [];
+    cells.push({
+      date:    dateStr,
+      dayNum:  d,
+      status:  getDayStatus(evts),
+      events:  evts,
+      isToday: dt.hasSame(now, 'day'),
+      isPast:  dt < now.startOf('day'),
+    });
+  }
+
+  // Pad to complete last row
+  while (cells.length % 7 !== 0) cells.push(null);
+
+  // Slice into weeks
+  const weeks: CalCell[][] = [];
+  for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
+
+  return { weeks, eventMap };
+}
+
+// ─── Hero status ──────────────────────────────────────────────────────────────
 
 interface HeroStatus {
   label: string;
@@ -127,57 +157,53 @@ interface HeroStatus {
   Icon: React.ElementType;
 }
 
-function buildHeroStatus(
-  allRosters: SharedRoster[],
+function buildHero(
+  rosters: SharedRoster[],
   now: DateTime,
   base: string,
 ): HeroStatus {
   const todayStr = now.toFormat('yyyy-MM-dd');
   const nowTime  = now.toFormat('HH:mm');
+  const allEvts  = rosters.flatMap(r => r.events ?? []);
+  const today    = allEvts.filter(e => e.date === todayStr);
 
-  // collect all events across all rosters, find today's
-  const allEvents = allRosters.flatMap(r => r.events ?? []);
-  const todayEvts = allEvents.filter(e => e.date === todayStr);
-
-  // 1. Active flight
-  const flying = todayEvts.find(
+  const flying = today.find(
     e => e.type === 'FLIGHT' && e.std && e.sta && nowTime >= e.std && nowTime <= e.sta,
   );
   if (flying) {
-    const from = city(flying.depPort) || flying.depPort || '';
-    const to   = city(flying.arrPort) || flying.arrPort || '';
     return {
       label:    'In the Air',
-      subtitle: `${from} → ${to}`,
+      subtitle: `${cityName(flying.depPort)} → ${cityName(flying.arrPort)}`,
       tag:      flying.sta ? `Lands at ${flying.sta} local` : 'Currently flying',
       gradient: 'from-sky-500 to-sky-600',
       Icon:     Plane,
     };
   }
 
-  // 2. Layover
-  const layover = todayEvts.find(e => e.type === 'LAYOVER');
+  const layover = today.find(e => e.type === 'LAYOVER');
   if (layover) {
-    const c         = city(layover.arrPort) || layover.arrPort || 'Away';
-    const homeDay   = nextHomeDay(allEvents, now);
-    const homeLabel = homeDay
-      ? homeDay.hasSame(now.plus({ days: 1 }), 'day')
-        ? 'Back tomorrow'
-        : `Back in ${Math.ceil(homeDay.diff(now, 'days').days)} days`
-      : '';
+    const c = cityName(layover.arrPort) || 'Away';
+    // Find next home day
+    const homeDate = allEvts
+      .map(e => e.date).filter(d => d > todayStr)
+      .sort()
+      .find(d => getDayStatus(allEvts.filter(e => e.date === d)) === 'EMPTY' ||
+                 getDayStatus(allEvts.filter(e => e.date === d)) === 'OFF_DO' ||
+                 getDayStatus(allEvts.filter(e => e.date === d)) === 'OFF_D');
+    const homeIn = homeDate
+      ? Math.ceil(DateTime.fromISO(homeDate).diff(now, 'days').days)
+      : null;
     return {
       label:    'On Layover',
       subtitle: c,
-      tag:      homeLabel,
+      tag:      homeIn != null ? (homeIn <= 1 ? 'Back tomorrow' : `Back in ${homeIn} days`) : '',
       gradient: 'from-indigo-500 to-indigo-600',
       Icon:     MapPin,
     };
   }
 
-  // 3. Standby
-  const standby = todayEvts.find(
-    e => e.type === 'STANDBY' && e.signOn && e.signOff
-      && nowTime >= e.signOn && nowTime <= e.signOff,
+  const standby = today.find(
+    e => e.type === 'STANDBY' && e.signOn && e.signOff && nowTime >= e.signOn && nowTime <= e.signOff,
   );
   if (standby) {
     return {
@@ -189,152 +215,420 @@ function buildHeroStatus(
     };
   }
 
-  // 4. Home
-  const nextTrip = nextTripDay(allEvents, now);
-  const tripTag  = nextTrip
-    ? nextTrip.hasSame(now.plus({ days: 1 }), 'day')
-      ? 'Next trip tomorrow'
-      : `Next trip in ${Math.ceil(nextTrip.diff(now, 'days').days)} days`
-    : 'No upcoming trips scheduled';
+  // Find next trip
+  const sorted = Array.from(new Set(allEvts.map(e => e.date))).sort();
+  const nextTrip = sorted.find(d => {
+    if (d <= todayStr) return false;
+    const s = getDayStatus(allEvts.filter(e => e.date === d));
+    return s === 'FLIGHT' || s === 'STANDBY' || s === 'LAYOVER';
+  });
+  const daysAway = nextTrip
+    ? Math.ceil(DateTime.fromISO(nextTrip).diff(now, 'days').days)
+    : null;
 
   return {
     label:    'At Home',
-    subtitle: city(base) || base,
-    tag:      tripTag,
+    subtitle: cityName(base) || base,
+    tag:      daysAway != null
+      ? (daysAway <= 1 ? 'Next trip tomorrow' : `Next trip in ${daysAway} days`)
+      : 'No upcoming trips',
     gradient: 'from-emerald-500 to-emerald-600',
     Icon:     Home,
   };
 }
 
-function buildEventMap(events: DutyEvent[]): Map<string, DutyEvent[]> {
-  const map = new Map<string, DutyEvent[]>();
-  for (const e of events ?? []) {
-    const list = map.get(e.date) ?? [];
-    list.push(e);
-    map.set(e.date, list);
+// ─── Sub-components ───────────────────────────────────────────────────────────
+
+const DOW = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+function PlaneIcons({ count }: { count: number }) {
+  return (
+    <span className="flex items-center gap-[2px]">
+      {Array.from({ length: Math.min(count, 4) }).map((_, i) => (
+        <Plane key={i} size={8} className="text-white/80" />
+      ))}
+    </span>
+  );
+}
+
+function DayCellComp({
+  cell,
+  isSelected,
+  onTap,
+}: {
+  cell: CalCell;
+  isSelected: boolean;
+  onTap: () => void;
+}) {
+  if (!cell) {
+    return <div className="rounded-lg bg-transparent" />;
   }
-  return map;
-}
 
-function nextHomeDay(events: DutyEvent[], now: DateTime): DateTime | null {
-  const map = buildEventMap(events);
-  const dates = Array.from(map.keys()).sort();
-  for (const d of dates) {
-    const dt = DateTime.fromISO(d);
-    if (dt <= now.startOf('day')) continue;
-    if (getDayStatus(map.get(d)!) === 'HOME') return dt;
+  const { dayNum, status, events, isToday, isPast } = cell;
+  const flights  = events.filter(e => e.type === 'FLIGHT');
+  const standby  = events.find(e => e.type === 'STANDBY');
+  const off      = events.find(e => e.type === 'OFF');
+  const carries  = continuesNextDay(events);
+
+  const headerBg = HEADER_BG[status];
+  const cellBg   = CELL_BG[status];
+
+  // Brief cell body text
+  let bodyLine1 = '';
+  let bodyLine2 = '';
+
+  if (status === 'FLIGHT') {
+    const f = flights[0];
+    bodyLine1 = f?.item || '';
+    bodyLine2 = flights.length > 1
+      ? `+${flights.length - 1} leg${flights.length > 2 ? 's' : ''}`
+      : (f?.depPort && f?.arrPort ? `${f.depPort}→${f.arrPort}` : '');
+  } else if (status === 'LAYOVER') {
+    const f = flights[0];
+    bodyLine1 = f?.item || '';
+    bodyLine2 = 'Layover';
+  } else if (status === 'STANDBY') {
+    bodyLine1 = standby?.item || 'SBY';
+    bodyLine2 = standby?.signOn ? `${standby.signOn}` : '';
+  } else if (status === 'DUTY') {
+    const d = events.find(e => e.type === 'TRAINING' || e.type === 'GROUND');
+    bodyLine1 = d?.item || 'DTY';
+  } else if (status === 'OFF_DO') {
+    bodyLine1 = 'DO';
+  } else if (status === 'OFF_D') {
+    bodyLine1 = off?.item || 'D';
   }
-  return null;
+
+  return (
+    <button
+      onClick={onTap}
+      className={`
+        rounded-lg overflow-hidden flex flex-col transition-all duration-100
+        ${isSelected ? 'ring-2 ring-offset-1 ring-text scale-[1.04] shadow-lg z-10 relative' : ''}
+        ${isPast && !isToday ? 'opacity-60' : ''}
+      `}
+    >
+      {/* Coloured header strip */}
+      <div className={`${headerBg} px-1 py-[3px] flex items-center justify-between gap-0.5`}>
+        <span className={`text-white font-black leading-none ${isToday ? 'text-[13px]' : 'text-[12px]'}`}>
+          {dayNum}
+        </span>
+        <div className="flex items-center gap-[2px]">
+          {status === 'FLIGHT' && <PlaneIcons count={flights.length} />}
+          {carries && <ArrowRight size={7} className="text-white/90" />}
+        </div>
+      </div>
+
+      {/* Body */}
+      <div className={`${cellBg} flex-1 flex flex-col items-center justify-center px-0.5 py-[3px] min-h-[38px]`}>
+        {bodyLine1 ? (
+          <span className="text-[9px] font-black text-center leading-tight truncate w-full text-center">
+            {bodyLine1}
+          </span>
+        ) : null}
+        {bodyLine2 ? (
+          <span className="text-[8px] font-bold text-center leading-tight truncate w-full text-center text-text-muted">
+            {bodyLine2}
+          </span>
+        ) : null}
+      </div>
+    </button>
+  );
 }
 
-function nextTripDay(events: DutyEvent[], now: DateTime): DateTime | null {
-  const map = buildEventMap(events);
-  const dates = Array.from(map.keys()).sort();
-  for (const d of dates) {
-    const dt = DateTime.fromISO(d);
-    if (dt <= now.startOf('day')) continue;
-    if (getDayStatus(map.get(d)!) !== 'HOME') return dt;
-  }
-  return null;
+function DayDetailCard({
+  cell,
+  onClose,
+}: {
+  cell: CalDay;
+  onClose: () => void;
+}) {
+  const { date, dayNum, status, events } = cell;
+  const dt       = DateTime.fromISO(date);
+  const flights  = events.filter(e => e.type === 'FLIGHT');
+  const standby  = events.find(e => e.type === 'STANDBY');
+  const layover  = events.find(e => e.type === 'LAYOVER');
+  const offEvt   = events.find(e => e.type === 'OFF');
+  const dutyEvt  = events.find(e => e.type === 'TRAINING' || e.type === 'GROUND');
+  const carries  = continuesNextDay(events);
+  const headerBg = HEADER_BG[status];
+
+  return (
+    <div className="col-span-7 mt-1 mb-2 animate-in slide-in-from-top-2 duration-150">
+      <div className="bg-white rounded-2xl border border-border shadow-lg overflow-hidden">
+
+        {/* ── Card header (matches reference image top bar) ── */}
+        <div className={`${headerBg} px-4 py-3 flex items-center justify-between`}>
+          <div className="flex items-center gap-3">
+            {/* Date badge */}
+            <div className="bg-white/20 rounded-lg w-9 h-9 flex items-center justify-center">
+              <span className="text-white font-black text-[18px] leading-none">{dayNum}</span>
+            </div>
+            <div>
+              <p className="text-white/70 text-[10px] font-black uppercase tracking-widest leading-none mb-0.5">
+                {dt.toFormat('EEEE')}
+              </p>
+              <p className="text-white font-black text-[13px] leading-none">
+                {dt.toFormat('d MMMM yyyy')}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {/* Plane icons per leg */}
+            {flights.length > 0 && (
+              <div className="flex items-center gap-1">
+                {Array.from({ length: Math.min(flights.length, 4) }).map((_, i) => (
+                  <Plane key={i} size={14} className="text-white/80" />
+                ))}
+              </div>
+            )}
+            {/* Continues-next-day arrow */}
+            {carries && (
+              <div className="bg-white/25 rounded-md px-1.5 py-0.5 flex items-center gap-0.5">
+                <ArrowRight size={12} className="text-white" />
+              </div>
+            )}
+            {/* Close */}
+            <button onClick={onClose} className="ml-1 text-white/70 hover:text-white transition-colors">
+              <X size={18} />
+            </button>
+          </div>
+        </div>
+
+        {/* ── Flight sectors ── */}
+        {flights.length > 0 && (
+          <div className="divide-y divide-border/60">
+            {flights.map((f, idx) => {
+              const overnight = isOvernight(f);
+              const hasMore   = idx < flights.length - 1; // more legs follow
+
+              return (
+                <div key={f.id || idx} className="px-4 py-3">
+                  {/* Route row */}
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-[18px] font-black text-text tracking-tight">
+                      {f.depPort || '—'}
+                    </span>
+                    <div className="flex flex-col items-center gap-0.5">
+                      <span className="text-[13px] font-black text-accent tracking-wide">
+                        {f.item || f.flightNumber || '—'}
+                      </span>
+                      {f.acType && (
+                        <span className="text-[8px] font-bold text-text-subtle uppercase tracking-widest">
+                          {f.acType}
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-[18px] font-black text-text tracking-tight">
+                      {f.arrPort || '—'}
+                    </span>
+                  </div>
+
+                  {/* City names */}
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[10px] font-bold text-text-muted">{cityName(f.depPort)}</span>
+                    <span className="text-[10px] font-bold text-text-muted">{cityName(f.arrPort)}</span>
+                  </div>
+
+                  {/* Times row — matches reference: STD  ...  STA+ */}
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-[16px] font-black text-text">{f.std || f.signOn || '—'}</span>
+                      {f.dutyCode && (
+                        <span className="ml-1.5 text-[11px] font-black text-text-muted">{f.dutyCode}</span>
+                      )}
+                    </div>
+
+                    {/* Middle dots (indicates more sectors or long haul) */}
+                    <span className="text-[14px] font-black text-text-subtle tracking-[4px]">···</span>
+
+                    <div className="text-right">
+                      <span className="text-[16px] font-black text-text">
+                        {f.sta || f.signOff || '—'}
+                        {overnight && <span className="text-accent text-[12px] ml-0.5">+</span>}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* "More sectors below" indicator */}
+                  {hasMore && (
+                    <div className="mt-2 flex items-center gap-2 text-text-subtle">
+                      <div className="flex-1 border-t border-dashed border-border" />
+                      <span className="text-[9px] font-black uppercase tracking-widest">next sector</span>
+                      <div className="flex-1 border-t border-dashed border-border" />
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* ── Standby ── */}
+        {standby && (
+          <div className="px-4 py-3 border-t border-border/60">
+            <div className="flex items-center justify-between">
+              <span className="text-[15px] font-black text-danger uppercase tracking-wide">Stand By</span>
+              <span className="text-[15px] font-black text-text">{standby.item || ''}</span>
+            </div>
+            {(standby.signOn || standby.signOff) && (
+              <div className="flex items-center justify-between mt-1">
+                <span className="text-[14px] font-black text-text">{standby.signOn || ''}</span>
+                <span className="text-[12px] text-text-subtle font-bold tracking-[4px]">···</span>
+                <span className="text-[14px] font-black text-text">{standby.signOff || ''}</span>
+              </div>
+            )}
+            {standby.depPort && (
+              <p className="text-[11px] font-bold text-text-muted mt-1">{standby.depPort}</p>
+            )}
+          </div>
+        )}
+
+        {/* ── Layover ── */}
+        {layover && (
+          <div className="px-4 py-3 border-t border-border/60 flex items-center justify-between">
+            <div>
+              <p className="text-[11px] font-black uppercase tracking-widest text-text-subtle mb-0.5">Layover</p>
+              <p className="text-[15px] font-black text-text">
+                {cityName(layover.arrPort) || layover.arrPort || 'Away'}
+              </p>
+            </div>
+            {layover.hotel && (
+              <p className="text-[11px] font-bold text-text-muted text-right max-w-[120px] leading-snug">
+                {layover.hotel}
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* ── Off / Duty day ── */}
+        {!flights.length && !standby && (status === 'OFF_DO' || status === 'OFF_D' || status === 'DUTY') && (
+          <div className="px-4 py-4 flex items-center justify-between">
+            <div>
+              <p className="text-[22px] font-black text-text">
+                {dutyEvt?.item || offEvt?.item || (status === 'OFF_DO' ? 'DO' : 'D')}
+              </p>
+              <p className="text-[12px] font-bold text-text-muted">
+                {status === 'OFF_DO'
+                  ? 'Day Off'
+                  : status === 'OFF_D'
+                  ? 'Off Duty at Base'
+                  : (dutyEvt?.description || 'Ground Duty')}
+              </p>
+            </div>
+            {(offEvt?.depPort || dutyEvt?.depPort) && (
+              <span className="text-[18px] font-black text-text-muted">
+                {offEvt?.depPort || dutyEvt?.depPort}
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* ── Empty day ── */}
+        {status === 'EMPTY' && (
+          <div className="px-4 py-4">
+            <p className="text-[13px] font-bold text-text-muted">No duty scheduled.</p>
+          </div>
+        )}
+
+      </div>
+    </div>
+  );
 }
 
-// ─── Calendar grid ────────────────────────────────────────────────────────────
+// ─── Hero Banner ──────────────────────────────────────────────────────────────
 
-const DOW_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-
-interface CalDay {
-  date: string;
-  dayNum: number;
-  status: DayStatus;
-  isToday: boolean;
-  isPast: boolean;
+function HeroBanner({ status, pilot }: { status: HeroStatus; pilot: PilotInfo }) {
+  return (
+    <div className={`bg-gradient-to-br ${status.gradient} px-5 pt-12 pb-8 rounded-b-[2.5rem] shadow-xl relative overflow-hidden`}>
+      <status.Icon size={130} strokeWidth={1} className="absolute -right-6 -bottom-4 opacity-[0.07] pointer-events-none" />
+      <div className="relative z-10">
+        <p className="text-[10px] font-black uppercase tracking-[0.4em] text-white/50 mb-2">
+          {pilot.full_name}{pilot.rank ? ` · ${pilot.rank}` : ''}
+        </p>
+        <h1 className="text-[2.4rem] font-black tracking-tighter text-white leading-none mb-1">
+          {status.label}
+        </h1>
+        <p className="text-[17px] font-black text-white/85 mb-4">{status.subtitle}</p>
+        {status.tag && (
+          <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/20 backdrop-blur-sm">
+            <span className="w-1.5 h-1.5 rounded-full bg-white/80 animate-pulse" />
+            <span className="text-[11px] font-black text-white">{status.tag}</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 
-function buildCalendarDays(
-  roster: SharedRoster,
-  eventMap: Map<string, DutyEvent[]>,
-  now: DateTime,
-): (CalDay | null)[] {
-  const start = DateTime.fromFormat(`${roster.month} ${roster.year}`, 'MMMM yyyy');
-  if (!start.isValid) return [];
-
-  const daysInMonth = start.daysInMonth ?? 30;
-  // Luxon weekday: Mon=1 … Sun=7; we want Sun=0 offset
-  const firstDow = start.weekday === 7 ? 0 : start.weekday;
-
-  const cells: (CalDay | null)[] = [];
-  for (let i = 0; i < firstDow; i++) cells.push(null);
-  for (let d = 1; d <= daysInMonth; d++) {
-    const dt      = start.set({ day: d });
-    const dateStr = dt.toFormat('yyyy-MM-dd');
-    cells.push({
-      date:   dateStr,
-      dayNum: d,
-      status: getDayStatus(eventMap.get(dateStr) ?? []),
-      isToday: dt.hasSame(now, 'day'),
-      isPast:  dt < now.startOf('day'),
-    });
-  }
-  return cells;
-}
-
-// ─── Component ────────────────────────────────────────────────────────────────
+// ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function SpouseViewClient() {
   const searchParams = useSearchParams();
   const token = searchParams.get('token');
 
-  const [apiData, setApiData]       = useState<ApiResponse | null>(null);
-  const [loading, setLoading]       = useState(true);
-  const [error, setError]           = useState<string | null>(null);
-  const [now, setNow]               = useState(() => DateTime.now());
-  const [selectedIdx, setSelectedIdx] = useState(0);   // 0 = most recent roster
+  const [apiData, setApiData]           = useState<{ pilot: PilotInfo; rosters: SharedRoster[] } | null>(null);
+  const [loading, setLoading]           = useState(true);
+  const [error, setError]               = useState<string | null>(null);
+  const [now, setNow]                   = useState(() => DateTime.now());
+  const [selectedIdx, setSelectedIdx]   = useState(0);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
-  // Clock tick every minute
   useEffect(() => {
     const t = setInterval(() => setNow(DateTime.now()), 60_000);
     return () => clearInterval(t);
   }, []);
 
-  // Fetch data
   useEffect(() => {
     if (!token) { setLoading(false); setError('no-token'); return; }
-
     fetch(`/api/roster/share?token=${encodeURIComponent(token)}`)
       .then(async res => {
         const json = await res.json();
         if (!res.ok) throw new Error(json.error ?? 'Failed to load');
-        setApiData(json as ApiResponse);
+        setApiData(json);
       })
       .catch(err => setError(String(err?.message ?? err)))
       .finally(() => setLoading(false));
   }, [token]);
 
-  // Always reset selected date when switching month
   const handleMonthChange = (idx: number) => {
     setSelectedIdx(idx);
     setSelectedDate(null);
   };
 
-  // Derived data
-  const roster     = apiData?.rosters[selectedIdx];
-  const eventMap   = useMemo(() => buildEventMap(roster?.events ?? []), [roster]);
-  const calDays    = useMemo(
-    () => roster ? buildCalendarDays(roster, eventMap, now) : [],
-    [roster, eventMap, now],
+  const roster = apiData?.rosters[selectedIdx];
+
+  const { weeks, eventMap } = useMemo(
+    () => roster ? buildCalendar(roster, now) : { weeks: [], eventMap: new Map() },
+    [roster, now],
   );
+
   const heroStatus = useMemo(
-    () => apiData ? buildHeroStatus(apiData.rosters, now, apiData.pilot.base) : null,
+    () => apiData ? buildHero(apiData.rosters, now, apiData.pilot.base) : null,
     [apiData, now],
   );
-  const selectedEvts = selectedDate ? (eventMap.get(selectedDate) ?? []) : [];
+
+  const selectedCell = useMemo((): CalDay | null => {
+    if (!selectedDate) return null;
+    for (const week of weeks) {
+      for (const cell of week) {
+        if (cell?.date === selectedDate) return cell;
+      }
+    }
+    return null;
+  }, [selectedDate, weeks]);
+
+  // Which week index contains the selected date
+  const selectedWeekIdx = useMemo(() => {
+    if (!selectedDate) return -1;
+    return weeks.findIndex(week => week.some(c => c?.date === selectedDate));
+  }, [selectedDate, weeks]);
 
   // ── Loading ──
   if (loading) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-surface-1 gap-3">
-        <Loader2 size={32} className="animate-spin text-accent" />
+        <Loader2 size={28} className="animate-spin text-accent" />
         <p className="text-[12px] font-black uppercase tracking-[0.3em] text-text-muted">Loading roster…</p>
       </div>
     );
@@ -342,25 +636,24 @@ export default function SpouseViewClient() {
 
   // ── Error ──
   if (error || !apiData || !heroStatus || !roster) {
-    const isNoToken = error === 'no-token';
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-surface-1 p-8 text-center gap-4">
         <div className="w-20 h-20 rounded-[2rem] bg-danger/10 flex items-center justify-center">
-          <AlertCircle size={40} className="text-danger" />
+          <AlertCircle size={36} className="text-danger" />
         </div>
         <div>
-          <h1 className="text-2xl font-black text-text mb-2">
-            {isNoToken ? 'Missing link' : 'Link not found'}
+          <h1 className="text-xl font-black text-text mb-2">
+            {error === 'no-token' ? 'Missing link' : 'Link not found'}
           </h1>
-          <p className="text-[14px] text-text-muted font-bold leading-relaxed max-w-xs mx-auto">
-            {isNoToken
-              ? 'This page requires a share link from the pilot.'
+          <p className="text-[13px] text-text-muted font-bold leading-relaxed max-w-xs mx-auto">
+            {error === 'no-token'
+              ? 'This page needs a share link from the pilot.'
               : 'This link may have expired or been reset. Ask the pilot to share a new one.'}
           </p>
         </div>
         <button
           onClick={() => window.location.reload()}
-          className="mt-2 px-6 py-3 rounded-full border border-border text-[13px] font-black text-text-muted hover:text-text transition-colors"
+          className="px-6 py-3 rounded-full border border-border text-[13px] font-black text-text-muted hover:text-text"
         >
           Try again
         </button>
@@ -371,57 +664,33 @@ export default function SpouseViewClient() {
   const { pilot, rosters } = apiData;
 
   return (
-    <div className="min-h-screen bg-surface-1 pb-24">
+    <div className="min-h-screen bg-surface-1 pb-16">
 
-      {/* ── Hero status (always today) ── */}
-      <div className={`bg-gradient-to-br ${heroStatus.gradient} px-6 pt-14 pb-10 rounded-b-[3rem] shadow-xl relative overflow-hidden`}>
-        <heroStatus.Icon
-          size={150}
-          strokeWidth={1}
-          className="absolute -right-8 -bottom-8 opacity-[0.07] pointer-events-none"
-        />
-        <div className="relative z-10">
-          <p className="text-[10px] font-black uppercase tracking-[0.4em] text-white/50 mb-3">
-            {pilot.full_name}{pilot.rank ? ` · ${pilot.rank}` : ''}
-          </p>
-          <h1 className="text-[2.6rem] font-black tracking-tighter text-white leading-none mb-1.5">
-            {heroStatus.label}
-          </h1>
-          <p className="text-[19px] font-black text-white/85 mb-5">
-            {heroStatus.subtitle}
-          </p>
-          {heroStatus.tag && (
-            <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/20 backdrop-blur-sm">
-              <span className="w-1.5 h-1.5 rounded-full bg-white/80 animate-pulse" />
-              <span className="text-[11px] font-black text-white tracking-wide">{heroStatus.tag}</span>
-            </div>
-          )}
-        </div>
-      </div>
+      {/* ── Hero ── */}
+      <HeroBanner status={heroStatus} pilot={pilot} />
 
-      <div className="px-4 mt-5 space-y-5">
+      <div className="px-3 mt-5 space-y-4">
 
         {/* ── Month picker ── */}
         {rosters.length > 1 && (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 px-1">
             <button
               disabled={selectedIdx >= rosters.length - 1}
               onClick={() => handleMonthChange(selectedIdx + 1)}
-              className="w-9 h-9 rounded-full border border-border bg-white flex items-center justify-center text-text-muted disabled:opacity-30 transition-opacity"
+              className="w-8 h-8 rounded-full border border-border bg-white flex items-center justify-center disabled:opacity-30"
             >
-              <ChevronLeft size={16} />
+              <ChevronLeft size={15} />
             </button>
-
             <div className="flex-1 overflow-x-auto scrollbar-hide">
-              <div className="flex gap-2 justify-center">
+              <div className="flex gap-1.5 justify-center">
                 {rosters.map((r, idx) => (
                   <button
                     key={`${r.month}-${r.year}`}
                     onClick={() => handleMonthChange(idx)}
-                    className={`px-4 py-2 rounded-full text-[12px] font-black whitespace-nowrap transition-all ${
+                    className={`px-3 py-1.5 rounded-full text-[12px] font-black whitespace-nowrap transition-all ${
                       idx === selectedIdx
-                        ? 'bg-accent text-accent-fg shadow-md'
-                        : 'bg-white border border-border text-text-muted hover:text-text'
+                        ? 'bg-accent text-accent-fg shadow-sm'
+                        : 'bg-white border border-border text-text-muted'
                     }`}
                   >
                     {r.month} {r.year}
@@ -429,167 +698,81 @@ export default function SpouseViewClient() {
                 ))}
               </div>
             </div>
-
             <button
               disabled={selectedIdx <= 0}
               onClick={() => handleMonthChange(selectedIdx - 1)}
-              className="w-9 h-9 rounded-full border border-border bg-white flex items-center justify-center text-text-muted disabled:opacity-30 transition-opacity"
+              className="w-8 h-8 rounded-full border border-border bg-white flex items-center justify-center disabled:opacity-30"
             >
-              <ChevronRight size={16} />
+              <ChevronRight size={15} />
             </button>
           </div>
         )}
 
         {/* ── Calendar ── */}
-        <div className="bg-white rounded-[2rem] p-5 border border-border shadow-sm">
+        <div className="bg-white rounded-[1.75rem] border border-border shadow-sm overflow-hidden">
 
-          {/* Header */}
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-[13px] font-black text-text">
-              {roster.month} {roster.year}
-            </h2>
-            <div className="flex items-center gap-2.5">
-              {(['FLIGHT', 'LAYOVER', 'STANDBY'] as const).map(s => {
-                const label = s === 'FLIGHT' ? 'Flying' : s === 'LAYOVER' ? 'Away' : 'Standby';
-                const dot   = s === 'FLIGHT' ? 'bg-sky-300' : s === 'LAYOVER' ? 'bg-indigo-300' : 'bg-amber-300';
-                return (
-                  <span key={s} className="flex items-center gap-1 text-[9px] font-black uppercase tracking-wider text-text-subtle">
-                    <span className={`w-2 h-2 rounded-sm ${dot}`} />
-                    {label}
-                  </span>
-                );
-              })}
+          {/* Month title */}
+          <div className="px-4 pt-4 pb-2 flex items-center justify-between">
+            <h2 className="text-[14px] font-black text-text">{roster.month} {roster.year}</h2>
+            {/* Legend */}
+            <div className="flex items-center gap-2">
+              {[
+                { label: 'Flight', bg: 'bg-sky-500' },
+                { label: 'Standby', bg: 'bg-amber-500' },
+                { label: 'Off', bg: 'bg-emerald-600' },
+              ].map(l => (
+                <span key={l.label} className="flex items-center gap-1 text-[8px] font-black text-text-subtle uppercase tracking-wider">
+                  <span className={`w-2 h-2 rounded-sm ${l.bg}`} />
+                  {l.label}
+                </span>
+              ))}
             </div>
           </div>
 
-          {/* DOW headers */}
-          <div className="grid grid-cols-7 mb-1.5">
-            {DOW_LABELS.map(d => (
-              <div key={d} className="text-center text-[9px] font-black uppercase tracking-widest text-text-subtle py-0.5">
+          {/* DOW headers — Monday first */}
+          <div className="grid grid-cols-7 px-2 pb-1">
+            {DOW.map(d => (
+              <div key={d} className="text-center text-[9px] font-black uppercase tracking-widest text-text-subtle py-1">
                 {d}
               </div>
             ))}
           </div>
 
-          {/* Day grid */}
-          <div className="grid grid-cols-7 gap-1">
-            {calDays.map((day, i) => {
-              if (!day) return <div key={`pad-${i}`} />;
-              const isSelected = selectedDate === day.date;
-              return (
-                <button
-                  key={day.date}
-                  onClick={() => setSelectedDate(isSelected ? null : day.date)}
-                  className={`
-                    aspect-square rounded-xl flex items-center justify-center
-                    text-[13px] font-black transition-all duration-100
-                    ${dayBg(day.status, day.isToday, isSelected)}
-                    ${day.isPast && !day.isToday ? 'opacity-35' : ''}
-                    ${isSelected ? 'scale-110' : 'active:scale-95'}
-                  `}
-                >
-                  {day.dayNum}
-                </button>
-              );
-            })}
-          </div>
+          {/* Weeks */}
+          <div className="px-2 pb-3 space-y-1">
+            {weeks.map((week, wIdx) => (
+              <React.Fragment key={wIdx}>
+                {/* Week row */}
+                <div className="grid grid-cols-7 gap-1">
+                  {week.map((cell, cIdx) => (
+                    <DayCellComp
+                      key={cell ? cell.date : `pad-${wIdx}-${cIdx}`}
+                      cell={cell}
+                      isSelected={cell?.date === selectedDate}
+                      onTap={() => {
+                        if (!cell) return;
+                        setSelectedDate(prev => prev === cell.date ? null : cell.date);
+                      }}
+                    />
+                  ))}
+                </div>
 
-          {/* Day detail */}
-          {selectedDate && (
-            <div className="mt-4 pt-4 border-t border-border">
-              <div className="flex items-start justify-between mb-2 gap-2">
-                <p className="text-[12px] font-black uppercase tracking-widest text-text-subtle">
-                  {DateTime.fromISO(selectedDate).toFormat('EEEE, d MMMM yyyy')}
-                </p>
-                <button
-                  onClick={() => setSelectedDate(null)}
-                  className="shrink-0 text-text-subtle hover:text-text transition-colors mt-0.5"
-                >
-                  <ChevronUp size={16} />
-                </button>
-              </div>
-              <div className="space-y-1.5">
-                {describeDayEvents(selectedEvts).map((line, i) => (
-                  <p key={i} className="text-[14px] font-bold text-text leading-snug">{line}</p>
-                ))}
-              </div>
-            </div>
-          )}
+                {/* Detail panel — inserted after the week that contains the selected day */}
+                {wIdx === selectedWeekIdx && selectedCell && (
+                  <DayDetailCard
+                    cell={selectedCell}
+                    onClose={() => setSelectedDate(null)}
+                  />
+                )}
+              </React.Fragment>
+            ))}
+          </div>
         </div>
 
-        {/* ── All events list ── */}
-        {(roster.events ?? []).length > 0 ? (
-          <div>
-            <h2 className="text-[11px] font-black uppercase tracking-[0.3em] text-text-subtle mb-3 px-1">
-              Full Schedule
-            </h2>
-            <div className="space-y-2">
-              {Array.from(
-                new Map(
-                  (roster.events ?? []).map(e => [e.date, e.date])
-                ).keys()
-              )
-                .sort()
-                .map(dateStr => {
-                  const dayEvts  = eventMap.get(dateStr) ?? [];
-                  const status   = getDayStatus(dayEvts);
-                  const dt       = DateTime.fromISO(dateStr);
-                  const isToday  = dt.hasSame(now, 'day');
-                  const isPast   = dt < now.startOf('day');
-                  if (status === 'HOME') return null;
-                  return (
-                    <div
-                      key={dateStr}
-                      className={`bg-white rounded-[1.5rem] p-4 border transition-all ${
-                        isToday ? 'border-accent shadow-md' : 'border-border'
-                      } ${isPast ? 'opacity-50' : ''}`}
-                    >
-                      <div className="flex gap-3">
-                        {/* Date pill */}
-                        <div className={`shrink-0 w-11 h-11 rounded-2xl flex flex-col items-center justify-center text-center ${
-                          isToday ? 'bg-accent text-accent-fg' : 'bg-surface-2 text-text-muted'
-                        }`}>
-                          <span className="text-[8px] font-black uppercase leading-none">{dt.toFormat('ccc')}</span>
-                          <span className="text-[16px] font-black leading-tight">{dt.toFormat('d')}</span>
-                        </div>
-
-                        {/* Content */}
-                        <div className="min-w-0 flex-1">
-                          <span className={`inline-block text-[8px] font-black px-1.5 py-0.5 rounded-md tracking-widest uppercase mb-1.5 ${
-                            status === 'FLIGHT'  ? 'bg-sky-100 text-sky-700' :
-                            status === 'LAYOVER' ? 'bg-indigo-100 text-indigo-700' :
-                            status === 'STANDBY' ? 'bg-amber-100 text-amber-700' :
-                            'bg-purple-100 text-purple-700'
-                          }`}>
-                            {status}
-                          </span>
-                          <div className="space-y-0.5">
-                            {describeDayEvents(dayEvts).map((line, i) => (
-                              <p key={i} className="text-[13px] font-bold text-text leading-snug">{line}</p>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })
-                .filter(Boolean)}
-            </div>
-          </div>
-        ) : (
-          <div className="bg-white rounded-[2rem] p-8 border border-border text-center">
-            <p className="text-[13px] font-bold text-text-muted">No duty events for this month.</p>
-          </div>
-        )}
-
         {/* ── Footer ── */}
-        <div className="text-center py-4">
-          <p className="text-[11px] font-black text-text-subtle uppercase tracking-[0.2em]">
-            Shared via Otarosta
-          </p>
-          <p className="text-[10px] text-text-subtle/50 font-bold mt-1">
-            Live read-only · Auto-updates
-          </p>
+        <div className="text-center py-3">
+          <p className="text-[11px] font-black text-text-subtle uppercase tracking-[0.2em]">Shared via Otarosta</p>
+          <p className="text-[9px] text-text-subtle/50 font-bold mt-0.5">Live read-only · Auto-updates</p>
         </div>
 
       </div>
