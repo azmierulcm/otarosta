@@ -22,20 +22,23 @@ export async function GET(request: NextRequest) {
     const userId = profileDoc.id;
     const profileData = profileDoc.data();
 
-    // 2. Fetch the active roster for this user
+    // 2. Fetch the active roster for this user — sort in JS to avoid needing a composite index
     const rostersRef = adminDb.collection('rosters');
     const rosterSnapshot = await rostersRef
       .where('userId', '==', userId)
-      .orderBy('month', 'desc')
-      .orderBy('year', 'desc')
-      .limit(1)
       .get();
 
     if (rosterSnapshot.empty) {
       return NextResponse.json({ error: 'No roster found' }, { status: 404 });
     }
 
-    const rosterData = rosterSnapshot.docs[0].data();
+    const rosterData = rosterSnapshot.docs
+      .map(d => d.data())
+      .sort((a, b) => {
+        const aTime = a.uploadedAt?.toMillis?.() ?? 0;
+        const bTime = b.uploadedAt?.toMillis?.() ?? 0;
+        return bTime - aTime;
+      })[0];
 
     return NextResponse.json({
       pilot: {
