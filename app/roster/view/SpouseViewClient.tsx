@@ -6,7 +6,7 @@ import { DateTime } from 'luxon';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Plane, PlaneTakeoff, PlaneLanding,
-  Check, ChevronRight, ChevronLeft,
+  Check, ChevronDown,
   AlertCircle, Loader2, X,
 } from 'lucide-react';
 import { getAirportMeta } from '@/lib/utils/destinations';
@@ -234,14 +234,13 @@ const DOW = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 // ─── DayCell ─────────────────────────────────────────────────────────────────
 
 function DayCell({
-  day, rday, isToday, isActive, onHover, onHoverEnd, onClick,
+  day, rday, isToday, isActive, onHover, onClick,
 }: {
   day: number | null;
   rday: RosterDay | null;
   isToday: boolean;
   isActive: boolean;
   onHover: () => void;
-  onHoverEnd: () => void;
   onClick: () => void;
 }) {
   if (!day) return <div />;
@@ -254,7 +253,6 @@ function DayCell({
     <div
       onClick={onClick}
       onMouseEnter={onHover}
-      onMouseLeave={onHoverEnd}
       className={[
         'relative flex flex-col items-center justify-center',
         'rounded-2xl aspect-square cursor-pointer select-none',
@@ -669,24 +667,24 @@ export default function SpouseViewClient() {
 
         {/* ── Chrome bar ── */}
         <div className="flex items-center justify-between rounded-2xl border border-black/10 bg-surface-2 px-5 py-3">
-          <div className="flex items-center gap-2">
-            <button
-              disabled={rosterIdx <= 0}
-              onClick={() => { setRosterIdx(i => i - 1); setHoveredDate(null); setActiveDate(null); }}
-              className="grid h-7 w-7 place-items-center rounded-full border border-border bg-white text-text-muted shadow-sm disabled:opacity-30 hover:border-border-hover"
+          {/* Month dropdown */}
+          <div className="relative flex items-center">
+            <select
+              value={rosterIdx}
+              onChange={e => {
+                setRosterIdx(Number(e.target.value));
+                setHoveredDate(null);
+                setActiveDate(null);
+              }}
+              className="appearance-none bg-transparent pr-6 font-mono text-[13px] font-extrabold uppercase tracking-[.2em] text-text outline-none cursor-pointer"
             >
-              <ChevronLeft size={13} />
-            </button>
-            <span className="font-mono text-[13px] font-extrabold uppercase tracking-[.2em] text-text">
-              {monthAbbr}
-            </span>
-            <button
-              disabled={rosterIdx >= rosters.length - 1}
-              onClick={() => { setRosterIdx(i => i + 1); setHoveredDate(null); setActiveDate(null); }}
-              className="grid h-7 w-7 place-items-center rounded-full border border-border bg-white text-text-muted shadow-sm disabled:opacity-30 hover:border-border-hover"
-            >
-              <ChevronRight size={13} />
-            </button>
+              {rosters.map((r, i) => (
+                <option key={i} value={i} className="font-mono font-bold normal-case tracking-normal">
+                  {r.month.slice(0, 3).toUpperCase()} {r.year}
+                </option>
+              ))}
+            </select>
+            <ChevronDown size={12} className="pointer-events-none absolute right-0 text-text-muted" />
           </div>
           <span className="flex items-center gap-1.5 rounded-full bg-success/10 px-3 py-1.5 text-[11px] font-extrabold text-success">
             <Check size={11} strokeWidth={3} /> Synced
@@ -694,14 +692,16 @@ export default function SpouseViewClient() {
         </div>
 
         {/* ── Pilot info ── */}
-        <div className="flex items-center gap-3 rounded-2xl border border-border bg-white px-4 py-3 shadow-sm">
-          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-accent text-sm font-bold text-white">
+        <div className="flex items-center gap-4 rounded-2xl border border-border bg-white px-5 py-4 shadow-sm">
+          <span className="grid h-16 w-16 shrink-0 place-items-center rounded-2xl bg-accent text-[22px] font-extrabold text-white">
             {initials}
           </span>
           <div className="min-w-0">
-            <p className="truncate text-[14px] font-bold text-text">{pilot.full_name}</p>
+            <p className="truncate text-[22px] font-extrabold leading-tight text-text">
+              {pilot.full_name}
+            </p>
             {(pilot.rank || pilot.airline) && (
-              <p className="truncate text-[12px] text-text-muted">
+              <p className="mt-1 truncate text-[15px] font-medium leading-snug text-text-muted">
                 {[pilot.rank, pilot.airline].filter(Boolean).join(' · ')}
               </p>
             )}
@@ -758,7 +758,6 @@ export default function SpouseViewClient() {
                     isToday={dateStr === todayStr}
                     isActive={hoveredDate === dateStr || activeDate === dateStr}
                     onHover={() => setHoveredDate(dateStr)}
-                    onHoverEnd={() => setHoveredDate(null)}
                     onClick={() => setActiveDate(prev => prev === dateStr ? null : dateStr)}
                   />
                 );
