@@ -428,12 +428,14 @@ export default function RosterCard({ defaultRole = "pilot", defaultPeriod = "mon
             <HighlightCard
               accent="#FF385C" bg="#FFE9EE"
               icon={ICONS.bed}   label="Longest layover"
-              title={data.longest.city}  value={`${data.longest.hours}h`}
+              title={data.longest.city}
+              value={data.longest.hours != null ? `${data.longest.hours}h` : data.longest.code}
             />
             <HighlightCard
               accent="#00A699" bg="#E1F5EE"
               icon={ICONS.heart} label="Favorite stay"
-              title={data.favorite.city} value={`★ ${data.favorite.rating?.toFixed(1)}`}
+              title={data.favorite.city}
+              value={data.favorite.rating != null ? `★ ${data.favorite.rating.toFixed(1)}` : data.favorite.code}
             />
           </section>
 
