@@ -12,7 +12,7 @@ import type { Listing } from '@/lib/types/marketplace';
 import {
   User2, Plane, Building2, MapPin, FileText,
   Loader2, Check, ChevronDown, ArrowRight, Camera, Trash2,
-  Lock, ShoppingBag, ExternalLink,
+  Lock, ShoppingBag, ExternalLink, LogOut,
 } from 'lucide-react';
 import { FlipWords } from '@/components/shared/FlipWords';
 
@@ -78,7 +78,7 @@ function SelectWrapper({ children }: { children: React.ReactNode }) {
 
 /* ── Main component ───────────────────────────────────────────────────────── */
 export default function SettingsClient() {
-  const { user, profile, setProfile, isLoading: authLoading } = useAuth();
+  const { user, profile, setProfile, signOutUser, isLoading: authLoading } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
   const isOnboarding = searchParams.get('onboarding') === '1';
@@ -101,6 +101,7 @@ export default function SettingsClient() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [pwResetSent, setPwResetSent] = useState(false);
   const [pwResetLoading, setPwResetLoading] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
   const [listings, setListings] = useState<Listing[]>([]);
   const [listingsLoading, setListingsLoading] = useState(false);
 
@@ -189,6 +190,15 @@ export default function SettingsClient() {
     }
   };
 
+  const handleSignOut = async () => {
+    setSigningOut(true);
+    try {
+      await signOutUser();
+    } catch {
+      setSigningOut(false);
+    }
+  };
+
   const handlePasswordReset = async () => {
     if (!user?.email) return;
     setPwResetLoading(true);
@@ -250,7 +260,7 @@ export default function SettingsClient() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto px-4 pt-24 pb-32">
+    <div className="max-w-2xl mx-auto px-4 pt-20 pb-24">
 
       {/* Onboarding welcome banner */}
       {isOnboarding && (
@@ -572,6 +582,29 @@ export default function SettingsClient() {
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {/* ── Sign out ── */}
+      {!isOnboarding && (
+        <div className="mt-6 bg-white border border-border rounded-[2rem] p-8 shadow-sm">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-[13px] font-black text-text">Sign out</p>
+              <p className="text-[12px] text-text-muted font-bold mt-0.5">
+                You&apos;ll need to sign in again to access your account.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleSignOut}
+              disabled={signingOut}
+              className="shrink-0 flex items-center gap-2 px-5 py-2.5 rounded-full border border-danger/30 text-[12px] font-black text-danger hover:bg-danger/5 transition-colors disabled:opacity-60"
+            >
+              {signingOut ? <Loader2 size={13} className="animate-spin" /> : <LogOut size={13} />}
+              {signingOut ? 'Signing out…' : 'Sign out'}
+            </button>
+          </div>
         </div>
       )}
 

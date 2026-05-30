@@ -122,12 +122,6 @@ export const AuthModal = () => {
           </div>
         ) : (
           <form onSubmit={handleReset} className="space-y-4" noValidate>
-            {error && (
-              <div role="alert" className="mb-2 p-4 rounded-[var(--radius-md)] bg-danger-soft border border-danger/20 flex items-start gap-3 text-[14px] text-danger">
-                <AlertCircle size={16} className="shrink-0 mt-0.5" aria-hidden="true" />
-                <span>{error}</span>
-              </div>
-            )}
             <div>
               <label htmlFor="reset-email" className="sr-only">Email address</label>
               <div className="relative">

@@ -186,6 +186,10 @@ export function hasCoordinates(iata: string): boolean {
   return iata.toUpperCase() in IATA_COORDS;
 }
 
+export function getCoordinates(iata: string): [number, number] | null {
+  return IATA_COORDS[iata.toUpperCase()] ?? null;
+}
+
 /**
  * Calculate total block minutes from an array of flight events.
  * Handles midnight-crossing (STA < STD).

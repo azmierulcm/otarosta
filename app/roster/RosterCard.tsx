@@ -19,7 +19,11 @@ type Period = "month" | "half" | "year";
 export interface RosterCardProps {
   defaultRole?:   Role;
   defaultPeriod?: Period;
+  /** When provided, real user data replaces the demo profile and the role toggle is hidden. */
+  profileOverride?: Profile;
 }
+
+export type { Profile, PeriodData };
 
 interface Pin       { x: number; y: number; code: string }
 interface TopRoute  { from: string; to: string; count: number }
@@ -269,21 +273,23 @@ const pctDelta = (now: number, prev: number) => Math.round(((now - prev) / prev)
 
 // ---------- component --------------------------------------------------------
 
-export default function RosterCard({ defaultRole = "pilot", defaultPeriod = "month" }: RosterCardProps) {
+export default function RosterCard({ defaultRole = "pilot", defaultPeriod = "month", profileOverride }: RosterCardProps) {
   const [role, setRole]     = useState<Role>(defaultRole);
   const [period, setPeriod] = useState<Period>(defaultPeriod);
 
-  const profile  = PROFILES[role];
+  const profile  = profileOverride ?? PROFILES[role];
   const data     = profile.periods[period];
   const delta    = pctDelta(data.hours, data.prevHours);
   const positive = delta >= 0;
 
   return (
     <div className="flex flex-col items-center gap-4">
-      {/* External controls (sit outside the story card) */}
-      <div className="flex items-center gap-2 text-[13px]">
-        <RoleToggle role={role} setRole={setRole} />
-      </div>
+      {/* Role toggle only shown in demo mode */}
+      {!profileOverride && (
+        <div className="flex items-center gap-2 text-[13px]">
+          <RoleToggle role={role} setRole={setRole} />
+        </div>
+      )}
 
       {/* The story card — locked to 9:16 (Instagram Stories) */}
       <div
