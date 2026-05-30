@@ -17,13 +17,15 @@ type Role   = "pilot" | "cabin";
 type Period = "month" | "half" | "year";
 
 export interface RosterCardProps {
-  defaultRole?:   Role;
-  defaultPeriod?: Period;
+  defaultRole?:      Role;
+  defaultPeriod?:    Period;
   /** When provided, real user data replaces the demo profile and the role toggle is hidden. */
-  profileOverride?: Profile;
+  profileOverride?:  Profile;
+  /** Restrict which period tabs are shown. Defaults to all three. */
+  availablePeriods?: Period[];
 }
 
-export type { Profile, PeriodData };
+export type { Profile, PeriodData, Period };
 
 interface Pin       { x: number; y: number; code: string }
 interface TopRoute  { from: string; to: string; count: number }
@@ -273,12 +275,13 @@ const pctDelta = (now: number, prev: number) => Math.round(((now - prev) / prev)
 
 // ---------- component --------------------------------------------------------
 
-export default function RosterCard({ defaultRole = "pilot", defaultPeriod = "month", profileOverride }: RosterCardProps) {
+export default function RosterCard({ defaultRole = "pilot", defaultPeriod = "month", profileOverride, availablePeriods }: RosterCardProps) {
   const [role, setRole]     = useState<Role>(defaultRole);
   const [period, setPeriod] = useState<Period>(defaultPeriod);
 
-  const profile  = profileOverride ?? PROFILES[role];
-  const data     = profile.periods[period];
+  const tabs    = availablePeriods ? PERIOD_TABS.filter((t) => availablePeriods.includes(t.id)) : PERIOD_TABS;
+  const profile = profileOverride ?? PROFILES[role];
+  const data    = profile.periods[period];
   const delta    = pctDelta(data.hours, data.prevHours);
   const positive = delta >= 0;
 
@@ -331,23 +334,25 @@ export default function RosterCard({ defaultRole = "pilot", defaultPeriod = "mon
           </header>
 
           {/* ---------- Period tabs (segmented) ---------- */}
-          <div className="mt-5 flex rounded-full bg-[#F1EFE8] p-1 text-[12px] font-medium">
-            {PERIOD_TABS.map((t) => {
-              const active = t.id === period;
-              return (
-                <button
-                  key={t.id}
-                  onClick={() => setPeriod(t.id)}
-                  className={[
-                    "flex-1 rounded-full py-2 transition",
-                    active ? "bg-white text-[#222] shadow-sm" : "text-[#717171] hover:text-[#222]",
-                  ].join(" ")}
-                >
-                  {t.label}
-                </button>
-              );
-            })}
-          </div>
+          {tabs.length > 1 && (
+            <div className="mt-5 flex rounded-full bg-[#F1EFE8] p-1 text-[12px] font-medium">
+              {tabs.map((t) => {
+                const active = t.id === period;
+                return (
+                  <button
+                    key={t.id}
+                    onClick={() => setPeriod(t.id)}
+                    className={[
+                      "flex-1 rounded-full py-2 transition",
+                      active ? "bg-white text-[#222] shadow-sm" : "text-[#717171] hover:text-[#222]",
+                    ].join(" ")}
+                  >
+                    {t.label}
+                  </button>
+                );
+              })}
+            </div>
+          )}
 
           {/* ---------- Hero stat ---------- */}
           <section className="mt-5">

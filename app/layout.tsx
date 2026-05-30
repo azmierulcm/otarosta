@@ -6,6 +6,7 @@ import { AuthProvider } from "@/lib/contexts/AuthContext";
 import { RosterProvider } from "@/lib/contexts/RosterContext";
 import { InstallBanner } from "@/components/shared/InstallBanner";
 import { BottomNav } from "@/components/shared/BottomNav";
+import { BottomNavSpacer } from "@/components/shared/BottomNavSpacer";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -91,8 +92,9 @@ export default function RootLayout({
             {/* flex-1 + min-h-0 makes this div the scroll container (not the body/window).
                 position:fixed elements (BottomNav, InstallBanner) stay truly viewport-fixed
                 on all pages and browsers — including iOS Safari with long roster content. */}
-            <div className="flex-1 min-h-0 overflow-y-auto pb-20 md:pb-0">
+            <div className="flex-1 min-h-0 overflow-y-auto">
               {children}
+              <BottomNavSpacer />
             </div>
             <InstallBanner />
             <BottomNav />

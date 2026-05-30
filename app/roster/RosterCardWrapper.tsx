@@ -7,7 +7,7 @@ import { useAuth } from '@/lib/contexts/AuthContext';
 import { useRoster } from '@/lib/contexts/RosterContext';
 import { DESTINATION_CATALOG } from '@/lib/data/destination-catalog';
 import { getCoordinates } from '@/lib/utils/geo/haversine';
-import type { Profile, PeriodData } from './RosterCard';
+import type { Profile, PeriodData, Period } from './RosterCard';
 import RosterCard from './RosterCard';
 import type { DutyEvent } from '@/lib/types';
 
@@ -298,5 +298,15 @@ export default function RosterCardWrapper() {
     },
   };
 
-  return <RosterCard profileOverride={realProfile} defaultPeriod="month" />;
+  const availablePeriods: Period[] = ['month'];
+  if (rosters.length >= 2) availablePeriods.push('half');
+  if (rosters.length >= 6) availablePeriods.push('year');
+
+  return (
+    <RosterCard
+      profileOverride={realProfile}
+      defaultPeriod="month"
+      availablePeriods={availablePeriods}
+    />
+  );
 }
