@@ -5,7 +5,7 @@ import StoryDeck from '@/components/product/passport/StoryDeck';
 
 export default function YearInAirStoryPage() {
   return (
-    <main className="bg-passport-bg min-h-screen">
+    <main className="min-h-screen" style={{ background: '#0A1520' }}>
       <StoryDeck />
     </main>
   );

@@ -40,6 +40,13 @@
   --color-sand:        #F7F5F0;
   --color-cloud:       #F1EFE8;
 
+  /* ── Passport / story theme ───────────────────────────────────────────── */
+  --color-passport-bg:       #0A1520;
+  --color-passport-gold:     #C8A84B;
+  --color-passport-gold-soft:#BF9B3A;
+  --color-passport-secondary:#7A8EA0;
+  --color-passport-parchment:#F5EDD8;
+
   /* Region patches */
   --color-patch-sea: var(--patch-sea);
   --color-patch-east: var(--patch-east);
