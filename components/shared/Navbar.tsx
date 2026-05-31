@@ -1,7 +1,7 @@
 'use client'
 
 import React from 'react'
-import { LayoutDashboard, BookOpen, CreditCard, ShoppingBag, Settings2, LogOut } from 'lucide-react'
+import { LayoutDashboard, BookOpen, ShoppingBag, Settings2, LogOut } from 'lucide-react'
 import Link from 'next/link'
 import { useAuth } from '@/lib/contexts/AuthContext'
 import { usePathname } from 'next/navigation'
@@ -22,17 +22,12 @@ export const Navbar = () => {
   const navLinks = [
     { label: 'Roster',      href: '/',            icon: LayoutDashboard },
     { label: 'Passport',    href: '/passport',    icon: BookOpen },
-    { label: 'Card',        href: '/roster',      icon: CreditCard },
     { label: 'Marketplace', href: '/marketplace', icon: ShoppingBag },
     { label: 'Settings',    href: '/settings',    icon: Settings2 },
   ]
 
   const isActive = (href: string) =>
-    href === '/'
-      ? pathname === '/'
-      : href === '/roster'
-        ? pathname === '/roster'
-        : pathname.startsWith(href)
+    href === '/' ? pathname === '/' : pathname.startsWith(href)
 
   const pageTitle = Object.entries(PAGE_TITLES).find(([path]) =>
     path === '/' ? pathname === '/' : pathname.startsWith(path)

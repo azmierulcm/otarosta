@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, BookOpen, CreditCard, ShoppingBag, Settings2 } from 'lucide-react'
+import { LayoutDashboard, BookOpen, ShoppingBag, Settings2 } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { haptics } from '@/lib/haptics'
 import { useAuth } from '@/lib/contexts/AuthContext'
@@ -10,7 +10,6 @@ import { useAuth } from '@/lib/contexts/AuthContext'
 const navItems = [
   { icon: LayoutDashboard, label: 'Roster',   path: '/' },
   { icon: BookOpen,        label: 'Passport', path: '/passport' },
-  { icon: CreditCard,      label: 'Card',     path: '/roster' },
   { icon: ShoppingBag,     label: 'Market',   path: '/marketplace' },
   { icon: Settings2,       label: 'Settings', path: '/settings' },
 ]
@@ -33,9 +32,7 @@ export function BottomNav() {
           const isActive =
             item.path === '/'
               ? pathname === '/'
-              : item.path === '/roster'
-                ? pathname === '/roster'
-                : pathname.startsWith(item.path)
+              : pathname.startsWith(item.path)
 
           return (
             <Link

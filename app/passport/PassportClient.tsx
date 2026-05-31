@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { Globe, Plane, Clock, Award, Play, Share2, Lock, ChevronRight } from 'lucide-react';
+import { Globe, Plane, Clock, Award, Play, CreditCard, Lock, ChevronRight } from 'lucide-react';
 import { Navbar } from '@/components/shared/Navbar';
 import { useAuth } from '@/lib/contexts/AuthContext';
 import { useRoster } from '@/lib/contexts/RosterContext';
@@ -15,7 +15,6 @@ import { ACHIEVEMENT_CATALOG } from '@/lib/achievements/definitions';
 import type { CrewStats } from '@/lib/types/passport';
 import AchievementBadge from '@/components/product/passport/AchievementBadge';
 import { DestinationsGrid } from '@/components/product/profile/DestinationsGrid';
-import ShareModal from '@/components/product/passport/ShareModal';
 
 /* ── Loading skeleton ─────────────────────────────────────────────────────── */
 function LoadingShell() {
@@ -97,7 +96,6 @@ export default function PassportClient() {
 
   const [earnedDestinations, setEarnedDestinations] = useState<EarnedDestination[]>([]);
   const [isLoadingDests, setIsLoadingDests] = useState(false);
-  const [isShareOpen, setIsShareOpen] = useState(false);
 
   useEffect(() => {
     if (!user) { setEarnedDestinations([]); return; }
@@ -202,13 +200,13 @@ export default function PassportClient() {
                 <Play size={13} fill="currentColor" />
                 Watch story
               </Link>
-              <button
-                onClick={() => setIsShareOpen(true)}
+              <Link
+                href="/roster"
                 className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-accent text-accent-fg text-[13px] font-black hover:bg-accent-hover transition-colors shadow-lg shadow-accent/20"
               >
-                <Share2 size={13} />
-                Share
-              </button>
+                <CreditCard size={13} />
+                Card
+              </Link>
             </div>
           </div>
         </div>
@@ -245,8 +243,21 @@ export default function PassportClient() {
               />
             </div>
 
-            {/* ── Achievements ── */}
+            {/* ── City stamps ── */}
             <div className="bg-white border border-border rounded-[2rem] p-8 shadow-sm mb-8">
+              <div className="flex items-center justify-between mb-6 pb-5 border-b border-border">
+                <div className="text-[10px] font-black uppercase tracking-[0.35em] text-text-subtle font-mono">
+                  City Stamps
+                </div>
+                <div className="text-[10px] font-black text-accent font-mono">
+                  {lifetimeStats.citiesCollected} collected
+                </div>
+              </div>
+              <DestinationsGrid earnedDestinations={earnedDestinations} />
+            </div>
+
+            {/* ── Achievements ── */}
+            <div className="bg-white border border-border rounded-[2rem] p-8 shadow-sm">
               <div className="flex items-center justify-between mb-6 pb-5 border-b border-border">
                 <div className="text-[10px] font-black uppercase tracking-[0.35em] text-text-subtle font-mono">
                   Achievement Collection
@@ -271,28 +282,9 @@ export default function PassportClient() {
                 </div>
               )}
             </div>
-
-            {/* ── City stamps ── */}
-            <div className="bg-white border border-border rounded-[2rem] p-8 shadow-sm">
-              <div className="flex items-center justify-between mb-6 pb-5 border-b border-border">
-                <div className="text-[10px] font-black uppercase tracking-[0.35em] text-text-subtle font-mono">
-                  City Stamps
-                </div>
-                <div className="text-[10px] font-black text-accent font-mono">
-                  {lifetimeStats.citiesCollected} collected
-                </div>
-              </div>
-              <DestinationsGrid earnedDestinations={earnedDestinations} />
-            </div>
           </>
         )}
       </div>
-
-      <ShareModal
-        isOpen={isShareOpen}
-        onClose={() => setIsShareOpen(false)}
-        crewId={user?.uid ?? ''}
-      />
 
       {/* motion hint for framer-motion usage */}
       <motion.div aria-hidden className="sr-only" />
