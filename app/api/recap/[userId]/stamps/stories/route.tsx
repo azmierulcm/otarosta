@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { StampsTemplate } from '@/lib/recap/templates';
+import { verifyIdToken } from '@/lib/firebase/auth-helpers';
 import { getRecapFonts } from '@/lib/recap/og-fonts';
 import { renderImage } from '@/lib/recap/render';
 import { adminDb } from '@/lib/firebase/admin';
@@ -16,6 +17,14 @@ export async function GET(
 ) {
   try {
     const { userId } = await params;
+
+    const token = (req.headers.get('Authorization') ?? '').replace('Bearer ', '');
+    let uid: string;
+    try { uid = await verifyIdToken(token); } catch {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    if (uid !== userId) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+
     const download = new URL(req.url).searchParams.get('download') === '1';
 
     const [snap, profileSnap, fonts] = await Promise.all([

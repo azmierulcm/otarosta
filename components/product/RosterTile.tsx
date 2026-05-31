@@ -167,13 +167,13 @@ const STATUS_META: Record<DutyStatus, {
   label: string;
   chipTone: string;
 }> = {
-  flight:   { band: 'bg-sky-50 text-sky-700',       label: 'Duty',    chipTone: 'sky'    },
-  office:   { band: 'bg-sky-50 text-sky-700',        label: 'Office',  chipTone: 'sky'    },
-  standby:  { band: 'bg-yellow-50 text-yellow-800',  label: 'Standby', chipTone: 'yellow' },
-  off:      { band: 'bg-green-50 text-green-700',    label: 'Off',     chipTone: 'green'  },
-  medical:  { band: 'bg-red-50 text-red-900',        label: 'Medical', chipTone: 'maroon' },
-  annual:   { band: 'bg-red-50 text-red-900',        label: 'Leave',   chipTone: 'maroon' },
-  training: { band: 'bg-teal-50 text-teal-700',      label: 'Sim',     chipTone: 'teal'   },
+  flight:   { band: 'bg-duty-flight-bg text-duty-flight-text',   label: 'Duty',    chipTone: 'flight'  },
+  office:   { band: 'bg-duty-flight-bg text-duty-flight-text',   label: 'Office',  chipTone: 'flight'  },
+  standby:  { band: 'bg-duty-standby-bg text-duty-standby-text', label: 'Standby', chipTone: 'standby' },
+  off:      { band: 'bg-duty-off-bg text-duty-off-text',         label: 'Off',     chipTone: 'off'     },
+  medical:  { band: 'bg-duty-leave-bg text-duty-leave-text',     label: 'Medical', chipTone: 'leave'   },
+  annual:   { band: 'bg-duty-leave-bg text-duty-leave-text',     label: 'Leave',   chipTone: 'leave'   },
+  training: { band: 'bg-duty-sim-bg text-duty-sim-text',         label: 'Sim',     chipTone: 'sim'     },
 };
 
 // ── Sub-components ────────────────────────────────────────────────────────────
@@ -208,11 +208,11 @@ function PairingArrow({ on }: { on?: boolean }) {
 function WorkChip({ children, tone }: { children: React.ReactNode; tone: string }) {
   const tones: Record<string, string> = {
     neutral: 'bg-ink-100 text-ink-700',
-    sky:     'bg-sky-50 text-sky-700',
-    yellow:  'bg-yellow-50 text-yellow-800',
-    green:   'bg-green-50 text-green-700',
-    teal:    'bg-teal-50 text-teal-700',
-    maroon:  'bg-red-50 text-red-900',
+    flight:  'bg-duty-flight-bg text-duty-flight-text',
+    standby: 'bg-duty-standby-bg text-duty-standby-text',
+    off:     'bg-duty-off-bg text-duty-off-text',
+    leave:   'bg-duty-leave-bg text-duty-leave-text',
+    sim:     'bg-duty-sim-bg text-duty-sim-text',
   };
   return (
     <span className={`tile-workchip inline-flex items-center rounded px-1.5 py-0.5 text-[12px] font-bold tracking-wider tabular-nums ${tones[tone] ?? tones.neutral}`}>
@@ -236,7 +236,7 @@ function FlightRows({ f, compact }: { f: TileFlight; compact: boolean }) {
         <span className="tile-airport tabular-nums text-[14px] font-semibold text-ink-700">
           {f.from}
         </span>
-        <span className="tile-flight-no flex-1 text-center tabular-nums text-[15px] font-bold text-green-700 tracking-tight">
+        <span className="tile-flight-no flex-1 text-center tabular-nums text-[15px] font-bold text-duty-flight-no tracking-tight">
           {f.flightNo}
         </span>
         <span className="tile-airport tabular-nums text-[14px] font-semibold text-ink-700">
@@ -312,11 +312,11 @@ export function RosterTile({ duty: d, onClick }: RosterTileProps) {
       className="
         tile-cq
         group relative overflow-hidden bg-white
-        border border-neutral-200 rounded-[var(--radius-tile)]
+        border border-ink-200 rounded-[var(--radius-tile)]
         shadow-[var(--shadow-card)]
         transition-all duration-150
-        hover:shadow-[var(--shadow-card-hover)] hover:border-neutral-300
-        focus-within:shadow-[var(--shadow-card-hover)] focus-within:border-neutral-300
+        hover:shadow-[var(--shadow-card-hover)] hover:border-ink-300
+        focus-within:shadow-[var(--shadow-card-hover)] focus-within:border-ink-300
       "
       onClick={onClick}
       role={onClick ? 'button' : undefined}
@@ -356,7 +356,7 @@ export function RosterTile({ duty: d, onClick }: RosterTileProps) {
       </header>
 
       {/* Hairline divider */}
-      <div className="tile-route-row-divider border-t border-neutral-100" />
+      <div className="tile-route-row-divider border-t border-ink-100" />
 
       {/* ── Body ──────────────────────────────────────────────────────────── */}
       {flights ? (
@@ -365,7 +365,7 @@ export function RosterTile({ duty: d, onClick }: RosterTileProps) {
           <React.Fragment key={i}>
             <FlightRows f={f} compact={multi} />
             {i < flights.length - 1 && (
-              <div className="border-t border-dashed border-neutral-200/70 mx-3" />
+              <div className="border-t border-dashed border-ink-200/70 mx-3" />
             )}
           </React.Fragment>
         ))
@@ -382,7 +382,7 @@ export function RosterTile({ duty: d, onClick }: RosterTileProps) {
           Annual / medical leave skip this entirely. */}
       {!flights && d.startTime && (
         <>
-          <div className="border-t border-neutral-100" />
+          <div className="border-t border-ink-100" />
           <div className="tile-pad flex items-center gap-1.5 px-3 py-2">
             <span className="tile-time tabular-nums text-[15px] font-semibold text-ink-900">
               {d.startTime}
@@ -402,7 +402,7 @@ export function RosterTile({ duty: d, onClick }: RosterTileProps) {
       )}
 
       {/* Hairline divider */}
-      <div className="border-t border-neutral-100" />
+      <div className="border-t border-ink-100" />
 
       {/* ── Footer — work chip + crew status / pairing activity ───────────── */}
       <footer className="tile-pad flex items-center gap-2 px-3 py-2">

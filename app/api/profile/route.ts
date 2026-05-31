@@ -34,24 +34,29 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { full_name, rank, airline, fleet, base, bio, avatar_url } = body;
 
-    // Only persist the known profile fields — nothing else from the request body
+    const str = (v: unknown, max: number) => {
+      const s = String(v ?? '').trim();
+      if (s.length > max) throw Object.assign(new Error(`Field exceeds ${max} characters`), { status: 400 });
+      return s;
+    };
+
+    // Only persist known profile fields with enforced length limits
     const data: Record<string, string> = {};
-    if (full_name  !== undefined) data.full_name  = String(full_name);
-    if (rank       !== undefined) data.rank       = String(rank);
-    if (airline    !== undefined) data.airline    = String(airline);
-    if (fleet      !== undefined) data.fleet      = String(fleet);
-    if (base       !== undefined) data.base       = String(base);
-    if (bio        !== undefined) data.bio        = String(bio);
-    if (avatar_url !== undefined) data.avatar_url = String(avatar_url);
+    if (full_name  !== undefined) data.full_name  = str(full_name,  120);
+    if (rank       !== undefined) data.rank       = str(rank,        60);
+    if (airline    !== undefined) data.airline    = str(airline,     60);
+    if (fleet      !== undefined) data.fleet      = str(fleet,      120);
+    if (base       !== undefined) data.base       = str(base,        10);
+    if (bio        !== undefined) data.bio        = str(bio,        500);
+    if (avatar_url !== undefined) data.avatar_url = str(avatar_url, 500);
 
     await adminDb.collection('profiles').doc(uid).set(data, { merge: true });
 
     return NextResponse.json({ ok: true });
   } catch (err) {
+    const status = (err as { status?: number }).status ?? 500;
+    if (status === 400) return NextResponse.json({ error: (err as Error).message }, { status: 400 });
     console.error('[POST /api/profile]', err);
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : String(err) },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

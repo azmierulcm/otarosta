@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { StoriesTemplate } from '@/lib/recap/templates';
+import { verifyIdToken } from '@/lib/firebase/auth-helpers';
 import { computeRecap } from '@/lib/recap/compute';
 import { parsePeriodKey } from '@/lib/recap/period';
 import { getRecapFonts } from '@/lib/recap/og-fonts';
@@ -14,6 +15,14 @@ export async function GET(
 ) {
   try {
     const { userId, year, month } = await params;
+
+    const token = (req.headers.get('Authorization') ?? '').replace('Bearer ', '');
+    let uid: string;
+    try { uid = await verifyIdToken(token); } catch {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    if (uid !== userId) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+
     const download = new URL(req.url).searchParams.get('download') === '1';
 
     const periodKey = `${year}-${month.padStart(2, '0')}`;

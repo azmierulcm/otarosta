@@ -41,11 +41,16 @@
   --color-cloud:       #F1EFE8;
 
   /* ── Passport / story theme ───────────────────────────────────────────── */
-  --color-passport-bg:       #0A1520;
-  --color-passport-gold:     #C8A84B;
-  --color-passport-gold-soft:#BF9B3A;
-  --color-passport-secondary:#7A8EA0;
-  --color-passport-parchment:#F5EDD8;
+  --color-passport-bg:             #0A1520;
+  --color-passport-gold:           #C8A84B;
+  --color-passport-gold-soft:      #BF9B3A;
+  --color-passport-secondary:      #7A8EA0;
+  --color-passport-parchment:      #F5EDD8;
+  --color-passport-text:           #EDE8DC;
+  --color-passport-text-secondary: #9EB3C8;
+  --color-passport-text-tertiary:  #6A8098;
+  --color-passport-surface:        #142535;
+  --color-passport-border:         #1F3248;
 
   /* Region patches */
   --color-patch-sea: var(--patch-sea);
@@ -80,6 +85,19 @@
   --color-mint-50:  #E8F4EF;
   --color-mint-500: #10A573;
   --color-mint-700: #0A6A4D;
+
+  /* Duty tile status palette — RosterTile bands & chips */
+  --color-duty-flight-bg:    #f0f9ff;
+  --color-duty-flight-text:  #0369a1;
+  --color-duty-flight-no:    #15803d;
+  --color-duty-standby-bg:   #fefce8;
+  --color-duty-standby-text: #854d0e;
+  --color-duty-off-bg:       #f0fdf4;
+  --color-duty-off-text:     #15803d;
+  --color-duty-leave-bg:     #fef2f2;
+  --color-duty-leave-text:   #7f1d1d;
+  --color-duty-sim-bg:       #f0fdfa;
+  --color-duty-sim-text:     #0f766e;
 
   /* Radii */
   --radius-sm: 6px;

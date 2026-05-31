@@ -72,6 +72,9 @@ export async function POST(req: NextRequest) {
     if (!description || description.trim().length < 10) {
       return NextResponse.json({ error: 'Description too short.' }, { status: 400 });
     }
+    if (description.trim().length > 5000) {
+      return NextResponse.json({ error: 'Description too long (max 5000 characters).' }, { status: 400 });
+    }
 
     // Sanitise all user-supplied strings that appear in HTML email
     const safeDescription  = escHtml(String(description).trim());

@@ -41,7 +41,7 @@ export const Footer = () => {
 
           {/* Product */}
           <div>
-            <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-text-subtle mb-8 font-mono">{"// PRODUCT"}</h4>
+            <p className="text-[10px] font-black uppercase tracking-[0.3em] text-text-subtle mb-8 font-mono">{"// PRODUCT"}</p>
             <ul className="space-y-4">
               <li><Link href="/profile" className="text-sm font-bold text-text-muted hover:text-text transition-colors">Digital Passport</Link></li>
               <li>
@@ -54,7 +54,7 @@ export const Footer = () => {
 
           {/* Supported Airlines */}
           <div>
-            <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-text-subtle mb-8 font-mono">{"// FLEET SUPPORT"}</h4>
+            <p className="text-[10px] font-black uppercase tracking-[0.3em] text-text-subtle mb-8 font-mono">{"// FLEET SUPPORT"}</p>
             <ul className="space-y-4">
               <li className="flex items-center gap-3">
                 <span className="w-2 h-2 rounded-full bg-success shadow-[0_0_10px_rgba(0,138,5,0.3)]" />
@@ -73,7 +73,7 @@ export const Footer = () => {
 
           {/* Legal */}
           <div>
-            <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-text-subtle mb-8 font-mono">{"// LEGAL"}</h4>
+            <p className="text-[10px] font-black uppercase tracking-[0.3em] text-text-subtle mb-8 font-mono">{"// LEGAL"}</p>
             <ul className="space-y-4">
               <li><Link href="/privacy" className="text-sm font-bold text-text-muted hover:text-text transition-colors">Privacy Policy</Link></li>
               <li><Link href="/terms" className="text-sm font-bold text-text-muted hover:text-text transition-colors">Terms of Service</Link></li>

@@ -19,7 +19,7 @@ export const PATCH_IMAGE_MAP: Record<string, string> = {
   SBW: 'sibu_patch.png',
   TWU: 'tawau_patch.png',
   BTU: 'bintulu_patch.png',
-  AOR: 'alor_setar_patch',       // no extension — file uploaded without .png
+  AOR: 'alor_setar_patch.png',
   KUA: 'kuantan_patch.png',
   // Southeast Asia
   SIN: 'singapore_patch.png',
@@ -33,7 +33,7 @@ export const PATCH_IMAGE_MAP: Record<string, string> = {
   BPN: 'balikpapan_patch.png',
   PKU: 'pekanbaru_patch.png',
   KNO: 'medan_patch.png',
-  JOG: 'yogyakarta_patch',       // no extension
+  JOG: 'yogyakarta_patch.png',
   MNL: 'manila_patch.png',
   RGN: 'yangon_patch.png',
   HAN: 'hanoi_patch.png',
@@ -63,7 +63,7 @@ export const PATCH_IMAGE_MAP: Record<string, string> = {
   PER: 'perth_patch.png',
   BNE: 'brisbane_patch.png',
   AKL: 'auckland_patch.png',
-  ADL: 'adelaide_patch',         // no extension
+  ADL: 'adelaide_patch.png',
   // Middle East
   DOH: 'doha_patch.png',
   JED: 'jeddah_patch.png',

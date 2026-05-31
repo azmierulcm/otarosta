@@ -60,7 +60,7 @@ export function BottomNav() {
               </motion.div>
 
               <span
-                className={`text-[9px] font-bold uppercase tracking-wide ${
+                className={`text-[10px] font-bold uppercase tracking-wide ${
                   isActive ? 'text-accent' : 'text-text-muted'
                 }`}
               >
