@@ -189,7 +189,7 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
                   {
                     icon: Calendar,
                     title: 'Synced calendar',
-                    desc: 'Every duty imported into iPhone, Google, or any calendar app — automatically.',
+                    desc: 'Once your PDF is parsed, export an ICS file to iPhone, Android, or any calendar app — automatically.',
                     color: 'bg-blue-50 text-blue-600',
                   },
                   {
