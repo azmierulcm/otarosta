@@ -43,6 +43,7 @@ export const Footer = () => {
           <div>
             <p className="text-[10px] font-black uppercase tracking-[0.3em] text-text-subtle mb-8 font-mono">{"// PRODUCT"}</p>
             <ul className="space-y-4">
+              <li><Link href="/guide" className="text-sm font-bold text-text-muted hover:text-text transition-colors">How It Works</Link></li>
               <li><Link href="/profile" className="text-sm font-bold text-text-muted hover:text-text transition-colors">Digital Passport</Link></li>
               <li>
                 <Link href="/marketplace" className="text-sm font-bold text-text-muted hover:text-text transition-colors">
