@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { getPatchImageUrl } from "@/lib/patches/patch-images";
 
 /* ============================================================================
  * RosterCard — Instagram Stories-style summary card for pilots & cabin crew
@@ -281,7 +282,7 @@ const pctDelta = (now: number, prev: number) => Math.round(((now - prev) / prev)
 
 // ---------- component --------------------------------------------------------
 
-const MAX_STAMPS_GRID = 32; // 4 cols × 8 rows
+const MAX_STAMPS_GRID = 16; // 2 cols × 8 rows
 
 function handleShare() {
   const url = window.location.href;
@@ -512,18 +513,25 @@ export default function RosterCard({ defaultRole = "pilot", defaultPeriod = "mon
             {/* Divider */}
             <div className="w-full border-t border-[#EEEEEE] mb-4" />
 
-            {/* Stamps grid or count fallback */}
+            {/* City patches grid or count fallback */}
             {allStamps.length <= MAX_STAMPS_GRID ? (
-              <div className="grid grid-cols-4 gap-2 flex-1 content-start">
-                {allStamps.map(({ iata, flag }) => (
-                  <div
-                    key={iata}
-                    className="flex flex-col items-center justify-center gap-0.5 rounded-2xl bg-white py-2.5 px-1 ring-1 ring-black/5"
-                  >
-                    <span className="text-[18px] leading-none">{flag}</span>
-                    <span className="text-[9px] font-bold tracking-wider text-[#717171] mt-0.5">{iata}</span>
-                  </div>
-                ))}
+              <div className="grid grid-cols-2 gap-3 flex-1 content-start">
+                {allStamps.map(({ iata, flag }) => {
+                  const patchUrl = getPatchImageUrl(iata);
+                  return (
+                    <div key={iata} className="flex flex-col items-center gap-1.5">
+                      <div className="w-full aspect-square rounded-2xl bg-[#F7F5F0] ring-1 ring-black/5 flex items-center justify-center overflow-hidden p-3">
+                        {patchUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={patchUrl} alt={iata} className="w-full h-full object-contain" />
+                        ) : (
+                          <span className="text-4xl leading-none">{flag}</span>
+                        )}
+                      </div>
+                      <span className="text-[10px] font-bold tracking-[0.12em] text-[#717171]">{iata}</span>
+                    </div>
+                  );
+                })}
               </div>
             ) : (
               <div className="flex flex-1 flex-col items-center justify-center gap-3">
