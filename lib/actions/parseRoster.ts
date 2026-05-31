@@ -304,6 +304,11 @@ export async function saveConfirmedRoster(
     // saveRoster verifies the token internally and uses the derived uid.
     const { rosterId, calendarSecret } = await saveRoster(token, previewData, icsContent);
 
+    // ── Fire-and-forget: schedule 6-hour pre-flight push reminders ───────
+    import('@/lib/push/schedule-reminders').then(({ scheduleFlightReminders }) =>
+      scheduleFlightReminders(userId, previewData.events, previewData.year, previewData.month),
+    ).catch(() => { /* non-critical — reminders best-effort */ });
+
     // ── Fire-and-forget parse feedback ────────────────────────────────────
     // Runs after the roster is saved — never blocks the response to the user.
     if (previewData.parseReport) {

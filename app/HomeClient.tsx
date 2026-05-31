@@ -8,6 +8,7 @@ import { Footer } from '@/components/shared/Footer';
 import { useRoster } from '@/lib/contexts/RosterContext';
 import { AnimatePresence, motion } from 'framer-motion';
 import { AuthModal } from '@/components/shared/AuthModal';
+import { NotificationPrompt } from '@/components/shared/NotificationPrompt';
 import { useAuth } from '@/lib/contexts/AuthContext';
 
 // ── Below-fold marketing sections ─────────────────────────────────────────────
@@ -181,6 +182,9 @@ export default function HomeClient() {
 
       {/* Footer shown in non-dashboard states (landing already includes its own) */}
       {user && !activeRoster && <Footer />}
+
+      {/* 6-hour pre-flight push notification prompt — auth-gated, delayed 4s */}
+      <NotificationPrompt />
     </main>
   );
 }
