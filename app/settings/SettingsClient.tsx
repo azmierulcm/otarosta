@@ -262,27 +262,6 @@ export default function SettingsClient() {
   return (
     <div className="max-w-2xl mx-auto px-4 pt-20 pb-24">
 
-      {/* Onboarding welcome banner */}
-      {isOnboarding && (
-        <div className="mb-10 p-6 rounded-[2rem] bg-accent/5 border border-accent/15">
-          {/* Heading with flip language effect */}
-          <h2 className="text-2xl md:text-3xl font-black tracking-tighter text-text leading-none mb-3 flex items-baseline gap-2 flex-wrap">
-            Welcome Aboard.
-            <FlipWords
-              words={['Selamat Datang.', '欢迎登机.', 'Bienvenue.', 'Bienvenido.', '搭乗歡迎.', 'Willkommen.', 'أهلاً بك.']}
-              duration={3200}
-              className="text-accent italic"
-            />
-          </h2>
-
-          {/* Subtitle */}
-          <p className="text-[14px] text-text-muted font-bold leading-snug max-w-lg">
-            A few details first — your name and rank help us personalise everything from your dashboard to your digital passport.{' '}
-            <span className="text-text">Your passport and recap cards will thank you.</span>
-          </p>
-        </div>
-      )}
-
       {/* Page title */}
       <div className="mb-10">
         <div className="text-[10px] font-black uppercase tracking-[0.4em] text-text-subtle font-mono mb-3">
