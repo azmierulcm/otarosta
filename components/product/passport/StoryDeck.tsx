@@ -444,7 +444,7 @@ function OutroSlide({
 export default function StoryDeck() {
   const router = useRouter();
   const { user, profile, isLoading: isAuthLoading } = useAuth();
-  const { rosters } = useRoster();
+  const { rosters, isLoadingList } = useRoster();
 
   const [slides, setSlides]         = useState<Slide[]>([]);
   const [isDataLoading, setLoading] = useState(true);
@@ -465,15 +465,26 @@ export default function StoryDeck() {
   pausedRef.current = isPaused;
   lenRef.current    = slides.length;
 
-  // ── Data fetch ──────────────────────────────────────────────────────────────
+  // ── Auth redirect — unauthenticated users sent back to passport ────────────
   useEffect(() => {
     if (isAuthLoading) return;
+    if (!user) router.replace('/passport');
+  }, [isAuthLoading, user, router]);
+
+  // ── Data fetch — wait for BOTH auth and roster list to settle ───────────────
+  useEffect(() => {
+    // Don't run until Firebase Auth has resolved AND the roster list fetch is done.
+    // Without the isLoadingList guard, the effect fires once with rosters=[]
+    // (km=0, sectors=0) and shows DEMO_SLIDES before real data arrives.
+    if (isAuthLoading || isLoadingList) return;
+    if (!user) return; // redirect handled above
+
     (async () => {
       try {
-        const earned = user ? await getLifetimeDestinations(user.uid) : [];
+        const earned = await getLifetimeDestinations(user.uid);
         const stats  = computeLifetimeStats(rosters, earned.filter(d => !d.isHome).length);
         const blockMinutes = rosters.reduce((s, r) => s + (r.totalBlockMinutes ?? 0), 0);
-        const name = profile?.full_name || user?.displayName || user?.email?.split('@')[0] || 'Crew';
+        const name = profile?.full_name || user.displayName || user.email?.split('@')[0] || 'Crew';
         const { CATALOG_SIZE } = await import('@/lib/data/destination-catalog');
 
         const built = stats.sectors > 0 || stats.km > 0
@@ -485,7 +496,7 @@ export default function StoryDeck() {
         setLoading(false);
       }
     })();
-  }, [isAuthLoading, user, profile, rosters]);
+  }, [isAuthLoading, isLoadingList, user, profile, rosters]);
 
   // ── Audio ───────────────────────────────────────────────────────────────────
   const audioCtxRef = useRef<AudioContext | null>(null);
