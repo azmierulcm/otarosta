@@ -65,6 +65,38 @@ const DUTY_CONFIG = {
   },
 } as const;
 
+/** Days with no roster event that fall between a layover departure and return. */
+function computeLayoverRestDates(events: DutyEvent[]): Set<string> {
+  const depCounts = new Map<string, number>();
+  for (const e of events) {
+    if (e.type === 'FLIGHT' && e.depPort)
+      depCounts.set(e.depPort, (depCounts.get(e.depPort) ?? 0) + 1);
+  }
+  let base = 'KUL', best = 0;
+  for (const [port, count] of depCounts)
+    if (count > best) { best = count; base = port; }
+
+  // date → last arrPort of that day's flights
+  const lastArr = new Map<string, string>();
+  for (const e of events)
+    if (e.type === 'FLIGHT' && e.arrPort) lastArr.set(e.date, e.arrPort);
+
+  const eventDates = new Set(events.map(e => e.date));
+  const layoverRestDates = new Set<string>();
+
+  for (const [date, arrPort] of lastArr) {
+    if (arrPort === base) continue;
+    const d = new Date(date + 'T00:00:00');
+    for (let i = 0; i < 30; i++) {
+      d.setDate(d.getDate() + 1);
+      const ds = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      if (eventDates.has(ds)) break;
+      layoverRestDates.add(ds);
+    }
+  }
+  return layoverRestDates;
+}
+
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -85,18 +117,21 @@ function DayCell({
   events,
   isToday,
   isSelected,
+  isLayoverRest,
   onSelect,
 }: {
   dayNum: number;
   events: DutyEvent[];
   isToday: boolean;
   isSelected: boolean;
+  isLayoverRest: boolean;
   onSelect: () => void;
 }) {
   const primary = primaryEvent(events);
   const cfg     = primary ? (DUTY_CONFIG[primary.type] ?? DUTY_CONFIG.OTHER) : null;
   const isOff   = primary?.type === 'OFF';
   const sectors = events.filter(e => e.type === 'FLIGHT').length;
+  const flightCfg = DUTY_CONFIG.FLIGHT;
 
   return (
     <div
@@ -105,12 +140,12 @@ function DayCell({
         relative flex flex-col items-center justify-center
         rounded-2xl aspect-square cursor-pointer select-none
         transition-all duration-150 hover:opacity-75
-        ${cfg && !isOff ? cfg.bg : ''}
+        ${cfg && !isOff ? cfg.bg : isLayoverRest ? flightCfg.bg : ''}
       `}
     >
       <span className={`
         text-[13px] font-[700] leading-none font-mono
-        ${cfg && !isOff ? cfg.text : isToday ? 'text-accent font-[800]' : 'text-text-subtle'}
+        ${cfg && !isOff ? cfg.text : isLayoverRest ? flightCfg.text : isToday ? 'text-accent font-[800]' : 'text-text-subtle'}
       `}>
         {dayNum}
       </span>
@@ -119,6 +154,10 @@ function DayCell({
         sectors > 1
           ? <span className={`mt-0.5 text-[7px] font-[800] font-mono opacity-70 ${cfg.text}`}>{sectors}×</span>
           : <div className={`mt-1 w-1 h-1 rounded-full ${cfg.dot} opacity-70`} />
+      )}
+
+      {!cfg && isLayoverRest && (
+        <div className={`mt-1 w-1 h-1 rounded-full ${flightCfg.dot} opacity-70`} />
       )}
 
       {/* Selected ring */}
@@ -149,6 +188,8 @@ export const DutyCalendar = ({ onExport }: { onExport?: () => void } = {}) => {
     return acc;
   }, {});
 
+  const layoverRestDates = computeLayoverRestDates(roster.events);
+
   const [firstEvent] = roster.events;
   const dateObj = new Date(firstEvent?.date || `${roster.year}-${roster.month}-01`);
   const year    = dateObj.getFullYear();
@@ -167,9 +208,10 @@ export const DutyCalendar = ({ onExport }: { onExport?: () => void } = {}) => {
   });
 
   /* ── Selected day detail ── */
-  const selEvents  = selectedDate ? (eventsByDate[selectedDate] ?? []) : [];
-  const selPrimary = selEvents.length > 0 ? primaryEvent(selEvents) : null;
-  const selCfg     = selPrimary ? (DUTY_CONFIG[selPrimary.type] ?? DUTY_CONFIG.OTHER) : null;
+  const selEvents      = selectedDate ? (eventsByDate[selectedDate] ?? []) : [];
+  const selPrimary     = selEvents.length > 0 ? primaryEvent(selEvents) : null;
+  const selCfg         = selPrimary ? (DUTY_CONFIG[selPrimary.type] ?? DUTY_CONFIG.OTHER) : null;
+  const selIsLayoverRest = selectedDate ? layoverRestDates.has(selectedDate) : false;
   const selFlights = selEvents.filter(e => e.type === 'FLIGHT');
   const selDayNum  = selectedDate ? parseInt(selectedDate.split('-')[2], 10) : null;
   const selLabel   = selDayNum ? `${MONTHS[month].slice(0, 3).toUpperCase()} ${selDayNum}` : null;
@@ -208,6 +250,7 @@ export const DutyCalendar = ({ onExport }: { onExport?: () => void } = {}) => {
               events={day.events}
               isToday={day.date === todayStr}
               isSelected={day.date === selectedDate}
+              isLayoverRest={layoverRestDates.has(day.date)}
               onSelect={() => setSelectedDate(day.date)}
             />
           ))}
@@ -256,6 +299,13 @@ export const DutyCalendar = ({ onExport }: { onExport?: () => void } = {}) => {
                   )}
                 </>
               )}
+            </>
+          ) : selIsLayoverRest ? (
+            <>
+              <span className={`text-[11px] font-[800] font-mono px-3 py-1.5 rounded-full shrink-0 ${DUTY_CONFIG.FLIGHT.pill}`}>
+                {selLabel}
+              </span>
+              <span className={`text-[14px] font-[700] ${DUTY_CONFIG.FLIGHT.text}`}>Rest day</span>
             </>
           ) : (
             <>
